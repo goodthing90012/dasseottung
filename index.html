@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>다썼텅 - Das sutt Tung (V5.7)</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#FF5A5F">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="다썼텅">
+    <style>
+        :root {
+            --primary: #FF5A5F;
+            --bg: #F7F9FA;
+            --card: #FFFFFF;
+            --text: #333333;
+            --gray: #888888;
+            --light-gray: #EEE;
+            --accent: #FF922B;
+            --sub-tab-bg: #EAECEF;
+            --liquid-full: #FF7A7E;
+            --cycle-blue: #007AFF;
+            --used-purple: #7C5CFF;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #222; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        
+        .phone-mockup { width: 360px; height: 740px; background-color: var(--bg); border-radius: 36px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); border: 12px solid #111; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+        
+        .header { background-color: var(--card); padding: 18px 16px 12px; border-bottom: 1px solid #eee; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .header-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 22px; color: var(--primary); letter-spacing: -0.5px; }
+        .header span { color: #111; font-weight: 400; font-size: 12px; display: block; margin-top: 2px; opacity: 0.6; }
+        
+        .content { padding: 16px; flex: 1; overflow-y: auto; display: none; }
+        .content.active { display: block; }
+        
+        .sub-tab-container { display: flex; background: var(--sub-tab-bg); padding: 4px; border-radius: 10px; margin-bottom: 16px; }
+        .sub-tab-item { flex: 1; text-align: center; padding: 8px; font-size: 12px; font-weight: bold; color: var(--gray); cursor: pointer; border-radius: 8px; transition: 0.2s; }
+        .sub-tab-item.active { background: white; color: #111; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+        
+        .sub-content { display: none; }
+        .sub-content.active { display: block; }
+
+        .add-form, .setting-form { background: var(--card); padding: 14px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { font-size: 11px; font-weight: bold; color: var(--gray); display: block; margin-bottom: 4px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; font-size: 14px; background-color: #fff; color: #333; }
+        
+        .cycle-quick-row { display: flex; gap: 6px; margin-bottom: 8px; }
+        .btn-quick-cycle { flex: 1; background: #FFF0F1; color: var(--primary); border: 1px solid #FFD9DA; padding: 8px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; transition: 0.15s; }
+        .btn-quick-cycle:hover, .btn-quick-cycle.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .preset-scroll { display: flex; gap: 8px; overflow-x: auto; padding: 4px 4px 12px 4px; margin-top: 4px; scrollbar-width: none; -ms-overflow-style: none; }
+        .preset-scroll::-webkit-scrollbar { display: none; }
+        .preset-btn { flex: 0 0 auto; background: #FFF4E6; color: var(--accent); border: 1px solid #FFE8CC; padding: 8px 14px; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .preset-btn:active { background: var(--accent); color: white; }
+
+        .filter-section { background: var(--card); padding: 12px; border-radius: 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .filter-group { display: flex; gap: 8px; margin-top: 6px; }
+        .filter-select { padding: 8px; font-size: 12px; border-radius: 8px; border: 1px solid #ddd; flex: 1; }
+
+        .btn-add, .btn-save { background-color: var(--primary); color: white; border: none; width: 100%; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 14px; }
+        
+        .section-title { font-size: 14px; color: var(--gray); margin-bottom: 8px; font-weight: bold; }
+        .product-card, .list-item-card { background: var(--card); padding: 14px; border-radius: 16px; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+        
+        .prod-info { flex: 1; }
+        .prod-name { font-weight: bold; font-size: 16px; margin-bottom: 4px; color: #111; }
+        .prod-status { font-size: 12px; color: #555; line-height: 1.4; margin-top: 6px; }
+        .prod-used { font-size: 11px; color: var(--used-purple); font-weight: bold; margin-top: 2px; }
+        
+        .badge { display: inline-block; padding: 3px 6px; border-radius: 6px; font-size: 10px; font-weight: bold; margin-top: 4px; margin-right: 4px; }
+        .badge.enough { background: #E6F7ED; color: #1EA94A; }
+        .badge.danger { background: #FFEBEB; color: #FF3B30; }
+        .badge.neutral { background: #F0F0F0; color: #777; }
+        .badge.category-tag { background: #FFF4E6; color: var(--accent); }
+        .badge.cycle-tag { background: #E8F2FF; color: var(--cycle-blue); }
+        
+        .inline-select { padding: 4px 8px; font-size: 11px; border-radius: 6px; border: 1px solid #ddd; margin-top: 6px; width: auto; color: #555; background-color: #f9f9f9; }
+        
+        .stock-control { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+        .btn-qty { background: #F0F0F0; border: none; width: 26px; height: 26px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        
+        .right-actions { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; height: 95px; gap: 4px; }
+        .btn-del-action { background: none; border: none; color: #FF3B30; font-size: 11px; cursor: pointer; padding: 2px; font-weight: bold; }
+
+        /* tung animations */
+        /* 꾹 눌림: 아래로 찌그러졌다 위로 탱! 바운스 */
+        @keyframes tung-bounce-press {
+            0%   { transform: scale(1, 1)    translateY(0px);  }
+            18%  { transform: scale(1.18, 0.78) translateY(4px);  }
+            38%  { transform: scale(0.88, 1.16) translateY(-6px); }
+            55%  { transform: scale(1.08, 0.93) translateY(2px);  }
+            72%  { transform: scale(0.97, 1.05) translateY(-1px); }
+            100% { transform: scale(1, 1)    translateY(0px);  }
+        }
+
+        @keyframes tung-idle-wobble {
+            0%, 100% { transform: rotate(0deg); }
+            20%       { transform: rotate(-6deg); }
+            40%       { transform: rotate(5deg); }
+            60%       { transform: rotate(-4deg); }
+            80%       { transform: rotate(3deg); }
+        }
+        @keyframes tung-press {
+            0%   { transform: scale(1) rotate(0deg); }
+            20%  { transform: scale(0.85) rotate(-8deg); }
+            50%  { transform: scale(1.1) rotate(6deg); }
+            75%  { transform: scale(0.95) rotate(-3deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+        @keyframes tung-empty-shake {
+            0%   { transform: scale(1)    rotate(0deg);  }
+            10%  { transform: scale(0.82) rotate(-11deg);}
+            25%  { transform: scale(1.18) rotate(10deg); }
+            40%  { transform: scale(0.9)  rotate(-8deg); }
+            55%  { transform: scale(1.1)  rotate(7deg);  }
+            70%  { transform: scale(0.95) rotate(-4deg); }
+            85%  { transform: scale(1.04) rotate(2deg);  }
+            100% { transform: scale(1)    rotate(0deg);  }
+        }
+        @keyframes sparkle-pop {
+            0%   { opacity: 0; transform: scale(0) translate(0,0); }
+            40%  { opacity: 1; transform: scale(1.2) translate(var(--tx), var(--ty)); }
+            100% { opacity: 0; transform: scale(0.6) translate(calc(var(--tx)*1.6), calc(var(--ty)*1.6)); }
+        }
+        @keyframes idle-glow {
+            0%, 100% { filter: drop-shadow(0 0 0px rgba(255,90,95,0)); }
+            50%       { filter: drop-shadow(0 0 6px rgba(255,90,95,0.55)); }
+        }
+        .tung-bottle-wrapper {
+            position: relative; width: 54px; height: 72px; cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+            animation: idle-glow 2.4s ease-in-out infinite;
+        }
+        .tung-bottle-wrapper:hover {
+            animation: tung-idle-wobble 0.7s ease-in-out infinite, idle-glow 2.4s ease-in-out infinite;
+        }
+        .tung-bottle-wrapper.pressing {
+            animation: tung-bounce-press 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards !important;
+        }
+        .tung-bottle-wrapper.shaking {
+            animation: tung-empty-shake 0.7s cubic-bezier(.36,.07,.19,.97) forwards !important;
+        }
+        .tung-bottle-svg { width: 100%; height: 100%; overflow: visible; }
+        .liquid-layer { transition: transform 0.4s ease-out; transform-origin: bottom; }
+        .tung-text {
+            font-size: 11px; font-weight: 900; color: var(--primary);
+            margin-top: 3px; text-align: center; line-height: 1;
+            pointer-events: none; letter-spacing: -0.5px;
+        }
+        .tung-bottle-wrapper.empty .tung-text { color: #FF3B30; }
+        .sparkle {
+            position: absolute; pointer-events: none; font-size: 11px; opacity: 0;
+            animation: sparkle-pop 0.55s ease-out forwards;
+        }
+
+        .tab-bar { background: var(--card); border-top: 1px solid var(--light-gray); display: flex; height: 60px; z-index: 10; }
+        .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: var(--gray); cursor: pointer; font-weight: bold; }
+        .tab-item.active { color: var(--primary); }
+        .tab-icon { font-size: 18px; margin-bottom: 2px; }
+
+        .toast { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: white; padding: 12px 20px; border-radius: 24px; font-size: 13px; display: none; z-index: 100; text-align: center; width: 80%; }
+        .sale-info-bar { background: #111; color: white; padding: 12px; text-align: center; font-size: 12px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="phone-mockup">
+    <div class="header">
+        <div class="header-brand">
+            <!-- 화장품 통을 손가락으로 누르는 로고 -->
+            <svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;">
+              <!-- 화장품 통 몸체 -->
+              <rect x="10" y="18" width="22" height="24" rx="4" fill="#FFD6D7" stroke="var(--primary)" stroke-width="2"/>
+              <!-- 펌프 헤드 -->
+              <rect x="16" y="10" width="10" height="8" rx="3" fill="white" stroke="var(--primary)" stroke-width="2"/>
+              <!-- 펌프 스템 -->
+              <line x1="21" y1="10" x2="21" y2="6" stroke="var(--primary)" stroke-width="2" stroke-linecap="round"/>
+              <!-- 펌프 노즐 (수평) -->
+              <line x1="21" y1="6" x2="30" y2="6" stroke="var(--primary)" stroke-width="2" stroke-linecap="round"/>
+              <!-- 내용물 (분홍 액체) -->
+              <rect x="12" y="26" width="18" height="14" rx="2" fill="#FF5A5F" opacity="0.35"/>
+              <!-- 손가락 -->
+              <path d="M28 9 C30 7, 36 6, 38 8 C40 10, 38 13, 36 13 L30 13 C29 13, 28 12, 28 11 Z" fill="#FFDBC1" stroke="#D4956A" stroke-width="1.2"/>
+              <!-- 손가락 관절선 -->
+              <line x1="31" y1="8.5" x2="31" y2="12" stroke="#D4956A" stroke-width="0.8" stroke-linecap="round"/>
+              <line x1="34" y1="7.8" x2="34" y2="12" stroke="#D4956A" stroke-width="0.8" stroke-linecap="round"/>
+              <!-- 반짝이 하이라이트 -->
+              <ellipse cx="15" cy="23" rx="2" ry="3" fill="white" opacity="0.3"/>
+            </svg>
+            다썼텅
+        </div>
+        <span>화장품 소비 & 리필 타이밍 메이트</span>
+    </div>
+    <div class="sale-info-bar">💡 텅을 누를수록 내 소진 패턴이 더 정확해져요</div>
+    
+    <!-- 탭 1: 내 화장대 -->
+    <div id="tab-home" class="content active">
+        <div class="add-form">
+            <div class="section-title">내 화장대에 새 제품 추가</div>
+            <div class="form-group"><input type="text" id="prodName" placeholder="제품명 입력 (예: 독도 토너)"></div>
+            <div class="form-group">
+                <label>카테고리 선택 (권장 사용 주기 자동 반영)</label>
+                <select id="prodCategorySelect"></select>
+            </div>
+            <div class="form-group">
+                <label>연동할 세일/구매 일정</label>
+                <select id="prodScheduleTarget"></select>
+            </div>
+            <div class="form-group">
+                <label>언제부터 쓰기 시작했나요? (이미 쓰던 제품이면 변경)</label>
+                <input type="date" id="prodOpenedDate">
+            </div>
+            <button class="btn-add" onclick="addProduct()">화장대에 추가</button>
+        </div>
+
+        <div class="filter-section">
+            <div class="section-title" style="margin-bottom:4px;">🔍 리스트 필터링</div>
+            <div class="filter-group">
+                <select id="filterCategory" class="filter-select" onchange="renderProducts()">
+                    <option value="all">전체 카테고리</option>
+                </select>
+                <select id="filterSchedule" class="filter-select" onchange="renderProducts()">
+                    <option value="all">전체 세일 일정</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="section-title">내 화장대 재고 현황</div>
+        <div id="productList"></div>
+    </div>
+
+    <!-- 탭 2: 마이페이지 (환경 설정) -->
+    <div id="tab-mypage" class="content">
+        <div class="sub-tab-container">
+            <div id="sub-btn-cat" class="sub-tab-item active" onclick="switchSubTab('cat')">📂 카테고리 설정</div>
+            <div id="sub-btn-sched" class="sub-tab-item" onclick="switchSubTab('sched')">🗓️ 세일·구매 설정</div>
+            <div id="sub-btn-backup" class="sub-tab-item" onclick="switchSubTab('backup')">💾 데이터 백업</div>
+        </div>
+
+        <!-- 서브 탭: 카테고리 관리 -->
+        <div id="sub-content-cat" class="sub-content active">
+            <div class="setting-form">
+                <div class="section-title">📂 카테고리 빠른 생성 프리셋</div>
+                <div class="preset-scroll">
+                    <button class="preset-btn" onclick="applyPreset('토너 / 에센스', 60)">🧴 토너 (60일)</button>
+                    <button class="preset-btn" onclick="applyPreset('선크림', 40)">☀️ 선크림 (40일)</button>
+                    <button class="preset-btn" onclick="applyPreset('수분 크림', 50)">🧴 수분크림 (50일)</button>
+                    <button class="preset-btn" onclick="applyPreset('클렌징 폼', 90)">🧼 클렌징폼 (90일)</button>
+                    <button class="preset-btn" onclick="applyPreset('아이크림', 120)">👀 아이크림 (120일)</button>
+                    <button class="preset-btn" onclick="applyPreset('마스크팩', 30)">🎭 마스크팩 (30일)</button>
+                    <button class="preset-btn" onclick="applyPreset('바디로션', 75)">🧴 바디로션 (75일)</button>
+                    <button class="preset-btn" onclick="applyPreset('샴푸', 90)">🧼 샴푸 (90일)</button>
+                </div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label>카테고리명</label>
+                    <input type="text" id="newCatName" placeholder="예: 수분 앰플">
+                </div>
+                <div class="form-group">
+                    <label>소진 주기 (일 수)</label>
+                    <input type="number" id="newCatDays" placeholder="예: 45">
+                </div>
+                <button class="btn-save" style="background-color: var(--accent);" onclick="addCustomCategory()">카테고리 저장</button>
+            </div>
+            <div class="section-title">활성화된 내 카테고리 목록</div>
+            <div id="customCategoryList"></div>
+        </div>
+
+        <!-- 서브 탭: 일정 관리 -->
+        <div id="sub-content-sched" class="sub-content">
+            <div class="setting-form">
+                <div class="section-title">🗓️ 새 세일 및 구매 루틴 추가</div>
+                <div class="form-group">
+                    <label>일정 / 브랜드 이름</label>
+                    <input type="text" id="schedName" placeholder="예: 시드물 정기 구독, 올영세일">
+                </div>
+                <div class="form-group">
+                    <label>구매 예정 날짜 선택 (실시간 디데이 연동)</label>
+                    <input type="date" id="schedTargetDate">
+                </div>
+                <div class="form-group">
+                    <label>주기 퀵 템플릿 (해당 개월 후 날짜 자동 연산)</label>
+                    <div class="cycle-quick-row">
+                        <button class="btn-quick-cycle" onclick="selectQuickCycle(1)">1개월 후</button>
+                        <button class="btn-quick-cycle" onclick="selectQuickCycle(2)">2개월 후</button>
+                        <button class="btn-quick-cycle" onclick="selectQuickCycle(3)">3개월 후</button>
+                        <button class="btn-quick-cycle" onclick="selectQuickCycle(6)">6개월 후</button>
+                    </div>
+                </div>
+                <button class="btn-save" onclick="addCustomSchedule()">일정 / 주기 저장</button>
+            </div>
+            <div class="section-title">등록된 구매 및 세일 일정</div>
+            <div id="scheduleList"></div>
+        </div>
+
+        <!-- 서브 탭: 데이터 백업 -->
+        <div id="sub-content-backup" class="sub-content">
+            <div class="setting-form">
+                <div class="section-title">💾 백업 파일 내려받기</div>
+                <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
+                    지금까지 등록한 제품, 카테고리, 세일·구매 일정을 파일 하나로 저장해요.<br>
+                    브라우저 데이터를 지우거나 폰을 바꿀 때 미리 받아두면 안전해요.
+                </div>
+                <button class="btn-save" onclick="exportBackup()">📥 백업 파일 내려받기</button>
+            </div>
+            <div class="setting-form">
+                <div class="section-title">📂 백업 파일 불러오기</div>
+                <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
+                    이전에 내려받은 백업 파일(.json)을 선택하면 지금 데이터를 덮어써요.
+                </div>
+                <input type="file" id="backupFileInput" accept="application/json" style="display:none;" onchange="importBackup(this.files[0])">
+                <button class="btn-save" style="background-color: var(--accent);" onclick="document.getElementById('backupFileInput').click()">📤 백업 파일 선택해서 불러오기</button>
+            </div>
+            <div style="font-size:11px; color:var(--gray); text-align:center; margin-top:8px;">
+                마지막 자동 저장: <span id="lastSavedAt">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 하단 탭 바 -->
+    <div class="tab-bar">
+        <div class="tab-item active" id="btn-tab-home" onclick="switchTab('home')">
+            <span class="tab-icon">🧴</span>
+            <span>내 화장대</span>
+        </div>
+        <div class="tab-item" id="btn-tab-mypage" onclick="switchTab('mypage')">
+            <span class="tab-icon">👤</span>
+            <span>마이페이지</span>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+</div>
+
+<script>
+    // [Core] 타임존 오차 없는 순수 오늘 날짜(00:00:00) 타임스탬프 구하기
+    const getTodayTimeline = () => {
+        const d = new Date();
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    };
+
+    // 타임스탬프를 YYYY-MM-DD 규격 문자열로 포맷팅
+    const formatDateString = (timestamp) => {
+        const d = new Date(timestamp);
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${d.getFullYear()}-${mm}-${dd}`;
+    };
+
+    // 인풋 데이터 로컬 날짜 기준 타임스탬프 파싱 알고리즘
+    const parseInputDateToTimestamp = (dateString) => {
+        const parts = dateString.split('-');
+        if(parts.length !== 3) return getTodayTimeline();
+        return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])).getTime();
+    };
+
+    // 두 타임스탬프 사이의 '일(day)' 차이 계산 (오늘 - 시작일)
+    const diffDaysFrom = (startTimestamp, todayTimestamp) => {
+        if (!startTimestamp) return 0;
+        const diff = Math.floor((todayTimestamp - startTimestamp) / (1000 * 60 * 60 * 24));
+        return diff < 0 ? 0 : diff;
+    };
+
+    // 로컬스토리지 키
+    const STORAGE_KEY = 'dasseottung_data_v1';
+
+    // 최초 접속(저장된 데이터 없음) 시에만 사용할 기본 목업 데이터
+    const defaultCategories = [
+        { id: 1, name: "선크림", days: 40 },
+        { id: 2, name: "토너 / 에센스", days: 60 },
+        { id: 3, name: "수분 크림", days: 50 },
+        { id: 4, name: "클렌징 폼", days: 90 },
+        { id: 5, name: "아이크림", days: 120 },
+        { id: 6, name: "마스크팩", days: 30 },
+        { id: 7, name: "바디로션", days: 75 },
+        { id: 8, name: "샴푸", days: 90 }
+    ];
+
+    const defaultSchedules = [
+        { id: 1, name: "올리브영 올영세일", targetDate: getTodayTimeline() + (25 * 24 * 60 * 60 * 1000) },
+        { id: 2, name: "아이크림 정기 구독일", targetDate: getTodayTimeline() + (90 * 24 * 60 * 60 * 1000) }
+    ];
+
+    const defaultProducts = [
+        { id: 1, name: "촉촉 수분 토너", categoryId: 2, stock: 2, targetScheduleId: 1, openedDate: getTodayTimeline() - (15 * 24 * 60 * 60 * 1000), tungHistory: [] },
+        { id: 2, name: "데일리 베리어 선크림", categoryId: 1, stock: 1, targetScheduleId: 2, openedDate: getTodayTimeline() - (10 * 24 * 60 * 60 * 1000), tungHistory: [] }
+    ];
+
+    // 저장된 데이터 불러오기 (없거나 파싱 실패 시 기본값 사용)
+    function loadFromStorage() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch (e) {
+            console.error('로컬스토리지 로드 실패:', e);
+            return null;
+        }
+    }
+
+    // 현재 데이터를 로컬스토리지에 저장
+    function saveToStorage() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ categories, schedules, products }));
+            localStorage.setItem(STORAGE_KEY + '_savedAt', String(Date.now()));
+            updateLastSavedLabel();
+        } catch (e) {
+            console.error('로컬스토리지 저장 실패:', e);
+        }
+    }
+
+    // 마이페이지 > 백업 탭에 마지막 저장 시각 표시
+    function updateLastSavedLabel() {
+        const labelEl = document.getElementById('lastSavedAt');
+        if (!labelEl) return;
+        const savedAt = localStorage.getItem(STORAGE_KEY + '_savedAt');
+        if (!savedAt) { labelEl.textContent = '-'; return; }
+        const d = new Date(Number(savedAt));
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        labelEl.textContent = `${formatDateString(d.getTime())} ${hh}:${mm}`;
+    }
+
+    // [백업] 현재 데이터를 JSON 파일로 내려받기
+    function exportBackup() {
+        const backupData = {
+            exportedAt: new Date().toISOString(),
+            app: 'dasseottung',
+            version: 1,
+            categories, schedules, products
+        };
+        const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = formatDateString(getTodayTimeline());
+        a.href = url;
+        a.download = `다썼텅_백업_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('💾 백업 파일을 내려받았어요');
+    }
+
+    // [백업] 선택한 JSON 파일로부터 데이터 복원
+    function importBackup(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const parsed = JSON.parse(e.target.result);
+                if (!parsed || !Array.isArray(parsed.products) || !Array.isArray(parsed.categories) || !Array.isArray(parsed.schedules)) {
+                    showToast('⚠️ 백업 파일 형식이 올바르지 않아요');
+                    return;
+                }
+                categories = parsed.categories;
+                schedules = parsed.schedules;
+                products = parsed.products;
+                syncAllAndRender();
+                showToast('✅ 백업 데이터를 불러왔어요');
+            } catch (err) {
+                console.error('백업 파일 읽기 실패:', err);
+                showToast('⚠️ 파일을 읽는 중 문제가 생겼어요');
+            } finally {
+                document.getElementById('backupFileInput').value = '';
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    const savedData = loadFromStorage();
+    let categories = savedData ? savedData.categories : defaultCategories;
+    let schedules = savedData ? savedData.schedules : defaultSchedules;
+    let products = savedData ? savedData.products : defaultProducts;
+
+    window.onload = () => {
+        document.getElementById('schedTargetDate').value = formatDateString(getTodayTimeline());
+        document.getElementById('prodOpenedDate').value = formatDateString(getTodayTimeline());
+        document.getElementById('prodOpenedDate').max = formatDateString(getTodayTimeline());
+        syncAllAndRender();
+    };
+
+    // 데이터 변경 발생 시 전체 뷰를 동기화 및 강제 새로고침하는 파이프라인 함수
+    function syncAllAndRender() {
+        saveToStorage();
+        syncSelectOptions();
+        renderProducts();
+        renderMypageLists();
+    }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+        document.getElementById(`btn-tab-${tabName}`).classList.add('active');
+        syncAllAndRender();
+    }
+
+    function switchSubTab(subTabName) {
+        document.querySelectorAll('.sub-tab-item').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.sub-content').forEach(el => el.classList.remove('active'));
+        document.getElementById(`sub-btn-${subTabName}`).classList.add('active');
+        document.getElementById(`sub-content-${subTabName}`).classList.add('active');
+        syncAllAndRender();
+    }
+
+    function selectQuickCycle(months) {
+        document.querySelectorAll('.btn-quick-cycle').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        const target = new Date();
+        target.setMonth(target.getMonth() + months);
+        
+        document.getElementById('schedTargetDate').value = formatDateString(target.getTime());
+        showToast(`💡 퀵 템플릿 [${months}개월 후] 날짜가 세팅되었습니다.`);
+    }
+
+    function addCustomSchedule() {
+        const name = document.getElementById('schedName').value.trim();
+        const dateVal = document.getElementById('schedTargetDate').value;
+        if(!name || !dateVal) { showToast('이름과 구매 예정일을 명확히 선택해주세요.'); return; }
+
+        const targetTime = parseInputDateToTimestamp(dateVal);
+
+        schedules.push({ id: Date.now(), name: name, targetDate: targetTime });
+        document.getElementById('schedName').value = '';
+        document.getElementById('schedTargetDate').value = formatDateString(getTodayTimeline());
+        document.querySelectorAll('.btn-quick-cycle').forEach(b => b.classList.remove('active'));
+        
+        showToast(`🗓️ [${name}] 일정이 추가되었습니다.`);
+        syncAllAndRender();
+    }
+
+    // [변경점] 카테고리 빠른 생성 프리셋과 동일한 아이콘 매핑 (커스텀 카테고리는 기본 📂)
+    const CATEGORY_ICONS = {
+        "선크림": "☀️",
+        "토너 / 에센스": "🧴",
+        "수분 크림": "🧴",
+        "클렌징 폼": "🧼",
+        "아이크림": "👀",
+        "마스크팩": "🎭",
+        "바디로션": "🧴",
+        "샴푸": "🧼"
+    };
+    const getCategoryIcon = (name) => CATEGORY_ICONS[name] || "📂";
+
+    function renderProducts() {
+        saveToStorage();
+        const listEl = document.getElementById('productList');
+        if (!listEl) return;
+        listEl.innerHTML = '';
+
+        const catFilter = document.getElementById('filterCategory') ? document.getElementById('filterCategory').value : 'all';
+        const schedFilter = document.getElementById('filterSchedule') ? document.getElementById('filterSchedule').value : 'all';
+
+        let filteredProducts = products.filter(p => {
+            const matchCat = (catFilter === 'all' || Number(p.categoryId) === Number(catFilter));
+            const matchSched = (schedFilter === 'all' || Number(p.targetScheduleId) === Number(schedFilter));
+            return matchCat && matchSched;
+        });
+
+        if(filteredProducts.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center; color:#888; padding:30px; font-size:12px;">조건에 맞는 품목이 없습니다.</div>'; 
+            return;
+        }
+
+        const today = getTodayTimeline();
+
+        filteredProducts.forEach(p => {
+            const isUnknownCat = (Number(p.categoryId) === 0);
+            const myCategory = isUnknownCat
+                ? { name: '🫙 일단 쓰고 봄', days: null }
+                : (categories.find(c => Number(c.id) === Number(p.categoryId)) || { name: '미지정', days: 30 });
+            const matchedSched = schedules.find(s => Number(s.id) === Number(p.targetScheduleId));
+            
+            let dDayLeft = 0;
+            if (matchedSched) {
+                const diffTime = matchedSched.targetDate - today;
+                dDayLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            }
+
+            // [변경점] 현재 쓰는 통(openedDate 기준)이 며칠째인지 계산
+            const daysUsed = p.stock > 0 ? diffDaysFrom(p.openedDate, today) : 0;
+
+            // [변경점] 소진일 계산: 현재 통은 (카테고리 평균일 - 며칠 썼는지)만큼만 남은 걸로 계산
+            // 나머지 미개봉 재고(stock - 1개)는 그대로 카테고리 평균일씩 더함
+            let totalRemainingDays = 0;
+            if (p.stock > 0) {
+                const remainingInCurrentBottle = Math.max(myCategory.days - daysUsed, 0);
+                const sealedUnits = p.stock - 1; // 현재 쓰는 1개를 제외한 미개봉 재고
+                totalRemainingDays = remainingInCurrentBottle + (sealedUnits * myCategory.days);
+            }
+            
+            let statusBadge = ''; let alertText = ''; let usedText = '';
+
+            if (isUnknownCat) {
+                // 🫙 일단 쓰고 봄 전용 분기
+                if (p.stock === 0) {
+                    statusBadge = '<span class="badge danger">재고 없음</span>';
+                    alertText = '즉시 구매 필요';
+                } else {
+                    const history = p.tungHistory || [];
+                    // 평균 소진일은 텅 기록 2회 이상부터 계산 (그 전엔 비교 불가)
+                    const avgDays = history.length >= 2
+                        ? Math.round(history.reduce((s, h) => s + h.days, 0) / history.length)
+                        : null;
+
+                    // [변경점] 평균값이 있으면(0일 수도 있음) openedDate 기준으로 totalRemainingDays도 계산
+                    // avgDays가 0이면 falsy라 if(avgDays)로 체크하면 안 됨 → null 여부로 명확히 체크
+                    if (avgDays !== null) {
+                        const remainingInCurrentBottle = Math.max(avgDays - daysUsed, 0);
+                        const sealedUnits = p.stock - 1;
+                        totalRemainingDays = remainingInCurrentBottle + (sealedUnits * avgDays);
+                    }
+
+                    if (!matchedSched) {
+                        // 세일/구매 일정이 연동 안 된 경우 — 기존처럼 분석 단계 안내만
+                        if (history.length === 0) {
+                            statusBadge = '<span class="badge neutral">🫙 분석 대기 중</span>';
+                            alertText = '텅을 누를수록 소진 패턴이 자동으로 분석돼요';
+                        } else if (history.length === 1) {
+                            statusBadge = '<span class="badge neutral">📊 데이터 1개 수집됨</span>';
+                            alertText = `첫 소진: ${history[0].days}일 걸렸어요 · 1번 더 누르면 평균 계산!`;
+                        } else {
+                            statusBadge = '<span class="badge enough">📊 평균 ' + avgDays + '일 소진</span>';
+                            alertText = `${history.length}회 분석 기준 · 평균 ${avgDays}일마다 한 통 소진`;
+                        }
+                    } else {
+                        // [변경점] 세일/구매 일정이 연동된 경우 — D-day와 실제 비교
+                        if (avgDays === null) {
+                            statusBadge = '<span class="badge neutral">🫙 분석 대기 중</span>';
+                            const needMore = Math.max(2 - history.length, 1);
+                            alertText = `세일까지 D-${dDayLeft} · 아직 데이터가 부족해 비교는 어려워요 (텅 ${needMore}번 더 누르면 비교 가능)`;
+                        } else if (totalRemainingDays >= dDayLeft) {
+                            statusBadge = '<span class="badge enough">구매일전 안전함</span>';
+                            alertText = `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
+                        } else {
+                            statusBadge = '<span class="badge danger">주기 전 소진위험</span>';
+                            alertText = `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 D-${dDayLeft} 전에 바닥남 🚨)`;
+                        }
+                    }
+
+                    usedText = `현재 통 사용 ${daysUsed}일째` + (avgDays !== null ? ` (평균 ${avgDays}일 주기)` : ' (패턴 분석 중)');
+                }
+            } else {
+                if (p.stock === 0) {
+                    statusBadge = '<span class="badge danger">재고 없음</span>'; alertText = '즉시 구매 필요';
+                } else if (!matchedSched) {
+                    statusBadge = '<span class="badge neutral">일단 씀</span>'; alertText = `소진까지 약 ${totalRemainingDays}일 남음`;
+                } else if (totalRemainingDays >= dDayLeft) {
+                    statusBadge = '<span class="badge enough">구매일전 안전함</span>'; 
+                    alertText = `소진 ${totalRemainingDays}일 후 (알림 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
+                } else {
+                    statusBadge = '<span class="badge danger">주기 전 소진위험</span>'; 
+                    alertText = `소진 ${totalRemainingDays}일 후 (세일일 D-${dDayLeft} 전에 바닥남 🚨)`;
+                }
+                if (p.stock > 0) {
+                    const history = p.tungHistory || [];
+                    const avgReal = history.length >= 2
+                        ? Math.round(history.reduce((s, h) => s + h.days, 0) / history.length)
+                        : null;
+                    if (avgReal) {
+                        usedText = `현재 통 사용 ${daysUsed}일째 · 실제 평균 ${avgReal}일 (카테고리 기준 ${myCategory.days}일)`;
+                    } else {
+                        usedText = `현재 통 사용 ${daysUsed}일째 (기준 ${myCategory.days}일 주기)`;
+                    }
+                }
+            }
+
+            let inlineOptions = `<option value="0" ${!p.targetScheduleId ? 'selected' : ''}>일정 없이 일단 씀</option>`;
+            schedules.forEach(s => { 
+                const sDiff = Math.ceil((s.targetDate - today) / (1000 * 60 * 60 * 24));
+                inlineOptions += `<option value="${s.id}" ${Number(s.id) === Number(p.targetScheduleId) ? 'selected' : ''}>${s.name} (D-${sDiff})</option>`; 
+            });
+
+            // [변경점] 카테고리도 화장대 추가 이후에 바꿀 수 있도록 인라인 select 구성
+            let categoryOptions = `<option value="0" ${Number(p.categoryId) === 0 ? 'selected' : ''}>🫙 일단 쓰고 봄</option>`;
+            categories.forEach(c => {
+                categoryOptions += `<option value="${c.id}" ${Number(c.id) === Number(p.categoryId) ? 'selected' : ''}>${getCategoryIcon(c.name)} ${c.name} (${c.days}일)</option>`;
+            });
+
+            const openedDateStr = p.openedDate ? new Date(p.openedDate).toISOString().slice(0,10) : '';
+            const todayStr = new Date().toISOString().slice(0,10);
+            const isBottleEmpty = p.stock === 0;
+            const liquidScaleY = isBottleEmpty ? 0 : 1; 
+            const bottleStrokeColor = isBottleEmpty ? '#FF3B30' : '#444444';
+            const liquidFillColor = isBottleEmpty ? 'transparent' : 'var(--liquid-full)';
+
+            const card = document.createElement('div');
+            card.className = 'product-card';
+            card.innerHTML = `
+                <div class="prod-info">
+                    <div class="prod-name">${p.name}</div>
+                    <div>${statusBadge}</div>
+                    <div class="prod-status">${alertText}</div>
+                    ${usedText ? `<div class="prod-used">⏱ ${usedText}</div>` : ''}
+                    <div style="margin-top:6px;">
+                        <select class="inline-select" onchange="changeProductCategory(${p.id}, this.value)">${categoryOptions}</select>
+                    </div>
+                    <div style="margin-top:6px;">
+                        <select class="inline-select" onchange="changeProductSchedule(${p.id}, this.value)">${inlineOptions}</select>
+                    </div>
+                    <div style="margin-top:6px; display:flex; align-items:center; gap:5px;">
+                        <span style="font-size:11px; color:#888; white-space:nowrap;">📅 사용 시작일</span>
+                        <input type="date" class="inline-select" 
+                            value="${openedDateStr}" max="${todayStr}"
+                            style="font-size:11px; padding:3px 6px; flex:1; min-width:0;"
+                            onchange="changeOpenedDate(${p.id}, this.value)">
+                    </div>
+                    <div class="stock-control">
+                        <button class="btn-qty" onclick="adjustStock(${p.id}, -1)">-</button>
+                        <span style="font-size:13px; font-weight:bold;">재고: ${p.stock}개</span>
+                        <button class="btn-qty" onclick="adjustStock(${p.id}, 1)">+</button>
+                    </div>
+                </div>
+                <div class="right-actions">
+                    <button class="btn-del-action" onclick="deleteProduct(${p.id})">삭제 🗑️</button>
+                    <div class="tung-bottle-wrapper ${isBottleEmpty ? 'empty' : ''}" onclick="pressTung(${p.id}, this)">
+                        <svg viewBox="0 0 44 58" style="width:100%; height:calc(100% - 16px); overflow:visible; display:block;">
+                          <!-- 뚜껑 -->
+                          <rect x="10" y="2" width="24" height="9" rx="4" 
+                            fill="${isBottleEmpty ? '#eee' : '#FF8FA3'}" 
+                            stroke="${bottleStrokeColor}" stroke-width="1.8"/>
+                          <!-- 뚜껑 하이라이트 -->
+                          <rect x="12" y="3.5" width="8" height="2.5" rx="1.2" fill="white" opacity="${isBottleEmpty ? '0' : '0.45'}"/>
+                          <!-- 어깨 (경사부) -->
+                          <path d="M10 11 Q10 17 7 19 L7 50 Q7 54 11 54 L33 54 Q37 54 37 50 L37 19 Q34 17 34 11 Z"
+                            fill="${isBottleEmpty ? '#f5f5f5' : '#FFF0F2'}"
+                            stroke="${bottleStrokeColor}" stroke-width="1.8"/>
+                          <!-- 내용물 (액체) — path로 출렁임 가능 -->
+                          <path id="liquidPath${p.id}" class="liquid-layer"
+                            d="M9 20 L9 50 Q9 53 11 53 L33 53 Q35 53 35 50 L35 20 Z"
+                            fill="${liquidFillColor}"
+                            style="transform: scaleY(${liquidScaleY}); transform-origin: bottom;"/>
+                          <!-- 병 테두리 재강조 (위에 덮음) -->
+                          <path d="M10 11 Q10 17 7 19 L7 50 Q7 54 11 54 L33 54 Q37 54 37 50 L37 19 Q34 17 34 11 Z"
+                            fill="none" stroke="${bottleStrokeColor}" stroke-width="1.8"/>
+                          <!-- 하이라이트 광택 -->
+                          <rect x="10" y="21" width="4" height="20" rx="2" fill="white" opacity="${isBottleEmpty ? '0' : '0.22'}"/>
+                          <!-- 재고수 표시 — 네모 없이 텍스트만, 크고 선명하게 -->
+                          <text x="22" y="39" text-anchor="middle" font-size="${isBottleEmpty ? '10' : '13'}" font-weight="900"
+                            fill="${isBottleEmpty ? '#FF3B30' : '#FF5A5F'}" font-family="-apple-system,sans-serif"
+                            paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">
+                            ${isBottleEmpty ? '텅!' : p.stock + '개'}
+                          </text>
+                        </svg>
+                        <div class="tung-text">${isBottleEmpty ? '😢텅' : '텅'}</div>
+                    </div>
+                </div>`;
+            listEl.appendChild(card);
+        });
+    }
+
+    function renderMypageLists() {
+        const catListEl = document.getElementById('customCategoryList'); 
+        if (catListEl) {
+            catListEl.innerHTML = '';
+            categories.forEach(c => { 
+                catListEl.innerHTML += `<div class="list-item-card" style="padding:10px 14px;"><div><strong>${getCategoryIcon(c.name)} ${c.name}</strong> <span style="font-size:12px; color:var(--gray);">(${c.days}일)</span></div><button class="btn-del-action" onclick="deleteCategory(${c.id})">❌</button></div>`; 
+            });
+        }
+        
+        const schedListEl = document.getElementById('scheduleList'); 
+        if (schedListEl) {
+            schedListEl.innerHTML = '';
+            const today = getTodayTimeline();
+            schedules.forEach(s => {
+                const diffDays = Math.ceil((s.targetDate - today) / (1000 * 60 * 60 * 24));
+                const dateStr = formatDateString(s.targetDate);
+                schedListEl.innerHTML += `
+                    <div class="list-item-card" style="padding:10px 14px;">
+                        <div><strong>${s.name}</strong> <div style="font-size:12px; color:var(--gray); margin-top:2px;">목표일: ${dateStr} <span class="badge cycle-tag">D-${diffDays}</span></div></div>
+                        <button class="btn-del-action" onclick="deleteSchedule(${s.id})">❌</button>
+                    </div>`;
+            });
+        }
+    }
+
+    function syncSelectOptions() {
+        const prodCatSelect = document.getElementById('prodCategorySelect'); 
+        const prodTarget = document.getElementById('prodScheduleTarget');
+        const filterCat = document.getElementById('filterCategory'); 
+        const filterSched = document.getElementById('filterSchedule');
+        const today = getTodayTimeline();
+        
+        // 필터값 임시 저장 (옵션 재빌드 시 초기화되는 현상 방지용)
+        const prevCatFilter = filterCat ? filterCat.value : 'all';
+        const prevSchedFilter = filterSched ? filterSched.value : 'all';
+        
+        if (prodCatSelect) {
+            prodCatSelect.innerHTML = '<option value="0">🫙 일단 쓰고 봄 (텅 누를 때마다 자동 분석)</option>'; 
+            categories.forEach(c => { prodCatSelect.innerHTML += `<option value="${c.id}">${getCategoryIcon(c.name)} ${c.name} (${c.days}일 주기)</option>`; });
+        }
+        
+        if (prodTarget) {
+            prodTarget.innerHTML = '<option value="0">📦 일정 없이 일단 씀 (재고만 관리)</option>'; 
+            schedules.forEach(s => { 
+                const diffDays = Math.ceil((s.targetDate - today) / (1000 * 60 * 60 * 24));
+                prodTarget.innerHTML += `<option value="${s.id}">${s.name} (D-${diffDays})</option>`; 
+            });
+        }
+        
+        if (filterCat) {
+            filterCat.innerHTML = '<option value="all">전체 카테고리</option><option value="0">🫙 일단 쓰고 봄</option>'; 
+            categories.forEach(c => { filterCat.innerHTML += `<option value="${c.id}">${getCategoryIcon(c.name)} ${c.name}</option>`; });
+            filterCat.value = prevCatFilter;
+            if(!filterCat.value) filterCat.value = 'all';
+        }
+        
+        if (filterSched) {
+            filterSched.innerHTML = '<option value="all">전체 세일 일정</option>'; 
+            schedules.forEach(s => { filterSched.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+            filterSched.value = prevSchedFilter;
+            if(!filterSched.value) filterSched.value = 'all';
+        }
+    }
+
+    // 텅 누르면: 재고 1개 차감. 0이 되는 순간 흔들림 + 파티클 폭죽!
+    function pressTung(id, el) {
+        const p = products.find(prod => prod.id === id);
+        if (!p || p.stock <= 0) return;
+
+        const goingEmpty = (p.stock === 1); // 이번 클릭으로 0이 되는 순간
+
+        // 데이터 먼저 업데이트
+        p.stock -= 1;
+
+        // 소진일 자동 기록 — 모든 카테고리에서 실제 사용 주기 추적
+        if (goingEmpty && p.openedDate) {
+            if (!p.tungHistory) p.tungHistory = [];
+            const daysUsedNow = Math.round((getTodayTimeline() - p.openedDate) / (1000 * 60 * 60 * 24));
+            p.tungHistory.push({ date: getTodayTimeline(), days: daysUsedNow });
+            if (p.tungHistory.length > 10) p.tungHistory.shift();
+        }
+
+        p.openedDate = p.stock > 0 ? getTodayTimeline() : null;
+
+        let toastMsg = '"텅! 다썼텅 리필 타이밍 체크"';
+        if (goingEmpty) {
+            if (Number(p.categoryId) === 0) {
+                const cnt = (p.tungHistory || []).length;
+                const avg = cnt >= 2 ? Math.round(p.tungHistory.reduce((s,h)=>s+h.days,0)/cnt) : null;
+                toastMsg = (avg !== null)
+                    ? '📊 ' + cnt + '회 분석 완료! 평균 ' + avg + '일 소진 패턴이에요'
+                    : '🫙 첫 텅! 한 번 더 누르면 소진 패턴 분석 시작!';
+            } else {
+                toastMsg = '🎉 텅! 다 썼어요! 리필 타이밍이에요';
+            }
+        }
+        showToast(toastMsg);
+
+        if (goingEmpty && el) {
+            // ── 흔들림 애니메이션: renderProducts 전에 el이 살아있을 때 ──
+            el.classList.add('shaking');
+
+            // ── 파티클 5개: el 기준 absolute로 phone-mockup에 붙임 ──
+            const emojis = ['✨','💫','🌸','⭐','💕'];
+            const offsets = [
+                {tx: -44, ty: -36},
+                {tx:  44, ty: -32},
+                {tx: -36, ty:  22},
+                {tx:  36, ty:  20},
+                {tx:   0, ty: -52},
+            ];
+            const phoneEl = document.querySelector('.phone-mockup');
+            const elRect  = el.getBoundingClientRect();
+            const phoneRect = phoneEl.getBoundingClientRect();
+            const cx = elRect.left - phoneRect.left + elRect.width  / 2;
+            const cy = elRect.top  - phoneRect.top  + elRect.height / 2;
+
+            emojis.forEach((emoji, i) => {
+                const sp = document.createElement('span');
+                sp.className = 'sparkle';
+                sp.style.position = 'absolute';
+                sp.style.left = cx + 'px';
+                sp.style.top  = cy + 'px';
+                sp.style.setProperty('--tx', offsets[i].tx + 'px');
+                sp.style.setProperty('--ty', offsets[i].ty + 'px');
+                sp.style.fontSize = '18px';
+                sp.style.animationDelay  = (i * 0.07) + 's';
+                sp.style.animationDuration = '0.7s';
+                sp.style.zIndex = 200;
+                sp.textContent = emoji;
+                phoneEl.appendChild(sp);
+                setTimeout(() => sp.remove(), 900);
+            });
+
+            // 흔들림 끝난 뒤 DOM 갱신
+            setTimeout(() => {
+                el.classList.remove('shaking');
+                renderProducts();
+            }, 700);
+        } else {
+            // 일반 클릭: 꾹 바운스 + 액체 출렁임
+            if (el) {
+                // 꾹 바운스
+                el.classList.add('pressing');
+                setTimeout(() => el.classList.remove('pressing'), 480);
+
+                // 액체 출렁임 — JS로 직접 path keyframes 구동
+                const liquidEl = el.querySelector('[id^="liquidPath"]');
+                if (liquidEl && p.stock > 0) {
+                    const frames = [
+                        "M9 20 L9 50 Q9 53 11 53 L33 53 Q35 53 35 50 L35 20 Z",
+                        "M9 23 Q18 17 35 22 L35 50 Q35 53 33 53 L11 53 Q9 53 9 50 Z",
+                        "M9 21 Q24 26 35 18 L35 50 Q35 53 33 53 L11 53 Q9 53 9 50 Z",
+                        "M9 22 Q16 19 35 22 L35 50 Q35 53 33 53 L11 53 Q9 53 9 50 Z",
+                        "M9 20 L9 50 Q9 53 11 53 L33 53 Q35 53 35 50 L35 20 Z",
+                    ];
+                    const delays = [0, 80, 200, 340, 500];
+                    delays.forEach((d, i) => {
+                        setTimeout(() => {
+                            if (liquidEl.parentNode) liquidEl.setAttribute('d', frames[i]);
+                        }, d);
+                    });
+                }
+            }
+            // 꾹 바운스 끝난 뒤 DOM 갱신 (애니메이션 끊김 방지)
+            setTimeout(() => renderProducts(), 480);
+        }
+    }
+    
+    // [변경점] 수동 +/- 조정: 0개에서 처음 늘어날 때만 openedDate를 오늘로 세팅 (그 외엔 사용 시작일 유지)
+    function adjustStock(id, amount) { 
+        const p = products.find(prod => prod.id === id); 
+        if (p) { 
+            const prevStock = p.stock;
+            p.stock += amount; 
+            if(p.stock < 0) p.stock = 0; 
+
+            if (prevStock === 0 && p.stock > 0) {
+                p.openedDate = getTodayTimeline(); // 0개 → 보충: 새로 쓰기 시작하는 것으로 간주
+            } else if (p.stock === 0) {
+                p.openedDate = null;
+            }
+            renderProducts(); 
+        } 
+    }
+    
+    function changeOpenedDate(id, val) {
+        const p = products.find(pr => pr.id === id);
+        if (!p || !val) return;
+        const parts = val.split('-');
+        if (parts.length !== 3) return;
+        const ts = new Date(Number(parts[0]), Number(parts[1])-1, Number(parts[2])).getTime();
+        if (isNaN(ts)) return;
+        p.openedDate = ts;
+        showToast('📅 사용 시작일이 변경됐어요');
+        renderProducts();
+    }
+
+    function changeProductSchedule(productId, newScheduleId) { 
+        const p = products.find(prod => prod.id === productId); 
+        if(p) { 
+            p.targetScheduleId = Number(newScheduleId); 
+            renderProducts(); 
+        } 
+    }
+
+    // [변경점] 화장대 추가 이후에도 카테고리를 바꿀 수 있도록
+    function changeProductCategory(productId, newCategoryId) {
+        const p = products.find(prod => prod.id === productId);
+        if (p) {
+            p.categoryId = Number(newCategoryId);
+            showToast('📂 카테고리가 변경되었어요');
+            renderProducts();
+        }
+    }
+    
+    function deleteProduct(productId) { 
+        products = products.filter(p => p.id !== productId); 
+        renderProducts(); 
+    }
+    
+    function deleteCategory(id) { 
+        categories = categories.filter(c => c.id !== id); 
+        // 삭제된 카테고리를 가지던 상품 안전 예외 처리
+        products.forEach(p => { if(Number(p.categoryId) === Number(id)) p.categoryId = 0; });
+        syncAllAndRender(); 
+    }
+    
+    function deleteSchedule(id) { 
+        schedules = schedules.filter(s => s.id !== id); 
+        // 삭제된 일정을 가지던 상품 예외 처리
+        products.forEach(p => { if(Number(p.targetScheduleId) === Number(id)) p.targetScheduleId = 0; });
+        syncAllAndRender(); 
+    }
+    
+    function applyPreset(name, days) { 
+        document.getElementById('newCatName').value = name; 
+        document.getElementById('newCatDays').value = days; 
+        showToast(`📂 [${name}] 프리셋이 적용되었습니다.`); 
+    }
+    
+    function addCustomCategory() { 
+        const name = document.getElementById('newCatName').value.trim(); 
+        const days = parseInt(document.getElementById('newCatDays').value); 
+        if(!name || isNaN(days)) { showToast('정확한 카테고리명과 일수를 기입해주세요.'); return; }
+        
+        categories.push({ id: Date.now(), name: name, days: days }); 
+        document.getElementById('newCatName').value = ''; 
+        document.getElementById('newCatDays').value = ''; 
+        
+        showToast(`📂 [${name}] 카테고리가 신설되었습니다.`);
+        syncAllAndRender(); 
+    }
+    
+    function addProduct() { 
+        const name = document.getElementById('prodName').value.trim(); 
+        const categoryId = parseInt(document.getElementById('prodCategorySelect').value); 
+        const targetScheduleId = parseInt(document.getElementById('prodScheduleTarget').value); 
+        if(!name) { showToast('제품 이름을 올바르게 채워주세요.'); return; }
+
+        // [변경점] 이미 쓰던 제품 등록 대응: 사용 시작일을 직접 선택 가능 (비우면 오늘)
+        const openedDateVal = document.getElementById('prodOpenedDate').value;
+        const today = getTodayTimeline();
+        let openedDate = openedDateVal ? parseInputDateToTimestamp(openedDateVal) : today;
+        if (openedDate > today) openedDate = today; // 미래 날짜는 오늘로 보정
+        
+        const isUnknown = (categoryId === 0 || isNaN(categoryId));
+        products.push({ 
+            id: Date.now(), 
+            name: name, 
+            categoryId: isUnknown ? 0 : categoryId,
+            stock: 1, 
+            targetScheduleId: isNaN(targetScheduleId) ? 0 : targetScheduleId,
+            openedDate: openedDate,
+            tungHistory: [] // 🫙 텅 누른 날짜 기록 (소진일 자동 분석용)
+        }); 
+        
+        document.getElementById('prodName').value = ''; 
+        document.getElementById('prodOpenedDate').value = formatDateString(today); // 다음 입력을 위해 오늘로 리셋
+        showToast(isUnknown ? '🫙 [' + name + '] 추가! 텅 누를수록 소진 패턴이 분석돼요' : '🧴 [' + name + '] 화장대 추가 완료!');
+        syncAllAndRender(); 
+    }
+    
+    function showToast(msg) { 
+        const toast = document.getElementById('toast'); 
+        toast.innerHTML = msg; 
+        toast.style.display = 'block'; 
+        setTimeout(() => toast.style.display = 'none', 2200); 
+    }
+
+    // 서비스워커 등록 (HTTPS 또는 localhost 환경에서만 동작)
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js').catch((err) => {
+                console.log('서비스워커 등록 실패:', err);
+            });
+        });
+    }
+
+</script>
+</body>
+</html>
