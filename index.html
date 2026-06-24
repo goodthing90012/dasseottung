@@ -659,8 +659,10 @@
                             statusBadge = '<span class="badge enough">구매일전 안전함</span>';
                             alertText = `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
                         } else {
+                            const shortfallDays = dDayLeft - totalRemainingDays;
+                            const neededUnits = avgDays > 0 ? Math.ceil(shortfallDays / avgDays) : 1;
                             statusBadge = '<span class="badge danger">주기 전 소진위험</span>';
-                            alertText = `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 D-${dDayLeft} 전에 바닥남 🚨)`;
+                            alertText = `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`;
                         }
                     }
 
@@ -675,8 +677,11 @@
                     statusBadge = '<span class="badge enough">구매일전 안전함</span>'; 
                     alertText = `소진 ${totalRemainingDays}일 후 (알림 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
                 } else {
+                    const shortfallDays = dDayLeft - totalRemainingDays;
+                    const cycleDays = myCategory.days > 0 ? myCategory.days : 30;
+                    const neededUnits = Math.ceil(shortfallDays / cycleDays);
                     statusBadge = '<span class="badge danger">주기 전 소진위험</span>'; 
-                    alertText = `소진 ${totalRemainingDays}일 후 (세일일 D-${dDayLeft} 전에 바닥남 🚨)`;
+                    alertText = `소진 ${totalRemainingDays}일 후 (세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`;
                 }
                 if (p.stock > 0) {
                     const history = p.tungHistory || [];
