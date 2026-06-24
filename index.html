@@ -181,6 +181,17 @@
 <body>
 
 <div class="phone-mockup">
+    <div class="confirm-overlay" id="editNameOverlay">
+        <div class="confirm-box">
+            <p>이름 수정</p>
+            <input type="text" id="editNameInput" maxlength="40" 
+                style="width:100%; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:14px; margin-bottom:14px;">
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelEditName()">취소</button>
+                <button class="confirm-btn yes" style="background:var(--primary, #FF5A5F);" onclick="saveEditName()">저장</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="confirmOverlay">
         <div class="confirm-box">
             <p>삭제하시겠습니까?</p>
@@ -720,7 +731,10 @@
             card.innerHTML = `
                 <button class="btn-del-corner" onclick="confirmDeleteProduct(${p.id})">삭제 🗑️</button>
                 <div class="prod-info" style="padding-right:42px;">
-                    <div class="prod-name">${p.name}</div>
+                    <div class="prod-name" style="display:flex; align-items:center; gap:6px;">
+                        <span style="flex:1;">${p.name}</span>
+                        <button onclick="editProductName(${p.id})" style="background:none; border:none; cursor:pointer; font-size:13px; padding:0 2px; flex-shrink:0;" title="이름 수정">✏️</button>
+                    </div>
                     <div>${statusBadge}</div>
                     <div class="prod-status">${alertText}</div>
                     ${usedText ? `<div class="prod-used">⏱ ${usedText}</div>` : ''}
@@ -975,6 +989,35 @@
         if (isNaN(ts)) return;
         p.openedDate = ts;
         showToast('📅 사용 시작일이 변경됐어요');
+        renderProducts();
+    }
+
+    // [변경점] 오타 등 이름을 나중에 수정할 수 있도록 (prompt 대신 자체 모달 사용)
+    let pendingEditNameId = null;
+    function editProductName(productId) {
+        const p = products.find(prod => prod.id === productId);
+        if (!p) return;
+        pendingEditNameId = productId;
+        const input = document.getElementById('editNameInput');
+        input.value = p.name;
+        document.getElementById('editNameOverlay').classList.add('active');
+        setTimeout(() => { input.focus(); input.select(); }, 50);
+    }
+    function cancelEditName() {
+        pendingEditNameId = null;
+        document.getElementById('editNameOverlay').classList.remove('active');
+    }
+    function saveEditName() {
+        const p = products.find(prod => prod.id === pendingEditNameId);
+        const newName = document.getElementById('editNameInput').value.trim();
+        if (!p) { cancelEditName(); return; }
+        if (newName === '') {
+            showToast('⚠️ 이름은 비워둘 수 없어요');
+            return;
+        }
+        p.name = newName;
+        showToast('✏️ 이름이 수정되었어요');
+        cancelEditName();
         renderProducts();
     }
 
