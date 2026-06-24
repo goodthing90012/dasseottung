@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dasseottung-v1';
+const CACHE_NAME = 'dasseottung-v2';
 const ASSETS = [
   './index.html',
   './manifest.json',
