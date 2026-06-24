@@ -25,9 +25,9 @@
             --cycle-blue: #007AFF;
             --used-purple: #7C5CFF;
         }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #222; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        html, body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: var(--bg); margin: 0; height: 100%; }
         
-        .phone-mockup { width: 360px; height: 740px; background-color: var(--bg); border-radius: 36px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); border: 12px solid #111; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+        .phone-mockup { width: 100%; height: 100vh; background-color: var(--bg); overflow: hidden; display: flex; flex-direction: column; position: relative; }
         
         .header { background-color: var(--card); padding: 18px 16px 12px; border-bottom: 1px solid #eee; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .header-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 22px; color: var(--primary); letter-spacing: -0.5px; }
@@ -83,8 +83,20 @@
         .stock-control { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
         .btn-qty { background: #F0F0F0; border: none; width: 26px; height: 26px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         
-        .right-actions { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; height: 95px; gap: 4px; }
+        .product-card, .list-item-card { position: relative; }
+        .right-actions { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 95px; gap: 4px; }
         .btn-del-action { background: none; border: none; color: #FF3B30; font-size: 11px; cursor: pointer; padding: 2px; font-weight: bold; }
+        .btn-del-corner { position: absolute; top: 8px; right: 8px; background: #FFEBEB; border: none; color: #FF3B30; font-size: 11px; cursor: pointer; padding: 4px 8px; border-radius: 8px; font-weight: bold; z-index: 2; }
+
+        /* 삭제 확인 모달 */
+        .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 999; align-items: center; justify-content: center; }
+        .confirm-overlay.active { display: flex; }
+        .confirm-box { background: var(--card); border-radius: 16px; padding: 22px 20px; width: 78%; max-width: 280px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+        .confirm-box p { font-size: 14px; color: var(--text); margin: 0 0 18px; font-weight: bold; }
+        .confirm-btn-row { display: flex; gap: 10px; }
+        .confirm-btn { flex: 1; padding: 10px; border-radius: 10px; border: none; font-weight: bold; font-size: 13px; cursor: pointer; }
+        .confirm-btn.no { background: #F0F0F0; color: #555; }
+        .confirm-btn.yes { background: #FF3B30; color: white; }
 
         /* tung animations */
         /* 꾹 눌림: 아래로 찌그러졌다 위로 탱! 바운스 */
@@ -169,6 +181,15 @@
 <body>
 
 <div class="phone-mockup">
+    <div class="confirm-overlay" id="confirmOverlay">
+        <div class="confirm-box">
+            <p>삭제하시겠습니까?</p>
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelDeleteProduct()">아니오</button>
+                <button class="confirm-btn yes" onclick="proceedDeleteProduct()">예</button>
+            </div>
+        </div>
+    </div>
     <div class="header">
         <div class="header-brand">
             <!-- 화장품 통을 손가락으로 누르는 로고 -->
@@ -692,7 +713,8 @@
             const card = document.createElement('div');
             card.className = 'product-card';
             card.innerHTML = `
-                <div class="prod-info">
+                <button class="btn-del-corner" onclick="confirmDeleteProduct(${p.id})">삭제 🗑️</button>
+                <div class="prod-info" style="padding-right:42px;">
                     <div class="prod-name">${p.name}</div>
                     <div>${statusBadge}</div>
                     <div class="prod-status">${alertText}</div>
@@ -717,7 +739,6 @@
                     </div>
                 </div>
                 <div class="right-actions">
-                    <button class="btn-del-action" onclick="deleteProduct(${p.id})">삭제 🗑️</button>
                     <div class="tung-bottle-wrapper ${isBottleEmpty ? 'empty' : ''}" onclick="pressTung(${p.id}, this)">
                         <svg viewBox="0 0 44 58" style="width:100%; height:calc(100% - 16px); overflow:visible; display:block;">
                           <!-- 뚜껑 -->
@@ -970,6 +991,23 @@
         }
     }
     
+    let pendingDeleteId = null;
+    function confirmDeleteProduct(productId) {
+        pendingDeleteId = productId;
+        document.getElementById('confirmOverlay').classList.add('active');
+    }
+    function cancelDeleteProduct() {
+        pendingDeleteId = null;
+        document.getElementById('confirmOverlay').classList.remove('active');
+    }
+    function proceedDeleteProduct() {
+        if (pendingDeleteId !== null) {
+            deleteProduct(pendingDeleteId);
+        }
+        pendingDeleteId = null;
+        document.getElementById('confirmOverlay').classList.remove('active');
+    }
+
     function deleteProduct(productId) { 
         products = products.filter(p => p.id !== productId); 
         renderProducts(); 
