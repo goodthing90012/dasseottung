@@ -689,7 +689,7 @@
             const matchCat = (catFilter === 'all' || Number(p.categoryId) === Number(catFilter));
             const matchSched = (schedFilter === 'all' || Number(p.targetScheduleId) === Number(schedFilter));
             return matchCat && matchSched;
-        });
+        }).sort((a, b) => b.id - a.id);
 
         if(filteredProducts.length === 0) {
             listEl.innerHTML = '<div style="text-align:center; color:#888; padding:30px; font-size:12px;">조건에 맞는 품목이 없습니다.</div>'; 
