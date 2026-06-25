@@ -617,13 +617,26 @@
             // [변경점] 현재 쓰는 통(openedDate 기준)이 며칠째인지 계산
             const daysUsed = p.stock > 0 ? diffDaysFrom(p.openedDate, today) : 0;
 
-            // [변경점] 소진일 계산: 현재 통은 (카테고리 평균일 - 며칠 썼는지)만큼만 남은 걸로 계산
-            // 나머지 미개봉 재고(stock - 1개)는 그대로 카테고리 평균일씩 더함
+            // [변경점] 일반 카테고리는 텅 기록이 쌓일수록 실제 평균 비중을 점점 높이는 가중평균 사용
+            // (기록 5회 이상이면 실제 평균 100% 반영, 그 전엔 카테고리 기준값과 섞어서 완만하게 전환)
+            const realHistory = p.tungHistory || [];
+            const realAvgDays = realHistory.length >= 2
+                ? Math.round(realHistory.reduce((s, h) => s + h.days, 0) / realHistory.length)
+                : null;
+            let effectiveCategoryDays = myCategory.days;
+            let blendWeight = 0;
+            if (!isUnknownCat && realAvgDays !== null) {
+                blendWeight = Math.min(realHistory.length / 5, 1); // 0~1
+                effectiveCategoryDays = Math.round(myCategory.days * (1 - blendWeight) + realAvgDays * blendWeight);
+            }
+
+            // [변경점] 소진일 계산: 현재 통은 (평균일 - 며칠 썼는지)만큼만 남은 걸로 계산
+            // 나머지 미개봉 재고(stock - 1개)는 그대로 평균일씩 더함
             let totalRemainingDays = 0;
             if (p.stock > 0) {
-                const remainingInCurrentBottle = Math.max(myCategory.days - daysUsed, 0);
+                const remainingInCurrentBottle = Math.max(effectiveCategoryDays - daysUsed, 0);
                 const sealedUnits = p.stock - 1; // 현재 쓰는 1개를 제외한 미개봉 재고
-                totalRemainingDays = remainingInCurrentBottle + (sealedUnits * myCategory.days);
+                totalRemainingDays = remainingInCurrentBottle + (sealedUnits * effectiveCategoryDays);
             }
             
             let statusBadge = ''; let alertText = ''; let usedText = '';
@@ -689,20 +702,16 @@
                     alertText = `소진 ${totalRemainingDays}일 후 (알림 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
                 } else {
                     const shortfallDays = dDayLeft - totalRemainingDays;
-                    const cycleDays = myCategory.days > 0 ? myCategory.days : 30;
-                    const neededUnits = Math.ceil(shortfallDays / cycleDays);
+                    const neededUnits = Math.ceil(shortfallDays / (effectiveCategoryDays > 0 ? effectiveCategoryDays : 30));
                     statusBadge = '<span class="badge danger">주기 전 소진위험</span>'; 
                     alertText = `소진 ${totalRemainingDays}일 후 (세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`;
                 }
                 if (p.stock > 0) {
-                    const history = p.tungHistory || [];
-                    const avgReal = history.length >= 2
-                        ? Math.round(history.reduce((s, h) => s + h.days, 0) / history.length)
-                        : null;
-                    if (avgReal) {
-                        usedText = `현재 통 사용 ${daysUsed}일째 · 실제 평균 ${avgReal}일 (카테고리 기준 ${myCategory.days}일)`;
+                    if (realAvgDays !== null) {
+                        const pct = Math.round(blendWeight * 100);
+                        usedText = `현재 통 사용 ${daysUsed}일째 · 실제 평균 ${realAvgDays}일 / 기준 ${myCategory.days}일 → 가중 적용 ${effectiveCategoryDays}일 (실제 반영 ${pct}%)`;
                     } else {
-                        usedText = `현재 통 사용 ${daysUsed}일째 (기준 ${myCategory.days}일 주기)`;
+                        usedText = `현재 통 사용 ${daysUsed}일째 (기준 ${myCategory.days}일 주기 · 텅 2번 누르면 실제 데이터 반영 시작)`;
                     }
                 }
             }
