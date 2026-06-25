@@ -210,6 +210,17 @@
             </div>
         </div>
     </div>
+    <div class="confirm-overlay" id="editReviewOverlay">
+        <div class="confirm-box">
+            <p id="editReviewModalTitle" style="margin-bottom:10px;">상품평 수정</p>
+            <textarea id="editReviewTextInput" maxlength="200" placeholder="수정할 내용을 입력하세요"
+                style="width:100%; height:80px; border-radius:8px; border:1px solid #ddd; padding:8px; font-size:13px; resize:none; box-sizing:border-box;"></textarea>
+            <div style="display:flex; gap:8px; margin-top:10px;">
+                <button class="confirm-btn no" onclick="cancelEditReview()">취소</button>
+                <button class="confirm-btn yes" onclick="saveEditReview()">수정 완료</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="reviewOverlay">
         <div class="confirm-box" style="width:86%; max-width:320px;">
             <p id="reviewModalTitle" style="margin-bottom:10px;">상품평을 남겨볼까요?</p>
@@ -218,6 +229,15 @@
             <div class="confirm-btn-row">
                 <button class="confirm-btn no" onclick="skipReview()">나중에 할게요</button>
                 <button class="confirm-btn yes" onclick="saveReview()">저장</button>
+            </div>
+        </div>
+    </div>
+    <div class="confirm-overlay" id="deleteReviewOverlay">
+        <div class="confirm-box">
+            <p>이 상품평을 삭제할까요?</p>
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelDeleteReview()">아니오</button>
+                <button class="confirm-btn yes" onclick="proceedDeleteReview()">예</button>
             </div>
         </div>
     </div>
@@ -380,6 +400,7 @@
                 </div>
             </div>
             <div class="section-title">내가 남긴 상품평</div>
+            <div id="pendingReviewContainer"></div>
             <div id="reviewListContainer"></div>
         </div>
 
@@ -1036,7 +1057,7 @@
         if (p.openedDate) {
             if (!p.tungHistory) p.tungHistory = [];
             const daysUsedNow = Math.round((getTodayTimeline() - p.openedDate) / (1000 * 60 * 60 * 24));
-            p.tungHistory.push({ date: getTodayTimeline(), days: daysUsedNow });
+            p.tungHistory.push({ date: getTodayTimeline(), days: daysUsedNow, tungNo: p.tungCount });
             if (p.tungHistory.length > 10) p.tungHistory.shift();
         }
 
@@ -1298,7 +1319,74 @@
         pendingReviewProductId = null;
         document.getElementById('reviewOverlay').classList.remove('active');
         renderProducts();
+        renderReviewList();
     }
+    // ── 미작성 리뷰 목록 ──
+    function getPendingReviews() {
+        const pending = [];
+        products.forEach(p => {
+            if (!p.tungHistory) return;
+            p.tungHistory.forEach(h => {
+                if (h.tungNo == null) return; // 구버전 데이터 스킵
+                const already = reviews.find(r => r.productId === p.id && r.tungNo === h.tungNo);
+                if (!already) {
+                    pending.push({ productId: p.id, productName: p.name, tungNo: h.tungNo, date: h.date });
+                }
+            });
+        });
+        return pending.sort((a, b) => b.date - a.date);
+    }
+
+    function renderPendingReviews() {
+        const el = document.getElementById('pendingReviewContainer');
+        if (!el) return;
+        const pending = getPendingReviews();
+        if (pending.length === 0) { el.innerHTML = ''; return; }
+        el.innerHTML = `
+            <div style="background:#FFF8E6; border:1.5px solid #FFD9B3; border-radius:12px; padding:12px; margin-bottom:14px;">
+                <div style="font-size:12px; font-weight:bold; color:#FF922B; margin-bottom:8px;">✏️ 아직 작성 안 한 상품평 ${pending.length}건</div>
+                ${pending.map(p => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid #FFE8C0;">
+                        <div>
+                            <span style="font-size:13px; font-weight:bold;">${p.productName}</span>
+                            <span style="font-size:11px; color:#FF922B; margin-left:5px;">${getTungOrdinalLabel(p.tungNo)}</span>
+                            <div style="font-size:10px; color:#AAA;">${formatDateString(p.date)} 텅</div>
+                        </div>
+                        <button onclick="openReviewModal(${p.productId}, '${p.productName.replace(/'/g,"\\'")}', ${p.tungNo})"
+                            style="background:#FF922B; color:white; border:none; border-radius:14px; padding:5px 12px; font-size:11px; font-weight:bold; cursor:pointer;">작성하기</button>
+                    </div>
+                `).join('')}
+            </div>`;
+    }
+
+    // ── 리뷰 수정 ──
+    let editingReviewId = null;
+    function openEditReview(reviewId) {
+        const r = reviews.find(rv => rv.id === reviewId);
+        if (!r) return;
+        editingReviewId = reviewId;
+        document.getElementById('editReviewModalTitle').textContent = `"${r.productName}" ${getTungOrdinalLabel(r.tungNo || 1)} 리뷰 수정`;
+        document.getElementById('editReviewTextInput').value = r.text;
+        document.getElementById('editReviewOverlay').classList.add('active');
+        setTimeout(() => document.getElementById('editReviewTextInput').focus(), 50);
+    }
+    function cancelEditReview() {
+        editingReviewId = null;
+        document.getElementById('editReviewOverlay').classList.remove('active');
+    }
+    function saveEditReview() {
+        const text = document.getElementById('editReviewTextInput').value.trim();
+        if (!text || !editingReviewId) { cancelEditReview(); return; }
+        const r = reviews.find(rv => rv.id === editingReviewId);
+        if (r) { r.text = text; r.editedAt = getTodayTimeline(); }
+        saveToStorage();
+        showToast('✏️ 상품평이 수정됐어요');
+        editingReviewId = null;
+        document.getElementById('editReviewOverlay').classList.remove('active');
+        renderReviewList();
+        renderProducts();
+    }
+
     function getLatestReview(productId, currentTungCount) {
         return reviews.find(r => r.productId === productId && r.tungNo === currentTungCount) || null;
     }
@@ -1313,14 +1401,27 @@
         renderReviewList();
     }
 
+    let pendingDeleteReviewId = null;
     function deleteReview(reviewId) {
-        reviews = reviews.filter(r => r.id !== reviewId);
+        pendingDeleteReviewId = reviewId;
+        document.getElementById('deleteReviewOverlay').classList.add('active');
+    }
+    function cancelDeleteReview() {
+        pendingDeleteReviewId = null;
+        document.getElementById('deleteReviewOverlay').classList.remove('active');
+    }
+    function proceedDeleteReview() {
+        if (pendingDeleteReviewId == null) return;
+        reviews = reviews.filter(r => r.id !== pendingDeleteReviewId);
+        pendingDeleteReviewId = null;
+        document.getElementById('deleteReviewOverlay').classList.remove('active');
         saveToStorage();
         renderReviewList();
         showToast('🗑️ 상품평이 삭제됐어요');
     }
 
     function renderReviewList() {
+        renderPendingReviews();
         const listEl = document.getElementById('reviewListContainer');
         if (!listEl) return;
         const keyword = (document.getElementById('reviewSearchInput')?.value || '').trim().toLowerCase();
@@ -1343,13 +1444,17 @@
             const cat = categories.find(c => c.id === r.categoryId);
             const sched = schedules.find(s => s.id === r.scheduleId);
             const ordinalLabel = getTungOrdinalLabel(r.tungNo || 1);
+            const editedMark = r.editedAt ? ' · 수정됨' : '';
             return `
                 <div class="review-card">
                     <div class="review-card-top">
                         <span class="review-prod-name">${r.productName} <span style="color:var(--primary, #FF5A5F); font-size:11px;">· ${ordinalLabel} 리뷰</span></span>
-                        <button class="btn-del-action" onclick="deleteReview(${r.id})">삭제</button>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn-del-action" style="background:#F0F0F0; color:#555;" onclick="openEditReview(${r.id})">수정</button>
+                            <button class="btn-del-action" onclick="deleteReview(${r.id})">삭제</button>
+                        </div>
                     </div>
-                    <div class="review-meta">${cat ? cat.name : '카테고리 없음'} ${sched ? '· ' + sched.name : ''} · ${formatDateString(r.date)}</div>
+                    <div class="review-meta">${cat ? cat.name : '카테고리 없음'} ${sched ? '· ' + sched.name : ''} · ${formatDateString(r.date)}${editedMark}</div>
                     <div class="review-text">${r.text}</div>
                 </div>
             `;
