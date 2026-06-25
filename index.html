@@ -73,6 +73,7 @@
         .btn-reset-history { background: none; border: none; color: #999; font-size: 10px; cursor: pointer; padding: 2px 0; margin-top: 2px; text-decoration: underline; }
         .review-preview { font-size: 11px; color: #777; margin-top: 4px; cursor: pointer; background: #F7F7F7; padding: 4px 8px; border-radius: 8px; display: inline-block; }
         .tung-count-badge { font-size: 11px; color: #888; margin-top: 4px; font-weight: bold; }
+        .btn-undo-tung { background: #FFF0EE; border: none; color: var(--primary, #FF5A5F); font-size: 10px; font-weight: bold; cursor: pointer; padding: 2px 6px; border-radius: 6px; margin-left: 4px; }
         .review-preview:active { background: #EFEFEF; }
         .review-card { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
         .review-card-top { display: flex; justify-content: space-between; align-items: center; }
@@ -825,7 +826,7 @@
                     <div class="prod-status">${alertText}</div>
                     ${usedText ? `<div class="prod-used">⏱ ${usedText}</div>` : ''}
                     ${(p.tungHistory && p.tungHistory.length > 0) ? `<button class="btn-reset-history" onclick="confirmResetHistory(${p.id})">↺ 사용 기록 초기화</button>` : ''}
-                    ${(p.tungCount > 0) ? `<div class="tung-count-badge">🫙 ${getTungOrdinalLabel(p.tungCount)}${latestReview ? '' : ' · 리뷰 없음'}</div>` : ''}
+                    ${(p.tungCount > 0) ? `<div class="tung-count-badge">🫙 ${getTungOrdinalLabel(p.tungCount)}${latestReview ? '' : ' · 리뷰 없음'}${(lastTungAction && lastTungAction.productId === p.id) ? ` <button class="btn-undo-tung" onclick="undoLastTung(${p.id})">↩️ 방금 텅 취소</button>` : ''}</div>` : ''}
                     ${latestReview ? `<div class="review-preview" onclick="openReviewFromCard(${p.id})">📝 ${getTungOrdinalLabel(latestReview.tungNo || 1)} 리뷰: "${latestReview.text.length > 18 ? latestReview.text.slice(0, 18) + '…' : latestReview.text}"</div>` : ''}
                     <div style="margin-top:6px;">
                         <select class="inline-select" onchange="changeProductCategory(${p.id}, this.value)">${categoryOptions}</select>
@@ -948,11 +949,49 @@
     }
 
     // 텅 누르면: 재고 1개 차감. 0이 되는 순간 흔들림 + 파티클 폭죽! (재고가 남아있어도 누른 건 모두 '텅'으로 카운트)
+    let lastTungAction = null;
+    function undoLastTung(productId) {
+        if (!lastTungAction || lastTungAction.productId !== productId) {
+            showToast('⚠️ 되돌릴 텅 기록이 없어요');
+            return;
+        }
+        const p = products.find(prod => prod.id === productId);
+        if (!p) return;
+
+        const undoneTungNo = lastTungAction.prevTungCount + 1;
+
+        if (lastTungAction.hadHistoryPush && p.tungHistory && p.tungHistory.length > 0) {
+            p.tungHistory.pop();
+        }
+        p.stock = lastTungAction.prevStock;
+        p.openedDate = lastTungAction.prevOpenedDate;
+        p.tungCount = lastTungAction.prevTungCount;
+
+        // 취소된 텅 차수에 달려있던 리뷰가 있다면 같이 제거 (그 텅 자체가 없던 일이 되므로)
+        reviews = reviews.filter(r => !(r.productId === productId && r.tungNo === undoneTungNo));
+
+        lastTungAction = null;
+        saveToStorage();
+        renderProducts();
+        renderReviewList();
+        showToast('↩️ 마지막 텅이 취소됐어요');
+    }
+
     function pressTung(id, el) {
         const p = products.find(prod => prod.id === id);
         if (!p || p.stock <= 0) return;
 
         const goingEmpty = (p.stock === 1); // 이번 클릭으로 0이 되는 순간 (애니메이션 분기용)
+
+        // ── 되돌리기용 스냅샷: 이번 텅으로 기록이 추가됐는지까지 같이 저장 ──
+        const willPushHistory = !!p.openedDate;
+        lastTungAction = {
+            productId: id,
+            prevStock: p.stock,
+            prevOpenedDate: p.openedDate,
+            prevTungCount: p.tungCount || 0,
+            hadHistoryPush: willPushHistory
+        };
 
         // 데이터 먼저 업데이트
         p.stock -= 1;
