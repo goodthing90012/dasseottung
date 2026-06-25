@@ -99,6 +99,31 @@
         .inline-select { padding: 4px 8px; font-size: 11px; border-radius: 6px; border: 1px solid #ddd; margin-top: 6px; width: auto; color: #555; background-color: #f9f9f9; }
         
         .stock-control { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+
+        /* 미개봉/사용중 토글 */
+        .sealed-toggle {
+            display: flex; align-items: center; gap: 6px;
+            margin-top: 7px; padding: 5px 8px;
+            border-radius: 8px; cursor: pointer;
+            background: #f5f5f5; border: 1.5px solid #e0e0e0;
+            font-size: 11px; font-weight: 700; color: #888;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .sealed-toggle.is-open {
+            background: #FFF0F2; border-color: var(--primary); color: var(--primary);
+        }
+        .sealed-toggle .toggle-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: #ccc; transition: background 0.2s; flex-shrink: 0;
+        }
+        .sealed-toggle.is-open .toggle-dot { background: var(--primary); }
+
+        /* 미개봉 카드 스타일 */
+        .product-card.sealed {
+            opacity: 0.72;
+            border-left: 3px solid #ccc;
+        }
         .btn-qty { background: #F0F0F0; border: none; width: 26px; height: 26px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         
         .product-card, .list-item-card { position: relative; }
@@ -159,6 +184,10 @@
         @keyframes idle-glow {
             0%, 100% { filter: drop-shadow(0 0 0px rgba(255,90,95,0)); }
             50%       { filter: drop-shadow(0 0 6px rgba(255,90,95,0.55)); }
+        }
+        .tung-bottle-wrapper.sealed-bottle {
+            opacity: 0.38; filter: grayscale(0.6); cursor: not-allowed;
+            animation: none !important;
         }
         .tung-bottle-wrapper {
             position: relative; width: 54px; height: 72px; cursor: pointer;
@@ -486,8 +515,8 @@
     ];
 
     const defaultProducts = [
-        { id: 1, name: "촉촉 수분 토너", categoryId: 2, stock: 2, targetScheduleId: 1, openedDate: getTodayTimeline() - (15 * 24 * 60 * 60 * 1000), tungHistory: [] },
-        { id: 2, name: "데일리 베리어 선크림", categoryId: 1, stock: 1, targetScheduleId: 2, openedDate: getTodayTimeline() - (10 * 24 * 60 * 60 * 1000), tungHistory: [] }
+        { id: 1, name: "촉촉 수분 토너", categoryId: 2, stock: 2, targetScheduleId: 1, openedDate: getTodayTimeline() - (15 * 24 * 60 * 60 * 1000), tungHistory: [], isSealed: false },
+        { id: 2, name: "데일리 베리어 선크림", categoryId: 1, stock: 1, targetScheduleId: 2, openedDate: getTodayTimeline() - (10 * 24 * 60 * 60 * 1000), tungHistory: [], isSealed: false }
     ];
 
     const defaultReviews = [];
@@ -691,7 +720,7 @@
             }
 
             // [변경점] 현재 쓰는 통(openedDate 기준)이 며칠째인지 계산
-            const daysUsed = p.stock > 0 ? diffDaysFrom(p.openedDate, today) : 0;
+            const daysUsed = (p.stock > 0 && !p.isSealed && p.openedDate) ? diffDaysFrom(p.openedDate, today) : 0;
 
             // [변경점] 일반 카테고리는 텅 기록이 쌓일수록 실제 평균 비중을 점점 높이는 가중평균 사용
             // (기록 5회 이상이면 실제 평균 100% 반영, 그 전엔 카테고리 기준값과 섞어서 완만하게 전환)
@@ -813,8 +842,9 @@
             const bottleStrokeColor = isBottleEmpty ? '#FF3B30' : '#444444';
             const liquidFillColor = isBottleEmpty ? 'transparent' : 'var(--liquid-full)';
 
+            const isSealed = !!p.isSealed;
             const card = document.createElement('div');
-            card.className = 'product-card';
+            card.className = 'product-card' + (isSealed ? ' sealed' : '');
             card.innerHTML = `
                 <button class="btn-del-corner" onclick="confirmDeleteProduct(${p.id})">삭제 🗑️</button>
                 <div class="prod-info" style="padding-right:42px;">
@@ -834,13 +864,18 @@
                     <div style="margin-top:6px;">
                         <select class="inline-select" onchange="changeProductSchedule(${p.id}, this.value)">${inlineOptions}</select>
                     </div>
+                    <div class="sealed-toggle ${isSealed ? '' : 'is-open'}" onclick="toggleSealed(${p.id})">
+                        <span class="toggle-dot"></span>
+                        ${isSealed ? '⚪ 미개봉 — 탭하면 개봉' : '🟢 사용 중 — 탭하면 미개봉으로'}
+                    </div>
+                    ${!isSealed ? `
                     <div style="margin-top:6px; display:flex; align-items:center; gap:5px;">
                         <span style="font-size:11px; color:#888; white-space:nowrap;">📅 사용 시작일</span>
                         <input type="date" class="inline-select" 
                             value="${openedDateStr}" max="${todayStr}"
                             style="font-size:11px; padding:3px 6px; flex:1; min-width:0;"
                             onchange="changeOpenedDate(${p.id}, this.value)">
-                    </div>
+                    </div>` : ''}
                     <div class="stock-control">
                         <button class="btn-qty" onclick="adjustStock(${p.id}, -1)">-</button>
                         <span style="font-size:13px; font-weight:bold;">재고: ${p.stock}개</span>
@@ -848,7 +883,8 @@
                     </div>
                 </div>
                 <div class="right-actions">
-                    <div class="tung-bottle-wrapper ${isBottleEmpty ? 'empty' : ''}" onclick="pressTung(${p.id}, this)">
+                    <div class="tung-bottle-wrapper ${isBottleEmpty ? 'empty' : ''} ${isSealed ? 'sealed-bottle' : ''}" 
+                    onclick="pressTung(${p.id}, this)">
                         <svg viewBox="0 0 44 58" style="width:100%; height:calc(100% - 16px); overflow:visible; display:block;">
                           <!-- 뚜껑 -->
                           <rect x="10" y="2" width="24" height="9" rx="4" 
@@ -980,6 +1016,7 @@
     function pressTung(id, el) {
         const p = products.find(prod => prod.id === id);
         if (!p || p.stock <= 0) return;
+        if (p.isSealed) { showSealedWarning(); return; }
 
         const goingEmpty = (p.stock === 1); // 이번 클릭으로 0이 되는 순간 (애니메이션 분기용)
 
@@ -1118,6 +1155,26 @@
         } 
     }
     
+    function toggleSealed(id) {
+        const p = products.find(pr => pr.id === id);
+        if (!p) return;
+        p.isSealed = !p.isSealed;
+        if (!p.isSealed) {
+            // 개봉하는 순간 → 오늘을 사용 시작일로 세팅
+            p.openedDate = getTodayTimeline();
+            showToast('🟢 개봉 완료! 오늘부터 사용 시작일로 카운팅돼요');
+        } else {
+            // 미개봉으로 되돌리기 → 사용 시작일 초기화
+            p.openedDate = null;
+            showToast('⚪ 미개봉 상태로 변경됐어요');
+        }
+        renderProducts();
+    }
+
+    function showSealedWarning() {
+        showToast('⚪ 미개봉 상태예요! 먼저 개봉해주세요');
+    }
+
     function changeOpenedDate(id, val) {
         const p = products.find(pr => pr.id === id);
         if (!p || !val) return;
@@ -1415,8 +1472,9 @@
             categoryId: isUnknown ? 0 : categoryId,
             stock: 1, 
             targetScheduleId: isNaN(targetScheduleId) ? 0 : targetScheduleId,
-            openedDate: openedDate,
-            tungHistory: [] // 🫙 텅 누른 날짜 기록 (소진일 자동 분석용)
+            openedDate: null,   // 개봉 전엔 null
+            isSealed: true,     // 기본값: 미개봉
+            tungHistory: []
         }); 
         
         document.getElementById('prodName').value = ''; 
