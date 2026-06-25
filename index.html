@@ -71,6 +71,22 @@
         .prod-status { font-size: 12px; color: #555; line-height: 1.4; margin-top: 6px; }
         .prod-used { font-size: 11px; color: var(--used-purple); font-weight: bold; margin-top: 2px; }
         .btn-reset-history { background: none; border: none; color: #999; font-size: 10px; cursor: pointer; padding: 2px 0; margin-top: 2px; text-decoration: underline; }
+        .review-preview { font-size: 11px; color: #777; margin-top: 4px; cursor: pointer; background: #F7F7F7; padding: 4px 8px; border-radius: 8px; display: inline-block; }
+        .tung-count-badge { font-size: 11px; color: #888; margin-top: 4px; font-weight: bold; }
+        .review-preview:active { background: #EFEFEF; }
+        .review-card { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .review-card-top { display: flex; justify-content: space-between; align-items: center; }
+        .review-prod-name { font-weight: bold; font-size: 13px; color: #111; }
+        .review-meta { font-size: 10px; color: #999; margin-top: 2px; }
+        .review-text { font-size: 13px; color: #333; margin-top: 6px; line-height: 1.4; }
+        .review-filter-row { display: flex; gap: 6px; margin-bottom: 10px; }
+        .review-filter-row select { flex: 1; font-size: 12px; padding: 6px; border-radius: 8px; border: 1px solid #ddd; }
+        .toggle-switch { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background-color: #ccc; transition: 0.2s; border-radius: 26px; }
+        .toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; transition: 0.2s; border-radius: 50%; }
+        .toggle-switch input:checked + .toggle-slider { background-color: var(--primary, #FF5A5F); }
+        .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
         
         .badge { display: inline-block; padding: 3px 6px; border-radius: 6px; font-size: 10px; font-weight: bold; margin-top: 4px; margin-right: 4px; }
         .badge.enough { background: #E6F7ED; color: #1EA94A; }
@@ -193,6 +209,17 @@
             </div>
         </div>
     </div>
+    <div class="confirm-overlay" id="reviewOverlay">
+        <div class="confirm-box" style="width:86%; max-width:320px;">
+            <p id="reviewModalTitle" style="margin-bottom:10px;">상품평을 남겨볼까요?</p>
+            <textarea id="reviewTextInput" maxlength="200" placeholder="이 제품, 어떻게 쓰셨나요? (예: 흡수는 좋았지만 향이 좀 강했어요)" 
+                style="width:100%; box-sizing:border-box; height:80px; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:13px; resize:none; margin-bottom:14px; font-family:inherit;"></textarea>
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="skipReview()">나중에 할게요</button>
+                <button class="confirm-btn yes" onclick="saveReview()">저장</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="resetHistoryOverlay">
         <div class="confirm-box">
             <p>이 항목의 사용 기록을 초기화할까요?<br><span style="font-size:11px; color:#888; font-weight:normal;">(지금까지 쌓인 텅 기록이 사라지고, 다시 기준값부터 시작해요)</span></p>
@@ -280,7 +307,8 @@
         <div class="sub-tab-container">
             <div id="sub-btn-cat" class="sub-tab-item active" onclick="switchSubTab('cat')">📂 카테고리 설정</div>
             <div id="sub-btn-sched" class="sub-tab-item" onclick="switchSubTab('sched')">🗓️ 세일·구매 설정</div>
-            <div id="sub-btn-backup" class="sub-tab-item" onclick="switchSubTab('backup')">💾 데이터 백업</div>
+            <div id="sub-btn-reviews" class="sub-tab-item" onclick="switchSubTab('reviews')">📝 상품평</div>
+            <div id="sub-btn-backup" class="sub-tab-item" onclick="switchSubTab('backup')">⚙️ 설정</div>
         </div>
 
         <!-- 서브 탭: 카테고리 관리 -->
@@ -338,8 +366,38 @@
             <div id="scheduleList"></div>
         </div>
 
+        <!-- 서브 탭: 상품평 -->
+        <div id="sub-content-reviews" class="sub-content">
+            <div class="setting-form">
+                <div class="form-group">
+                    <label>상품명 검색</label>
+                    <input type="text" id="reviewSearchInput" placeholder="예: 토너, 선크림" oninput="renderReviewList()">
+                </div>
+                <div class="review-filter-row">
+                    <select id="reviewCatFilter" onchange="renderReviewList()"></select>
+                    <select id="reviewSchedFilter" onchange="renderReviewList()"></select>
+                </div>
+            </div>
+            <div class="section-title">내가 남긴 상품평</div>
+            <div id="reviewListContainer"></div>
+        </div>
+
         <!-- 서브 탭: 데이터 백업 -->
         <div id="sub-content-backup" class="sub-content">
+            <div class="setting-form">
+                <div class="section-title">📝 텅 리뷰 입력</div>
+                <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
+                    켜두면 제품을 다 쓸 때(텅!)마다 상품평을 입력할 수 있는 창이 떠요.<br>
+                    리뷰 쓰는 게 귀찮으시면 꺼두실 수 있어요.
+                </div>
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <span style="font-size:13px; font-weight:bold;">텅! 할 때 상품평 입력창 띄우기</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="reviewFeatureToggle" onchange="toggleReviewFeature(this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
             <div class="setting-form">
                 <div class="section-title">💾 백업 파일 내려받기</div>
                 <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
@@ -431,6 +489,8 @@
         { id: 2, name: "데일리 베리어 선크림", categoryId: 1, stock: 1, targetScheduleId: 2, openedDate: getTodayTimeline() - (10 * 24 * 60 * 60 * 1000), tungHistory: [] }
     ];
 
+    const defaultReviews = [];
+
     // 저장된 데이터 불러오기 (없거나 파싱 실패 시 기본값 사용)
     function loadFromStorage() {
         try {
@@ -446,7 +506,7 @@
     // 현재 데이터를 로컬스토리지에 저장
     function saveToStorage() {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ categories, schedules, products }));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ categories, schedules, products, reviews }));
             localStorage.setItem(STORAGE_KEY + '_savedAt', String(Date.now()));
             updateLastSavedLabel();
         } catch (e) {
@@ -472,7 +532,7 @@
             exportedAt: new Date().toISOString(),
             app: 'dasseottung',
             version: 1,
-            categories, schedules, products
+            categories, schedules, products, reviews
         };
         const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -501,6 +561,7 @@
                 categories = parsed.categories;
                 schedules = parsed.schedules;
                 products = parsed.products;
+                reviews = Array.isArray(parsed.reviews) ? parsed.reviews : [];
                 syncAllAndRender();
                 showToast('✅ 백업 데이터를 불러왔어요');
             } catch (err) {
@@ -517,11 +578,13 @@
     let categories = savedData ? savedData.categories : defaultCategories;
     let schedules = savedData ? savedData.schedules : defaultSchedules;
     let products = savedData ? savedData.products : defaultProducts;
+    let reviews = (savedData && Array.isArray(savedData.reviews)) ? savedData.reviews : defaultReviews;
 
     window.onload = () => {
         document.getElementById('schedTargetDate').value = formatDateString(getTodayTimeline());
         document.getElementById('prodOpenedDate').value = formatDateString(getTodayTimeline());
         document.getElementById('prodOpenedDate').max = formatDateString(getTodayTimeline());
+        document.getElementById('reviewFeatureToggle').checked = reviewFeatureEnabled;
         syncAllAndRender();
     };
 
@@ -531,6 +594,8 @@
         syncSelectOptions();
         renderProducts();
         renderMypageLists();
+        populateReviewFilters();
+        renderReviewList();
     }
 
     function switchTab(tabName) {
@@ -742,6 +807,7 @@
             const openedDateStr = p.openedDate ? new Date(p.openedDate).toISOString().slice(0,10) : '';
             const todayStr = new Date().toISOString().slice(0,10);
             const isBottleEmpty = p.stock === 0;
+            const latestReview = getLatestReview(p.id, p.tungCount || 0);
             const liquidScaleY = isBottleEmpty ? 0 : 1; 
             const bottleStrokeColor = isBottleEmpty ? '#FF3B30' : '#444444';
             const liquidFillColor = isBottleEmpty ? 'transparent' : 'var(--liquid-full)';
@@ -759,6 +825,8 @@
                     <div class="prod-status">${alertText}</div>
                     ${usedText ? `<div class="prod-used">⏱ ${usedText}</div>` : ''}
                     ${(p.tungHistory && p.tungHistory.length > 0) ? `<button class="btn-reset-history" onclick="confirmResetHistory(${p.id})">↺ 사용 기록 초기화</button>` : ''}
+                    ${(p.tungCount > 0) ? `<div class="tung-count-badge">🫙 ${getTungOrdinalLabel(p.tungCount)}${latestReview ? '' : ' · 리뷰 없음'}</div>` : ''}
+                    ${latestReview ? `<div class="review-preview" onclick="openReviewFromCard(${p.id})">📝 ${getTungOrdinalLabel(latestReview.tungNo || 1)} 리뷰: "${latestReview.text.length > 18 ? latestReview.text.slice(0, 18) + '…' : latestReview.text}"</div>` : ''}
                     <div style="margin-top:6px;">
                         <select class="inline-select" onchange="changeProductCategory(${p.id}, this.value)">${categoryOptions}</select>
                     </div>
@@ -879,37 +947,39 @@
         }
     }
 
-    // 텅 누르면: 재고 1개 차감. 0이 되는 순간 흔들림 + 파티클 폭죽!
+    // 텅 누르면: 재고 1개 차감. 0이 되는 순간 흔들림 + 파티클 폭죽! (재고가 남아있어도 누른 건 모두 '텅'으로 카운트)
     function pressTung(id, el) {
         const p = products.find(prod => prod.id === id);
         if (!p || p.stock <= 0) return;
 
-        const goingEmpty = (p.stock === 1); // 이번 클릭으로 0이 되는 순간
+        const goingEmpty = (p.stock === 1); // 이번 클릭으로 0이 되는 순간 (애니메이션 분기용)
 
         // 데이터 먼저 업데이트
         p.stock -= 1;
 
-        // 소진일 자동 기록 — 모든 카테고리에서 실제 사용 주기 추적
-        if (goingEmpty && p.openedDate) {
+        // 텅 횟수 카운트 — 재고가 남아있어도 누를 때마다 1씩 증가 (낱개 단위 소진 = 텅 1회)
+        p.tungCount = (p.tungCount || 0) + 1;
+
+        // 소진일 자동 기록 — 모든 카테고리에서, 재고 남아있어도 매번 기록
+        if (p.openedDate) {
             if (!p.tungHistory) p.tungHistory = [];
             const daysUsedNow = Math.round((getTodayTimeline() - p.openedDate) / (1000 * 60 * 60 * 24));
             p.tungHistory.push({ date: getTodayTimeline(), days: daysUsedNow });
             if (p.tungHistory.length > 10) p.tungHistory.shift();
         }
 
+        // 다음 낱개 사용 시작일은 항상 오늘로 리셋 (재고 남아있어도 새 통 시작)
         p.openedDate = p.stock > 0 ? getTodayTimeline() : null;
 
         let toastMsg = '"텅! 다썼텅 리필 타이밍 체크"';
         if (goingEmpty) {
-            if (Number(p.categoryId) === 0) {
-                const cnt = (p.tungHistory || []).length;
-                const avg = cnt >= 2 ? Math.round(p.tungHistory.reduce((s,h)=>s+h.days,0)/cnt) : null;
-                toastMsg = (avg !== null)
-                    ? '📊 ' + cnt + '회 분석 완료! 평균 ' + avg + '일 소진 패턴이에요'
-                    : '🫙 첫 텅! 한 번 더 누르면 소진 패턴 분석 시작!';
-            } else {
-                toastMsg = '🎉 텅! 다 썼어요! 리필 타이밍이에요';
-            }
+            toastMsg = '🎉 텅! 다 썼어요! 리필 타이밍이에요';
+        } else {
+            const cnt = (p.tungHistory || []).length;
+            const avg = cnt >= 2 ? Math.round(p.tungHistory.reduce((s,h)=>s+h.days,0)/cnt) : null;
+            toastMsg = avg !== null
+                ? `📊 ${getTungOrdinalLabel(p.tungCount)}! 평균 ${avg}일 소진 패턴이에요`
+                : `🫙 ${getTungOrdinalLabel(p.tungCount)}!`;
         }
         showToast(toastMsg);
 
@@ -953,9 +1023,12 @@
             setTimeout(() => {
                 el.classList.remove('shaking');
                 renderProducts();
+                if (isReviewFeatureEnabled()) {
+                    openReviewModal(id, p.name, p.tungCount || 1);
+                }
             }, 700);
         } else {
-            // 일반 클릭: 꾹 바운스 + 액체 출렁임
+            // 일반 클릭: 꾹 바운스 + 액체 출렁임 (재고 남아있지만 이것도 텅 1회로 카운트됨)
             if (el) {
                 // 꾹 바운스
                 el.classList.add('pressing');
@@ -979,8 +1052,13 @@
                     });
                 }
             }
-            // 꾹 바운스 끝난 뒤 DOM 갱신 (애니메이션 끊김 방지)
-            setTimeout(() => renderProducts(), 480);
+            // 꾹 바운스 끝난 뒤 DOM 갱신 + 재고 남아있어도 리뷰 입력 기회 제공
+            setTimeout(() => {
+                renderProducts();
+                if (isReviewFeatureEnabled()) {
+                    openReviewModal(id, p.name, p.tungCount || 1);
+                }
+            }, 480);
         }
     }
     
@@ -1095,6 +1173,150 @@
         }
         pendingResetId = null;
         document.getElementById('resetHistoryOverlay').classList.remove('active');
+    }
+
+    // 텅 차수를 "첫 텅", "두번째 텅", "N번째 텅"으로 표현
+    function getTungOrdinalLabel(n) {
+        const map = { 1: '첫', 2: '두번째', 3: '세번째', 4: '네번째', 5: '다섯번째', 6: '여섯번째', 7: '일곱번째', 8: '여덟번째', 9: '아홉번째', 10: '열번째' };
+        return (map[n] || (n + '번째')) + ' 텅';
+    }
+
+    let reviewFeatureEnabled = (() => {
+        const v = localStorage.getItem(STORAGE_KEY + '_reviewEnabled');
+        return v === null ? true : v === 'true'; // 기본값: 켜짐
+    })();
+    function isReviewFeatureEnabled() { return reviewFeatureEnabled; }
+    function toggleReviewFeature(checked) {
+        reviewFeatureEnabled = checked;
+        localStorage.setItem(STORAGE_KEY + '_reviewEnabled', String(checked));
+        showToast(checked ? '📝 텅 리뷰 입력이 켜졌어요' : '🔕 텅 리뷰 입력이 꺼졌어요');
+    }
+
+    // ── 상품평 (텅 비운 직후 입력) ──
+    let pendingReviewProductId = null;
+    let pendingReviewTungNo = 1;
+    function openReviewModal(productId, productName, tungNo) {
+        pendingReviewProductId = productId;
+        pendingReviewTungNo = tungNo || 1;
+        document.getElementById('reviewModalTitle').textContent = `"${productName}" ${getTungOrdinalLabel(pendingReviewTungNo)}! 상품평을 남겨볼까요?`;
+        document.getElementById('reviewTextInput').value = '';
+        document.getElementById('reviewOverlay').classList.add('active');
+        setTimeout(() => document.getElementById('reviewTextInput').focus(), 50);
+    }
+    function skipReview() {
+        pendingReviewProductId = null;
+        document.getElementById('reviewOverlay').classList.remove('active');
+    }
+    function saveReview() {
+        const text = document.getElementById('reviewTextInput').value.trim();
+        const p = products.find(prod => prod.id === pendingReviewProductId);
+        if (!text || !p) { skipReview(); return; }
+        reviews.unshift({
+            id: Date.now(),
+            productId: p.id,
+            productName: p.name,
+            categoryId: p.categoryId,
+            scheduleId: p.targetScheduleId,
+            text: text,
+            date: getTodayTimeline(),
+            tungNo: pendingReviewTungNo
+        });
+        showToast('📝 상품평이 저장됐어요');
+        saveToStorage();
+        pendingReviewProductId = null;
+        document.getElementById('reviewOverlay').classList.remove('active');
+        renderProducts();
+    }
+    function getLatestReview(productId, currentTungCount) {
+        return reviews.find(r => r.productId === productId && r.tungNo === currentTungCount) || null;
+    }
+    function openReviewFromCard(productId) {
+        switchTab('mypage');
+        switchSubTab('reviews');
+        document.getElementById('reviewSearchInput').value = '';
+        const p = products.find(pr => pr.id === productId);
+        if (p) {
+            document.getElementById('reviewSearchInput').value = p.name;
+        }
+        renderReviewList();
+    }
+
+    function deleteReview(reviewId) {
+        reviews = reviews.filter(r => r.id !== reviewId);
+        saveToStorage();
+        renderReviewList();
+        showToast('🗑️ 상품평이 삭제됐어요');
+    }
+
+    function renderReviewList() {
+        const listEl = document.getElementById('reviewListContainer');
+        if (!listEl) return;
+        const keyword = (document.getElementById('reviewSearchInput')?.value || '').trim().toLowerCase();
+        const catFilter = document.getElementById('reviewCatFilter')?.value || 'all';
+        const schedFilter = document.getElementById('reviewSchedFilter')?.value || 'all';
+
+        let filtered = reviews.filter(r => {
+            if (keyword && !r.productName.toLowerCase().includes(keyword)) return false;
+            if (catFilter !== 'all' && String(r.categoryId) !== catFilter) return false;
+            if (schedFilter !== 'all' && String(r.scheduleId) !== schedFilter) return false;
+            return true;
+        });
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = `<div style="text-align:center; color:#999; font-size:12px; padding:30px 0;">조건에 맞는 상품평이 없어요</div>`;
+            return;
+        }
+
+        listEl.innerHTML = filtered.map(r => {
+            const cat = categories.find(c => c.id === r.categoryId);
+            const sched = schedules.find(s => s.id === r.scheduleId);
+            const ordinalLabel = getTungOrdinalLabel(r.tungNo || 1);
+            return `
+                <div class="review-card">
+                    <div class="review-card-top">
+                        <span class="review-prod-name">${r.productName} <span style="color:var(--primary, #FF5A5F); font-size:11px;">· ${ordinalLabel} 리뷰</span></span>
+                        <button class="btn-del-action" onclick="deleteReview(${r.id})">삭제</button>
+                    </div>
+                    <div class="review-meta">${cat ? cat.name : '카테고리 없음'} ${sched ? '· ' + sched.name : ''} · ${formatDateString(r.date)}</div>
+                    <div class="review-text">${r.text}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function populateReviewFilters() {
+        const catSel = document.getElementById('reviewCatFilter');
+        const schedSel = document.getElementById('reviewSchedFilter');
+
+        // 내 화장대 재고 현황에 실제로 등록된 카테고리/일정만 노출
+        const usedCatIds = new Set(products.map(p => Number(p.categoryId)));
+        const usedSchedIds = new Set(products.map(p => Number(p.targetScheduleId)).filter(id => id > 0));
+
+        if (catSel) {
+            const prevVal = catSel.value;
+            let options = '<option value="all">전체 카테고리</option>';
+            if (usedCatIds.has(0)) {
+                options += '<option value="0">🫙 일단 쓰고 봄</option>';
+            }
+            categories.forEach(c => {
+                if (usedCatIds.has(Number(c.id))) {
+                    options += `<option value="${c.id}">${c.name}</option>`;
+                }
+            });
+            catSel.innerHTML = options;
+            catSel.value = prevVal && [...catSel.options].some(o => o.value === prevVal) ? prevVal : 'all';
+        }
+        if (schedSel) {
+            const prevVal = schedSel.value;
+            let options = '<option value="all">전체 세일/구매 일정</option>';
+            schedules.forEach(s => {
+                if (usedSchedIds.has(Number(s.id))) {
+                    options += `<option value="${s.id}">${s.name}</option>`;
+                }
+            });
+            schedSel.innerHTML = options;
+            schedSel.value = prevVal && [...schedSel.options].some(o => o.value === prevVal) ? prevVal : 'all';
+        }
     }
 
     function deleteProduct(productId) { 
