@@ -805,8 +805,9 @@
                 categoryOptions += `<option value="${c.id}" ${Number(c.id) === Number(p.categoryId) ? 'selected' : ''}>${getCategoryIcon(c.name)} ${c.name} (${c.days}일)</option>`;
             });
 
-            const openedDateStr = p.openedDate ? new Date(p.openedDate).toISOString().slice(0,10) : '';
-            const todayStr = new Date().toISOString().slice(0,10);
+            // [버그수정] toISOString()은 UTC로 변환해서 한국시간 기준 날짜가 하루 밀려 보였음 → formatDateString(로컬 기준)으로 교체
+            const openedDateStr = p.openedDate ? formatDateString(p.openedDate) : '';
+            const todayStr = formatDateString(getTodayTimeline());
             const isBottleEmpty = p.stock === 0;
             const latestReview = getLatestReview(p.id, p.tungCount || 0);
             const liquidScaleY = isBottleEmpty ? 0 : 1; 
