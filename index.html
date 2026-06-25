@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>다썼텅 - Das sutt Tung (V5.7)</title>
+    <title>다썼텅 - Das sutt Tung (V5.8)</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon-192.png" type="image/png">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -486,8 +486,8 @@
     ];
 
     const defaultProducts = [
-        { id: 1, name: "촉촉 수분 토너", categoryId: 2, stock: 2, targetScheduleId: 1, openedDate: getTodayTimeline() - (15 * 24 * 60 * 60 * 1000), tungHistory: [] },
-        { id: 2, name: "데일리 베리어 선크림", categoryId: 1, stock: 1, targetScheduleId: 2, openedDate: getTodayTimeline() - (10 * 24 * 60 * 60 * 1000), tungHistory: [] }
+        { id: 1, name: "촉촉 수분 토너", categoryId: 2, stock: 2, targetScheduleId: 1, openedDate: getTodayTimeline() - (15 * 24 * 60 * 60 * 1000), unopened: false, tungHistory: [] },
+        { id: 2, name: "데일리 베리어 선크림", categoryId: 1, stock: 1, targetScheduleId: 2, openedDate: getTodayTimeline() - (10 * 24 * 60 * 60 * 1000), unopened: false, tungHistory: [] }
     ];
 
     const defaultReviews = [];
@@ -679,6 +679,7 @@
 
         filteredProducts.forEach(p => {
             const isUnknownCat = (Number(p.categoryId) === 0);
+            const isUnopened = !!p.unopened; // [신기능] 미개봉 플래그
             const myCategory = isUnknownCat
                 ? { name: '🫙 일단 쓰고 봄', days: null }
                 : (categories.find(c => Number(c.id) === Number(p.categoryId)) || { name: '미지정', days: 30 });
@@ -690,8 +691,8 @@
                 dDayLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             }
 
-            // [변경점] 현재 쓰는 통(openedDate 기준)이 며칠째인지 계산
-            const daysUsed = p.stock > 0 ? diffDaysFrom(p.openedDate, today) : 0;
+            // [변경점] 현재 쓰는 통(openedDate 기준)이 며칠째인지 계산 / 미개봉이면 0
+            const daysUsed = (!isUnopened && p.stock > 0 && p.openedDate) ? diffDaysFrom(p.openedDate, today) : 0;
 
             // [변경점] 일반 카테고리는 텅 기록이 쌓일수록 실제 평균 비중을 점점 높이는 가중평균 사용
             // (기록 5회 이상이면 실제 평균 100% 반영, 그 전엔 카테고리 기준값과 섞어서 완만하게 전환)
@@ -717,7 +718,11 @@
             
             let statusBadge = ''; let alertText = ''; let usedText = '';
 
-            if (isUnknownCat) {
+            // [신기능] 미개봉 상태 전용 배지
+            if (isUnopened) {
+                statusBadge = '<span class="badge neutral">📦 미개봉</span>';
+                alertText = '개봉 버튼을 누르면 사용 카운트가 시작돼요';
+            } else if (isUnknownCat) {
                 // 🫙 일단 쓰고 봄 전용 분기
                 if (p.stock === 0) {
                     statusBadge = '<span class="badge danger">재고 없음</span>';
@@ -805,20 +810,25 @@
                 categoryOptions += `<option value="${c.id}" ${Number(c.id) === Number(p.categoryId) ? 'selected' : ''}>${getCategoryIcon(c.name)} ${c.name} (${c.days}일)</option>`;
             });
 
-            // [버그수정] toISOString()은 UTC로 변환해서 한국시간 기준 날짜가 하루 밀려 보였음 → formatDateString(로컬 기준)으로 교체
-            const openedDateStr = p.openedDate ? formatDateString(p.openedDate) : '';
+            const openedDateStr = (!isUnopened && p.openedDate) ? formatDateString(p.openedDate) : '';
             const todayStr = formatDateString(getTodayTimeline());
             const isBottleEmpty = p.stock === 0;
             const latestReview = getLatestReview(p.id, p.tungCount || 0);
             const liquidScaleY = isBottleEmpty ? 0 : 1; 
-            const bottleStrokeColor = isBottleEmpty ? '#FF3B30' : '#444444';
-            const liquidFillColor = isBottleEmpty ? 'transparent' : 'var(--liquid-full)';
+            const bottleStrokeColor = isBottleEmpty ? '#FF3B30' : (isUnopened ? '#BBBBBB' : '#444444');
+            const liquidFillColor = isBottleEmpty ? 'transparent' : (isUnopened ? '#CCCCCC' : 'var(--liquid-full)');
 
             const card = document.createElement('div');
             card.className = 'product-card';
             card.innerHTML = `
                 <button class="btn-del-corner" onclick="confirmDeleteProduct(${p.id})">삭제 🗑️</button>
                 <div class="prod-info" style="padding-right:42px;">
+                    <div style="margin-bottom:7px;">
+                        ${isUnopened
+                            ? `<button onclick="openProduct(${p.id})" style="background:#FFF4E6; color:#FF922B; border:1.5px solid #FFD9B3; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer;">📦 미개봉</button>`
+                            : `<button onclick="closeProduct(${p.id})" style="background:#E6F7ED; color:#1EA94A; border:1.5px solid #B3E8C4; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer;">✅ 개봉</button>`
+                        }
+                    </div>
                     <div class="prod-name" style="display:flex; align-items:center; gap:6px;">
                         <span style="flex:1;">${p.name}</span>
                         <button onclick="editProductName(${p.id})" style="background:none; border:none; cursor:pointer; font-size:13px; padding:0 2px; flex-shrink:0;" title="이름 수정">✏️</button>
@@ -849,7 +859,9 @@
                     </div>
                 </div>
                 <div class="right-actions">
-                    <div class="tung-bottle-wrapper ${isBottleEmpty ? 'empty' : ''}" onclick="pressTung(${p.id}, this)">
+                    <div class="tung-bottle-wrapper ${isBottleEmpty ? 'empty' : ''}" 
+                        onclick="${isUnopened ? `showToast('📦 먼저 개봉 버튼을 눌러 개봉해주세요!')` : `pressTung(${p.id}, this)`}"
+                        style="${isUnopened ? 'opacity:0.45; cursor:not-allowed;' : ''}">
                         <svg viewBox="0 0 44 58" style="width:100%; height:calc(100% - 16px); overflow:visible; display:block;">
                           <!-- 뚜껑 -->
                           <rect x="10" y="2" width="24" height="9" rx="4" 
@@ -873,12 +885,12 @@
                           <rect x="10" y="21" width="4" height="20" rx="2" fill="white" opacity="${isBottleEmpty ? '0' : '0.22'}"/>
                           <!-- 재고수 표시 — 네모 없이 텍스트만, 크고 선명하게 -->
                           <text x="22" y="39" text-anchor="middle" font-size="${isBottleEmpty ? '10' : '13'}" font-weight="900"
-                            fill="${isBottleEmpty ? '#FF3B30' : '#FF5A5F'}" font-family="-apple-system,sans-serif"
+                            fill="${isBottleEmpty ? '#FF3B30' : (isUnopened ? '#AAAAAA' : '#FF5A5F')}" font-family="-apple-system,sans-serif"
                             paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">
-                            ${isBottleEmpty ? '텅!' : p.stock + '개'}
+                            ${isBottleEmpty ? '텅!' : (isUnopened ? '봉인' : p.stock + '개')}
                           </text>
                         </svg>
-                        <div class="tung-text">${isBottleEmpty ? '😢텅' : '텅'}</div>
+                        <div class="tung-text">${isBottleEmpty ? '😢텅' : (isUnopened ? '미개봉' : '텅')}</div>
                     </div>
                 </div>`;
             listEl.appendChild(card);
@@ -947,6 +959,26 @@
             filterSched.value = prevSchedFilter;
             if(!filterSched.value) filterSched.value = 'all';
         }
+    }
+
+    // [신기능] 미개봉 → 개봉: 카운트 시작
+    function openProduct(id) {
+        const p = products.find(prod => prod.id === id);
+        if (!p) return;
+        p.unopened = false;
+        p.openedDate = getTodayTimeline();
+        showToast('🎉 개봉 완료! 사용일 카운트를 시작해요');
+        syncAllAndRender();
+    }
+
+    // [신기능] 개봉 → 미개봉으로 되돌리기
+    function closeProduct(id) {
+        const p = products.find(prod => prod.id === id);
+        if (!p) return;
+        p.unopened = true;
+        p.openedDate = null;
+        showToast('📦 미개봉 상태로 변경됐어요');
+        syncAllAndRender();
     }
 
     // 텅 누르면: 재고 1개 차감. 0이 되는 순간 흔들림 + 파티클 폭죽! (재고가 남아있어도 누른 건 모두 '텅'으로 카운트)
@@ -1416,13 +1448,14 @@
             categoryId: isUnknown ? 0 : categoryId,
             stock: 1, 
             targetScheduleId: isNaN(targetScheduleId) ? 0 : targetScheduleId,
-            openedDate: openedDate,
-            tungHistory: [] // 🫙 텅 누른 날짜 기록 (소진일 자동 분석용)
+            openedDate: null,       // 미개봉 상태: 개봉 버튼 누를 때 세팅됨
+            unopened: true,         // 미개봉 플래그
+            tungHistory: []
         }); 
         
         document.getElementById('prodName').value = ''; 
-        document.getElementById('prodOpenedDate').value = formatDateString(today); // 다음 입력을 위해 오늘로 리셋
-        showToast(isUnknown ? '🫙 [' + name + '] 추가! 텅 누를수록 소진 패턴이 분석돼요' : '🧴 [' + name + '] 화장대 추가 완료!');
+        document.getElementById('prodOpenedDate').value = formatDateString(today);
+        showToast(isUnknown ? '📦 [' + name + '] 추가! 미개봉 상태예요 — 개봉 버튼을 눌러 카운트를 시작하세요' : '📦 [' + name + '] 화장대 추가 완료! 미개봉 상태예요');
         syncAllAndRender(); 
     }
     
