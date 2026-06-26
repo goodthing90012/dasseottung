@@ -884,7 +884,11 @@
                     </div>
                     <div class="stock-control">
                         <button class="btn-qty" onclick="adjustStock(${p.id}, -1)">-</button>
-                        <span style="font-size:13px; font-weight:bold;">재고: ${p.stock}개</span>
+                        <input type="number" min="0" max="99" value="${p.stock}"
+                            style="width:44px; text-align:center; font-size:13px; font-weight:bold; border:1.5px solid #E0E0E0; border-radius:8px; padding:3px 0; -moz-appearance:textfield;"
+                            onchange="setStock(${p.id}, this)"
+                            onclick="this.select()">
+                        <span style="font-size:12px; color:#888; margin-left:-2px;">개</span>
                         <button class="btn-qty" onclick="adjustStock(${p.id}, 1)">+</button>
                     </div>
                 </div>
@@ -1165,6 +1169,21 @@
     }
     
     // [변경점] 수동 +/- 조정: 0개에서 처음 늘어날 때만 openedDate를 오늘로 세팅 (그 외엔 사용 시작일 유지)
+    function setStock(id, inputEl) {
+        const p = products.find(prod => prod.id === id);
+        if (!p) return;
+        let val = parseInt(inputEl.value);
+        if (isNaN(val) || val < 0) val = 0;
+        if (val > 99) val = 99;
+        inputEl.value = val;
+        const prev = p.stock;
+        p.stock = val;
+        if (prev === 0 && val > 0 && !p.openedDate) p.openedDate = getTodayTimeline();
+        if (val === 0) p.openedDate = null;
+        saveToStorage();
+        syncAllAndRender();
+    }
+
     function adjustStock(id, amount) { 
         const p = products.find(prod => prod.id === id); 
         if (p) { 
