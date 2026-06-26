@@ -1750,7 +1750,9 @@
             });
         });
 
-        document.getElementById('prodName').value = '';
+        const textarea = document.getElementById('prodName');
+        textarea.value = '';
+        textarea.style.height = 'auto';
         document.getElementById('prodOpenedDate').value = formatDateString(today);
 
         if (names.length === 1) {
