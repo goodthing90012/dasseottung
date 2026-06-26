@@ -232,6 +232,22 @@
             </div>
         </div>
     </div>
+    <div class="confirm-overlay" id="memoOverlay">
+        <div class="confirm-box" style="width:86%; max-width:320px;">
+            <p style="margin-bottom:10px; font-weight:bold;">메모 추가</p>
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+                <span style="font-size:12px; color:#888; white-space:nowrap;">📅 날짜</span>
+                <input type="date" id="memoDateInput" style="flex:1; border:1px solid #ddd; border-radius:8px; padding:5px 8px; font-size:12px;">
+                <button onclick="clearMemoDate()" style="background:none; border:none; color:#BBB; font-size:11px; cursor:pointer;">날짜 없이</button>
+            </div>
+            <textarea id="memoTextInput" maxlength="100" placeholder="메모 내용을 입력하세요"
+                style="width:100%; height:70px; border-radius:8px; border:1px solid #ddd; padding:8px; font-size:13px; resize:none; box-sizing:border-box;"></textarea>
+            <div style="display:flex; gap:8px; margin-top:10px;">
+                <button class="confirm-btn no" onclick="closeMemoModal()">취소</button>
+                <button class="confirm-btn yes" onclick="saveMemo()">추가</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="deletePendingReviewOverlay">
         <div class="confirm-box">
             <p>미작성 상품평을 삭제할까요?</p>
@@ -891,6 +907,16 @@
                         <span style="font-size:12px; color:#888; margin-left:-2px;">개</span>
                         <button class="btn-qty" onclick="adjustStock(${p.id}, 1)">+</button>
                     </div>
+                    <div style="margin-top:8px; border-top:1px dashed #F0F0F0; padding-top:7px;">
+                        ${(p.memos && p.memos.length > 0) ? p.memos.map((m, idx) => `
+                            <div style="display:flex; align-items:flex-start; gap:4px; margin-bottom:4px;">
+                                <span style="font-size:11px; color:#888; white-space:nowrap; flex-shrink:0;">${m.date ? '📅 ' + m.date : '📝'}</span>
+                                <span style="font-size:11px; color:#555; flex:1; word-break:break-all;">${m.text}</span>
+                                <button onclick="deleteMemo(${p.id}, ${idx})" style="background:none; border:none; color:#CCC; font-size:11px; cursor:pointer; padding:0; flex-shrink:0;">✕</button>
+                            </div>
+                        `).join('') : ''}
+                        <button onclick="openMemoModal(${p.id})" style="background:none; border:1px dashed #DDD; border-radius:8px; color:#AAA; font-size:11px; padding:3px 10px; cursor:pointer; margin-top:${(p.memos && p.memos.length > 0) ? '2' : '0'}px;">+ 메모 추가</button>
+                    </div>
                 </div>
                 <div class="right-actions">
                     <div class="tung-bottle-wrapper ${isBottleEmpty ? 'empty' : ''}" 
@@ -1417,6 +1443,43 @@
         document.getElementById('editReviewOverlay').classList.remove('active');
         renderReviewList();
         renderProducts();
+    }
+
+    // ── 메모 ──
+    let memoTargetId = null;
+    function openMemoModal(productId) {
+        memoTargetId = productId;
+        document.getElementById('memoDateInput').value = formatDateString(getTodayTimeline());
+        document.getElementById('memoTextInput').value = '';
+        document.getElementById('memoOverlay').classList.add('active');
+        setTimeout(() => document.getElementById('memoTextInput').focus(), 50);
+    }
+    function clearMemoDate() {
+        document.getElementById('memoDateInput').value = '';
+    }
+    function closeMemoModal() {
+        memoTargetId = null;
+        document.getElementById('memoOverlay').classList.remove('active');
+    }
+    function saveMemo() {
+        const text = document.getElementById('memoTextInput').value.trim();
+        if (!text) { closeMemoModal(); return; }
+        const date = document.getElementById('memoDateInput').value || '';
+        const p = products.find(prod => prod.id === memoTargetId);
+        if (!p) return;
+        if (!p.memos) p.memos = [];
+        p.memos.push({ date, text });
+        closeMemoModal();
+        saveToStorage();
+        syncAllAndRender();
+        showToast('📝 메모가 추가됐어요');
+    }
+    function deleteMemo(productId, idx) {
+        const p = products.find(prod => prod.id === productId);
+        if (!p || !p.memos) return;
+        p.memos.splice(idx, 1);
+        saveToStorage();
+        syncAllAndRender();
     }
 
     // ── 미작성 리뷰 삭제 ──
