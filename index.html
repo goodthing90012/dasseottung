@@ -232,6 +232,15 @@
             </div>
         </div>
     </div>
+    <div class="confirm-overlay" id="deletePendingReviewOverlay">
+        <div class="confirm-box">
+            <p>미작성 상품평을 삭제할까요?</p>
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelDeletePendingReview()">아니오</button>
+                <button class="confirm-btn yes" onclick="proceedDeletePendingReview()">예</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="deleteReviewOverlay">
         <div class="confirm-box">
             <p>이 상품평을 삭제할까요?</p>
@@ -1352,8 +1361,12 @@
                             <span style="font-size:11px; color:#FF922B; margin-left:5px;">${getTungOrdinalLabel(p.tungNo)}</span>
                             <div style="font-size:10px; color:#AAA;">${formatDateString(p.date)} 텅</div>
                         </div>
-                        <button onclick="openReviewModal(${p.productId}, '${p.productName.replace(/'/g,"\\'")}', ${p.tungNo})"
-                            style="background:#FF922B; color:white; border:none; border-radius:14px; padding:5px 12px; font-size:11px; font-weight:bold; cursor:pointer;">작성하기</button>
+                        <div style="display:flex; gap:6px;">
+                            <button onclick="deletePendingReview(${p.productId}, ${p.tungNo})"
+                                style="background:#F0F0F0; color:#888; border:none; border-radius:14px; padding:5px 10px; font-size:11px; font-weight:bold; cursor:pointer;">삭제</button>
+                            <button onclick="openReviewModal(${p.productId}, '${p.productName.replace(/'/g,"\\'")}', ${p.tungNo})"
+                                style="background:#FF922B; color:white; border:none; border-radius:14px; padding:5px 12px; font-size:11px; font-weight:bold; cursor:pointer;">작성하기</button>
+                        </div>
                     </div>
                 `).join('')}
             </div>`;
@@ -1385,6 +1398,30 @@
         document.getElementById('editReviewOverlay').classList.remove('active');
         renderReviewList();
         renderProducts();
+    }
+
+    // ── 미작성 리뷰 삭제 ──
+    let pendingDeleteTungKey = null;
+    function deletePendingReview(productId, tungNo) {
+        pendingDeleteTungKey = { productId, tungNo };
+        document.getElementById('deletePendingReviewOverlay').classList.add('active');
+    }
+    function cancelDeletePendingReview() {
+        pendingDeleteTungKey = null;
+        document.getElementById('deletePendingReviewOverlay').classList.remove('active');
+    }
+    function proceedDeletePendingReview() {
+        if (!pendingDeleteTungKey) return;
+        const { productId, tungNo } = pendingDeleteTungKey;
+        const p = products.find(prod => prod.id === productId);
+        if (p && p.tungHistory) {
+            p.tungHistory = p.tungHistory.filter(h => h.tungNo !== tungNo);
+        }
+        pendingDeleteTungKey = null;
+        document.getElementById('deletePendingReviewOverlay').classList.remove('active');
+        saveToStorage();
+        renderPendingReviews();
+        showToast('🗑️ 미작성 상품평이 삭제됐어요');
     }
 
     function getLatestReview(productId, currentTungCount) {
