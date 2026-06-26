@@ -325,7 +325,12 @@
     <div id="tab-home" class="content active">
         <div class="add-form">
             <div class="section-title">내 화장대에 새 제품 추가</div>
-            <div class="form-group"><input type="text" id="prodName" placeholder="제품명 입력 (예: 독도 토너)"></div>
+            <div class="form-group">
+                <textarea id="prodName" placeholder="제품명 입력 (예: 독도 토너)" rows="1"
+                    style="width:100%; resize:none; font-size:14px; padding:10px; border:1px solid var(--light-gray); border-radius:10px; box-sizing:border-box; font-family:inherit; line-height:1.5; overflow:hidden;"
+                    oninput="this.style.height='auto'; this.style.height=this.scrollHeight+'px';"></textarea>
+                <div style="font-size:10px; color:#BBB; margin-top:4px;">엔터로 줄바꿈 후 여러 제품 입력 → 화장대에 추가 버튼으로 일괄 등록</div>
+            </div>
             <div class="form-group">
                 <label>카테고리 선택 (권장 사용 주기 자동 반영)</label>
                 <select id="prodCategorySelect"></select>
@@ -1714,34 +1719,39 @@
         syncAllAndRender(); 
     }
     
-    function addProduct() { 
-        const name = document.getElementById('prodName').value.trim(); 
-        const categoryId = parseInt(document.getElementById('prodCategorySelect').value); 
-        const targetScheduleId = parseInt(document.getElementById('prodScheduleTarget').value); 
-        if(!name) { showToast('제품 이름을 올바르게 채워주세요.'); return; }
+    function addProduct() {
+        const raw = document.getElementById('prodName').value;
+        const names = raw.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+        if (names.length === 0) { showToast('제품 이름을 올바르게 채워주세요.'); return; }
 
-        // [변경점] 이미 쓰던 제품 등록 대응: 사용 시작일을 직접 선택 가능 (비우면 오늘)
-        const openedDateVal = document.getElementById('prodOpenedDate').value;
+        const categoryId = parseInt(document.getElementById('prodCategorySelect').value);
+        const targetScheduleId = parseInt(document.getElementById('prodScheduleTarget').value);
         const today = getTodayTimeline();
-        let openedDate = openedDateVal ? parseInputDateToTimestamp(openedDateVal) : today;
-        if (openedDate > today) openedDate = today; // 미래 날짜는 오늘로 보정
-        
         const isUnknown = (categoryId === 0 || isNaN(categoryId));
-        products.push({ 
-            id: Date.now(), 
-            name: name, 
-            categoryId: isUnknown ? 0 : categoryId,
-            stock: 1, 
-            targetScheduleId: isNaN(targetScheduleId) ? 0 : targetScheduleId,
-            openedDate: null,       // 미개봉 상태: 개봉 버튼 누를 때 세팅됨
-            unopened: true,         // 미개봉 플래그
-            tungHistory: []
-        }); 
-        
-        document.getElementById('prodName').value = ''; 
+
+        names.forEach((name, i) => {
+            products.push({
+                id: Date.now() + i,
+                name,
+                categoryId: isUnknown ? 0 : categoryId,
+                stock: 1,
+                targetScheduleId: isNaN(targetScheduleId) ? 0 : targetScheduleId,
+                openedDate: null,
+                unopened: true,
+                tungHistory: [],
+                memos: []
+            });
+        });
+
+        document.getElementById('prodName').value = '';
         document.getElementById('prodOpenedDate').value = formatDateString(today);
-        showToast(isUnknown ? '📦 [' + name + '] 추가! 미개봉 상태예요 — 개봉 버튼을 눌러 카운트를 시작하세요' : '📦 [' + name + '] 화장대 추가 완료! 미개봉 상태예요');
-        syncAllAndRender(); 
+
+        if (names.length === 1) {
+            showToast(`📦 [${names[0]}] 화장대 추가 완료! 미개봉 상태예요`);
+        } else {
+            showToast(`📦 ${names.length}개 상품이 한 번에 등록됐어요!`);
+        }
+        syncAllAndRender();
     }
     
     function showToast(msg) { 
