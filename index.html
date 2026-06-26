@@ -356,6 +356,9 @@
                     <option value="all">전체 세일 일정</option>
                 </select>
             </div>
+            <textarea id="filterSearch" placeholder="제품명 검색 (엔터로 여러 개 동시 검색)" rows="1"
+                style="width:100%; resize:none; font-size:13px; padding:8px 10px; border:1px solid var(--light-gray); border-radius:10px; box-sizing:border-box; font-family:inherit; line-height:1.5; overflow:hidden; margin-top:6px; color:#333;"
+                oninput="this.style.height='auto'; this.style.height=this.scrollHeight+'px'; renderProducts();"></textarea>
         </div>
 
         <div class="section-title">내 화장대 재고 현황</div>
@@ -724,10 +727,14 @@
         const catFilter = document.getElementById('filterCategory') ? document.getElementById('filterCategory').value : 'all';
         const schedFilter = document.getElementById('filterSchedule') ? document.getElementById('filterSchedule').value : 'all';
 
+        const searchRaw = (document.getElementById('filterSearch')?.value || '');
+        const keywords = searchRaw.split('\n').map(k => k.trim().toLowerCase()).filter(k => k.length > 0);
+
         let filteredProducts = products.filter(p => {
             const matchCat = (catFilter === 'all' || Number(p.categoryId) === Number(catFilter));
             const matchSched = (schedFilter === 'all' || Number(p.targetScheduleId) === Number(schedFilter));
-            return matchCat && matchSched;
+            const matchSearch = keywords.length === 0 || keywords.some(k => p.name.toLowerCase().includes(k));
+            return matchCat && matchSched && matchSearch;
         }).sort((a, b) => b.id - a.id);
 
         if(filteredProducts.length === 0) {
