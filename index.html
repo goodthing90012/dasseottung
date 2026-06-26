@@ -1728,7 +1728,7 @@
     
     function addProduct() {
         const raw = document.getElementById('prodName').value;
-        const names = raw.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+        const names = [...new Set(raw.split('\n').map(n => n.trim()).filter(n => n.length > 0))];
         if (names.length === 0) { showToast('제품 이름을 올바르게 채워주세요.'); return; }
 
         const categoryId = parseInt(document.getElementById('prodCategorySelect').value);
@@ -1736,7 +1736,19 @@
         const today = getTodayTimeline();
         const isUnknown = (categoryId === 0 || isNaN(categoryId));
 
-        names.forEach((name, i) => {
+        const duplicates = [];
+        const toAdd = [];
+
+        names.forEach(name => {
+            const exists = products.some(p => p.name === name);
+            if (exists) {
+                duplicates.push(name);
+            } else {
+                toAdd.push(name);
+            }
+        });
+
+        toAdd.forEach((name, i) => {
             products.push({
                 id: Date.now() + i,
                 name,
@@ -1755,12 +1767,18 @@
         textarea.style.height = 'auto';
         document.getElementById('prodOpenedDate').value = formatDateString(today);
 
-        if (names.length === 1) {
-            showToast(`📦 [${names[0]}] 화장대 추가 완료! 미개봉 상태예요`);
-        } else {
-            showToast(`📦 ${names.length}개 상품이 한 번에 등록됐어요!`);
+        if (duplicates.length > 0 && toAdd.length === 0) {
+            showToast(`⚠️ [${duplicates.join(', ')}] 이미 등록된 제품이라 중복 등록은 어려워요`);
+            return;
         }
-        syncAllAndRender();
+        if (duplicates.length > 0) {
+            showToast(`📦 ${toAdd.length}개 등록 완료! [${duplicates.join(', ')}]은 중복이라 제외됐어요`);
+        } else if (toAdd.length === 1) {
+            showToast(`📦 [${toAdd[0]}] 화장대 추가 완료! 미개봉 상태예요`);
+        } else {
+            showToast(`📦 ${toAdd.length}개 상품이 한 번에 등록됐어요!`);
+        }
+        if (toAdd.length > 0) syncAllAndRender();
     }
     
     function showToast(msg) { 
