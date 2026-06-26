@@ -1542,6 +1542,44 @@
         renderReviewList();
     }
 
+    function shareReview(reviewId) {
+        const r = reviews.find(rv => rv.id === reviewId);
+        if (!r) return;
+        const cat = categories.find(c => c.id === r.categoryId);
+        const ordinalLabel = getTungOrdinalLabel(r.tungNo || 1);
+        const lines = [
+            `🧴 ${r.productName} · ${ordinalLabel} 리뷰`,
+            cat ? `📂 ${cat.name}` : '',
+            `${formatDateString(r.date)} 다썼텅! 🎉`,
+            ``,
+            `📝 ${r.text}`,
+        ].filter(l => l !== null).join('\n');
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(lines).then(() => {
+                showToast('📋 클립보드에 복사됐어요! 붙여넣기 해보세요');
+            }).catch(() => fallbackCopy(lines));
+        } else {
+            fallbackCopy(lines);
+        }
+    }
+
+    function fallbackCopy(text) {
+        const el = document.createElement('textarea');
+        el.value = text;
+        el.style.position = 'fixed';
+        el.style.opacity = '0';
+        document.body.appendChild(el);
+        el.focus(); el.select();
+        try {
+            document.execCommand('copy');
+            showToast('📋 클립보드에 복사됐어요! 붙여넣기 해보세요');
+        } catch {
+            showToast('복사 실패 — 텍스트를 직접 선택해주세요');
+        }
+        document.body.removeChild(el);
+    }
+
     let pendingDeleteReviewId = null;
     function deleteReview(reviewId) {
         pendingDeleteReviewId = reviewId;
@@ -1591,6 +1629,7 @@
                     <div class="review-card-top">
                         <span class="review-prod-name">${r.productName} <span style="color:var(--primary, #FF5A5F); font-size:11px;">· ${ordinalLabel} 리뷰</span></span>
                         <div style="display:flex; gap:6px;">
+                            <button class="btn-del-action" style="background:#F0F0F0; color:#555;" onclick="shareReview(${r.id})">공유</button>
                             <button class="btn-del-action" style="background:#F0F0F0; color:#555;" onclick="openEditReview(${r.id})">수정</button>
                             <button class="btn-del-action" onclick="deleteReview(${r.id})">삭제</button>
                         </div>
