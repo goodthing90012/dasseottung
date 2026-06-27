@@ -1605,7 +1605,7 @@
         const dateVal = document.getElementById('editScheduleDate').value;
         if (!name || !dateVal) { showToast('행사명과 날짜를 올바르게 입력해주세요'); return; }
         const s = schedules.find(sc => sc.id === editingScheduleId);
-        if (s) { s.name = name; s.targetDate = parseDateString(dateVal); }
+        if (s) { s.name = name; s.targetDate = parseInputDateToTimestamp(dateVal); }
         cancelEditSchedule();
         saveToStorage();
         syncAllAndRender();
