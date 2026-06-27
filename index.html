@@ -1261,7 +1261,8 @@
         // 소진일 자동 기록 — 모든 카테고리에서, 재고 남아있어도 매번 기록
         if (p.openedDate) {
             if (!p.tungHistory) p.tungHistory = [];
-            const daysUsedNow = Math.round((getTodayTimeline() - p.openedDate) / (1000 * 60 * 60 * 24));
+            const pausedDays = getTotalPausedDays(p, getTodayTimeline());
+            const daysUsedNow = Math.max(Math.round((getTodayTimeline() - p.openedDate) / (1000 * 60 * 60 * 24)) - pausedDays, 0);
             p.tungHistory.push({ date: getTodayTimeline(), days: daysUsedNow, tungNo: p.tungCount });
             if (p.tungHistory.length > 10) p.tungHistory.shift();
         }
