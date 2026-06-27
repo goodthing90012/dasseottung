@@ -232,6 +232,24 @@
             </div>
         </div>
     </div>
+    <div class="confirm-overlay" id="deleteCategoryOverlay">
+        <div class="confirm-box">
+            <p>카테고리를 삭제할까요?<br><span style="font-size:11px; color:#999;">연결된 상품은 '일단 쓰고봄'으로 변경돼요</span></p>
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelDeleteCategory()">아니오</button>
+                <button class="confirm-btn yes" onclick="proceedDeleteCategory()">예</button>
+            </div>
+        </div>
+    </div>
+    <div class="confirm-overlay" id="deleteScheduleOverlay">
+        <div class="confirm-box">
+            <p>행사 일정을 삭제할까요?<br><span style="font-size:11px; color:#999;">연결된 상품의 일정 연동이 해제돼요</span></p>
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelDeleteSchedule()">아니오</button>
+                <button class="confirm-btn yes" onclick="proceedDeleteSchedule()">예</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="editCategoryOverlay">
         <div class="confirm-box" style="width:86%; max-width:320px;">
             <p style="margin-bottom:10px; font-weight:bold;">카테고리 수정</p>
@@ -1749,18 +1767,42 @@
         renderProducts(); 
     }
     
-    function deleteCategory(id) { 
-        categories = categories.filter(c => c.id !== id); 
-        // 삭제된 카테고리를 가지던 상품 안전 예외 처리
-        products.forEach(p => { if(Number(p.categoryId) === Number(id)) p.categoryId = 0; });
-        syncAllAndRender(); 
+    let pendingDeleteCategoryId = null;
+    function deleteCategory(id) {
+        pendingDeleteCategoryId = id;
+        document.getElementById('deleteCategoryOverlay').classList.add('active');
     }
-    
-    function deleteSchedule(id) { 
-        schedules = schedules.filter(s => s.id !== id); 
-        // 삭제된 일정을 가지던 상품 예외 처리
-        products.forEach(p => { if(Number(p.targetScheduleId) === Number(id)) p.targetScheduleId = 0; });
-        syncAllAndRender(); 
+    function cancelDeleteCategory() {
+        pendingDeleteCategoryId = null;
+        document.getElementById('deleteCategoryOverlay').classList.remove('active');
+    }
+    function proceedDeleteCategory() {
+        if (pendingDeleteCategoryId == null) return;
+        categories = categories.filter(c => c.id !== pendingDeleteCategoryId);
+        products.forEach(p => { if (Number(p.categoryId) === Number(pendingDeleteCategoryId)) p.categoryId = 0; });
+        pendingDeleteCategoryId = null;
+        document.getElementById('deleteCategoryOverlay').classList.remove('active');
+        showToast('🗑️ 카테고리가 삭제됐어요');
+        syncAllAndRender();
+    }
+
+    let pendingDeleteScheduleId = null;
+    function deleteSchedule(id) {
+        pendingDeleteScheduleId = id;
+        document.getElementById('deleteScheduleOverlay').classList.add('active');
+    }
+    function cancelDeleteSchedule() {
+        pendingDeleteScheduleId = null;
+        document.getElementById('deleteScheduleOverlay').classList.remove('active');
+    }
+    function proceedDeleteSchedule() {
+        if (pendingDeleteScheduleId == null) return;
+        schedules = schedules.filter(s => s.id !== pendingDeleteScheduleId);
+        products.forEach(p => { if (Number(p.targetScheduleId) === Number(pendingDeleteScheduleId)) p.targetScheduleId = 0; });
+        pendingDeleteScheduleId = null;
+        document.getElementById('deleteScheduleOverlay').classList.remove('active');
+        showToast('🗑️ 행사 일정이 삭제됐어요');
+        syncAllAndRender();
     }
     
     function applyPreset(name, days) { 
