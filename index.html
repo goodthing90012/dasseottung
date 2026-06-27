@@ -584,6 +584,17 @@
         return diff < 0 ? 0 : diff;
     };
 
+    // 중단 기간 합산 (완료된 중단 + 현재 진행 중인 중단 포함)
+    const getTotalPausedDays = (p, today) => {
+        if (!p.pauseHistory) return 0;
+        let total = 0;
+        p.pauseHistory.forEach(ph => {
+            const end = ph.resumedAt || today;
+            total += Math.floor((end - ph.pausedAt) / (1000 * 60 * 60 * 24));
+        });
+        return total;
+    };
+
     // 로컬스토리지 키
     const STORAGE_KEY = 'dasseottung_data_v1';
 
@@ -814,8 +825,11 @@
                 dDayLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             }
 
-            // [변경점] 현재 쓰는 통(openedDate 기준)이 며칠째인지 계산 / 미개봉이면 0
-            const daysUsed = (!isUnopened && p.stock > 0 && p.openedDate) ? diffDaysFrom(p.openedDate, today) : 0;
+            const isPaused = !!(p.pauseHistory && p.pauseHistory.length > 0 && !p.pauseHistory[p.pauseHistory.length - 1].resumedAt);
+            const totalPausedDays = getTotalPausedDays(p, today);
+
+            // [변경점] 현재 쓰는 통(openedDate 기준)이 며칠째인지 계산 / 미개봉이면 0 / 중단기간 차감
+            const daysUsed = (!isUnopened && p.stock > 0 && p.openedDate) ? Math.max(diffDaysFrom(p.openedDate, today) - totalPausedDays, 0) : 0;
 
             // [변경점] 일반 카테고리는 텅 기록이 쌓일수록 실제 평균 비중을 점점 높이는 가중평균 사용
             // (기록 5회 이상이면 실제 평균 100% 반영, 그 전엔 카테고리 기준값과 섞어서 완만하게 전환)
@@ -946,10 +960,17 @@
             card.innerHTML = `
                 <button class="btn-del-corner" onclick="confirmDeleteProduct(${p.id})">삭제 🗑️</button>
                 <div class="prod-info" style="padding-right:42px;">
-                    <div style="margin-bottom:7px;">
+                    <div style="margin-bottom:7px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                         ${isUnopened
                             ? `<button onclick="openProduct(${p.id})" style="background:#FFF4E6; color:#FF922B; border:1.5px solid #FFD9B3; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer;">📦 미개봉</button>`
                             : `<button onclick="closeProduct(${p.id})" style="background:#E6F7ED; color:#1EA94A; border:1.5px solid #B3E8C4; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer;">✅ 개봉</button>`
+                        }
+                        ${!isUnopened
+                            ? (isPaused
+                                ? `<button onclick="resumeProduct(${p.id})" style="background:#EEF2FF; color:#5C7CFA; border:1.5px solid #BAC8FF; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">⏸ 중단 중</button>`
+                                : `<button onclick="pauseProduct(${p.id})" style="background:#F5F5F5; color:#888; border:1.5px solid #DDD; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">⏸ 중단</button>`
+                            )
+                            : `<button style="visibility:hidden; padding:5px 13px; font-size:12px; white-space:nowrap;">⏸</button>`
                         }
                     </div>
                     <div class="prod-name" style="display:flex; align-items:center; gap:6px;">
@@ -1111,6 +1132,30 @@
         }
     }
 
+    // [신기능] 사용 중단
+    function pauseProduct(id) {
+        const p = products.find(prod => prod.id === id);
+        if (!p) return;
+        if (!p.pauseHistory) p.pauseHistory = [];
+        // 이미 중단 중이면 무시
+        const last = p.pauseHistory[p.pauseHistory.length - 1];
+        if (last && !last.resumedAt) return;
+        p.pauseHistory.push({ pausedAt: getTodayTimeline(), resumedAt: null });
+        showToast('⏸ 사용 중단됐어요. 카운트가 멈춰요');
+        syncAllAndRender();
+    }
+
+    // [신기능] 사용 재개
+    function resumeProduct(id) {
+        const p = products.find(prod => prod.id === id);
+        if (!p || !p.pauseHistory) return;
+        const last = p.pauseHistory[p.pauseHistory.length - 1];
+        if (!last || last.resumedAt) return;
+        last.resumedAt = getTodayTimeline();
+        showToast('▶️ 사용 재개! 카운트가 다시 시작돼요');
+        syncAllAndRender();
+    }
+
     // [신기능] 미개봉 → 개봉: 카운트 시작
     function openProduct(id) {
         const p = products.find(prod => prod.id === id);
@@ -1163,6 +1208,15 @@
     function pressTung(id, el) {
         const p = products.find(prod => prod.id === id);
         if (!p || p.stock <= 0) return;
+
+        // 중단 중이면 자동 재개
+        if (p.pauseHistory && p.pauseHistory.length > 0) {
+            const last = p.pauseHistory[p.pauseHistory.length - 1];
+            if (!last.resumedAt) {
+                last.resumedAt = getTodayTimeline();
+                showToast('▶️ 사용 재개 후 텅 처리됐어요');
+            }
+        }
 
         const goingEmpty = (p.stock === 1); // 이번 클릭으로 0이 되는 순간 (애니메이션 분기용)
 
