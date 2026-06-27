@@ -232,6 +232,15 @@
             </div>
         </div>
     </div>
+    <div class="confirm-overlay" id="closeProductOverlay">
+        <div class="confirm-box">
+            <p>미개봉으로 되돌릴까요?<br><span style="font-size:11px; color:#999;">개봉일, 사용 기록이 모두 초기화돼요</span></p>
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelCloseProduct()">아니오</button>
+                <button class="confirm-btn yes" onclick="proceedCloseProduct()">예</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="deleteCategoryOverlay">
         <div class="confirm-box">
             <p>카테고리를 삭제할까요?<br><span style="font-size:11px; color:#999;">연결된 상품은 '일단 쓰고봄'으로 변경돼요</span></p>
@@ -967,7 +976,7 @@
                         }
                         ${!isUnopened
                             ? (isPaused
-                                ? `<button onclick="resumeProduct(${p.id})" style="background:#EEF2FF; color:#5C7CFA; border:1.5px solid #BAC8FF; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">⏸ 중단 중</button>`
+                                ? `<button onclick="resumeProduct(${p.id})" style="background:#EEF2FF; color:#5C7CFA; border:1.5px solid #BAC8FF; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">⏸ 쉬는 중</button>`
                                 : `<button onclick="pauseProduct(${p.id})" style="background:#F5F5F5; color:#888; border:1.5px solid #DDD; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">⏸ 중단</button>`
                             )
                             : `<button style="visibility:hidden; padding:5px 13px; font-size:12px; white-space:nowrap;">⏸</button>`
@@ -1141,7 +1150,7 @@
         const last = p.pauseHistory[p.pauseHistory.length - 1];
         if (last && !last.resumedAt) return;
         p.pauseHistory.push({ pausedAt: getTodayTimeline(), resumedAt: null });
-        showToast('⏸ 사용 중단됐어요. 카운트가 멈춰요');
+        showToast('⏸ 쉬는 중으로 변경됐어요. 카운트가 멈춰요');
         syncAllAndRender();
     }
 
@@ -1167,11 +1176,24 @@
     }
 
     // [신기능] 개봉 → 미개봉으로 되돌리기
+    let pendingCloseProductId = null;
     function closeProduct(id) {
-        const p = products.find(prod => prod.id === id);
-        if (!p) return;
-        p.unopened = true;
-        p.openedDate = null;
+        pendingCloseProductId = id;
+        document.getElementById('closeProductOverlay').classList.add('active');
+    }
+    function cancelCloseProduct() {
+        pendingCloseProductId = null;
+        document.getElementById('closeProductOverlay').classList.remove('active');
+    }
+    function proceedCloseProduct() {
+        const p = products.find(prod => prod.id === pendingCloseProductId);
+        if (p) {
+            p.unopened = true;
+            p.openedDate = null;
+            p.pauseHistory = [];
+        }
+        pendingCloseProductId = null;
+        document.getElementById('closeProductOverlay').classList.remove('active');
         showToast('📦 미개봉 상태로 변경됐어요');
         syncAllAndRender();
     }
