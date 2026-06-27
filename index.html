@@ -250,6 +250,25 @@
             </div>
         </div>
     </div>
+    <div class="confirm-overlay" id="editScheduleOverlay">
+        <div class="confirm-box" style="width:86%; max-width:320px;">
+            <p style="margin-bottom:10px; font-weight:bold;">행사 일정 수정</p>
+            <div style="margin-bottom:8px;">
+                <div style="font-size:12px; color:#888; margin-bottom:4px;">행사명</div>
+                <input type="text" id="editScheduleName" maxlength="20" placeholder="행사명"
+                    style="width:100%; border:1px solid #ddd; border-radius:8px; padding:8px 10px; font-size:13px; box-sizing:border-box;">
+            </div>
+            <div style="margin-bottom:10px;">
+                <div style="font-size:12px; color:#888; margin-bottom:4px;">행사 날짜</div>
+                <input type="date" id="editScheduleDate"
+                    style="width:100%; border:1px solid #ddd; border-radius:8px; padding:8px 10px; font-size:13px; box-sizing:border-box;">
+            </div>
+            <div style="display:flex; gap:8px;">
+                <button class="confirm-btn no" onclick="cancelEditSchedule()">취소</button>
+                <button class="confirm-btn yes" onclick="saveEditSchedule()">저장</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="editCategoryOverlay">
         <div class="confirm-box" style="width:86%; max-width:320px;">
             <p style="margin-bottom:10px; font-weight:bold;">카테고리 수정</p>
@@ -1043,8 +1062,11 @@
                 const dateStr = formatDateString(s.targetDate);
                 schedListEl.innerHTML += `
                     <div class="list-item-card" style="padding:10px 14px;">
-                        <div><strong>${s.name}</strong> <div style="font-size:12px; color:var(--gray); margin-top:2px;">목표일: ${dateStr} <span class="badge cycle-tag">D-${diffDays}</span></div></div>
-                        <button class="btn-del-action" onclick="deleteSchedule(${s.id})">❌</button>
+                        <div style="flex:1;"><strong>${s.name}</strong> <div style="font-size:12px; color:var(--gray); margin-top:2px;">목표일: ${dateStr} <span class="badge cycle-tag">D-${diffDays}</span></div></div>
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <button class="btn-del-action" style="background:#F0F0F0; color:#555;" onclick="editSchedule(${s.id})">수정</button>
+                            <button class="btn-del-action" onclick="deleteSchedule(${s.id})">❌</button>
+                        </div>
                     </div>`;
             });
         }
@@ -1561,6 +1583,33 @@
         saveToStorage();
         syncAllAndRender();
         showToast('🗑️ 메모가 삭제됐어요');
+    }
+
+    // ── 행사 수정 ──
+    let editingScheduleId = null;
+    function editSchedule(id) {
+        const s = schedules.find(sc => sc.id === id);
+        if (!s) return;
+        editingScheduleId = id;
+        document.getElementById('editScheduleName').value = s.name;
+        document.getElementById('editScheduleDate').value = formatDateString(s.targetDate);
+        document.getElementById('editScheduleOverlay').classList.add('active');
+        setTimeout(() => document.getElementById('editScheduleName').focus(), 50);
+    }
+    function cancelEditSchedule() {
+        editingScheduleId = null;
+        document.getElementById('editScheduleOverlay').classList.remove('active');
+    }
+    function saveEditSchedule() {
+        const name = document.getElementById('editScheduleName').value.trim();
+        const dateVal = document.getElementById('editScheduleDate').value;
+        if (!name || !dateVal) { showToast('행사명과 날짜를 올바르게 입력해주세요'); return; }
+        const s = schedules.find(sc => sc.id === editingScheduleId);
+        if (s) { s.name = name; s.targetDate = parseDateString(dateVal); }
+        cancelEditSchedule();
+        saveToStorage();
+        syncAllAndRender();
+        showToast('✅ 행사 일정이 수정됐어요');
     }
 
     // ── 카테고리 수정 ──
