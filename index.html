@@ -423,7 +423,7 @@
                 <div style="font-size:22px; font-weight:900; color:#4CAF50;" id="dash-routine-pct">0%</div>
                 <div style="font-size:10px; color:#888; margin-top:2px;">루틴 달성률</div>
             </div>
-            <div class="add-form" style="padding:12px; text-align:center; margin-bottom:0;">
+            <div class="add-form" style="padding:12px; text-align:center; margin-bottom:0; cursor:pointer;" onclick="showDashProductPopup('refill')">
                 <div style="font-size:20px;">📦</div>
                 <div style="font-size:22px; font-weight:900; color:#FF922B;" id="dash-refill-count">0</div>
                 <div style="font-size:10px; color:#888; margin-top:2px;">재고 없음</div>
@@ -435,12 +435,12 @@
                 <div style="font-size:20px; font-weight:900; color:#333;" id="dash-opened-count">0</div>
                 <div style="font-size:10px; color:#888; margin-top:2px;">개봉 중</div>
             </div>
-            <div class="add-form" style="padding:12px; text-align:center; margin-bottom:0;">
+            <div class="add-form" style="padding:12px; text-align:center; margin-bottom:0; cursor:pointer;" onclick="showDashProductPopup('sealed')">
                 <div style="font-size:18px;">📦</div>
                 <div style="font-size:20px; font-weight:900; color:#333;" id="dash-sealed-count">0</div>
                 <div style="font-size:10px; color:#888; margin-top:2px;">미개봉</div>
             </div>
-            <div class="add-form" style="padding:12px; text-align:center; margin-bottom:0;">
+            <div class="add-form" style="padding:12px; text-align:center; margin-bottom:0; cursor:pointer;" onclick="showDashProductPopup('soon')">
                 <div style="font-size:18px;">⏰</div>
                 <div style="font-size:20px; font-weight:900; color:#E67E22;" id="dash-soon-count">0</div>
                 <div style="font-size:10px; color:#888; margin-top:2px;">소진 예정</div>
@@ -713,6 +713,17 @@
         </div>
     </div>
     
+    <!-- 재고 팝업 -->
+    <div id="dashProductPopup" style="display:none; position:fixed; inset:0; z-index:999; background:rgba(0,0,0,0.45);" onclick="closeDashProductPopup()">
+        <div onclick="event.stopPropagation()" style="position:absolute; bottom:0; left:0; right:0; background:white; border-radius:20px 20px 0 0; padding:20px 16px 36px; max-height:60vh; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <div style="font-size:15px; font-weight:900;" id="dashPopupTitle"></div>
+                <button onclick="closeDashProductPopup()" style="background:none; border:none; font-size:20px; cursor:pointer; color:#aaa;">✕</button>
+            </div>
+            <div id="dashPopupList"></div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 </div>
 
@@ -2220,6 +2231,49 @@
     }
 
     // 날짜 클릭 상세 카드
+    function showDashProductPopup(type) {
+        const popup = document.getElementById('dashProductPopup');
+        const title = document.getElementById('dashPopupTitle');
+        const list = document.getElementById('dashPopupList');
+        if (!popup || !title || !list) return;
+
+        let items = [];
+        if (type === 'refill') {
+            title.textContent = '📦 재고 없음 제품';
+            items = products.filter(p => p.stock === 0);
+        } else if (type === 'soon') {
+            title.textContent = '⏰ 소진 예정 제품 (재고 1개)';
+            items = products.filter(p => p.stock === 1 && !p.unopened);
+        } else if (type === 'sealed') {
+            title.textContent = '📦 미개봉 제품';
+            items = products.filter(p => !!p.unopened);
+        }
+
+        if (items.length === 0) {
+            list.innerHTML = '<div style="text-align:center; color:#bbb; font-size:13px; padding:20px 0;">해당 제품이 없어요</div>';
+        } else {
+            list.innerHTML = items.map(p => {
+                const cat = categories.find(c => Number(c.id) === Number(p.categoryId));
+                const catName = cat ? cat.name : (Number(p.categoryId) === 0 ? '🫙 일단 쓰고 봄' : '미지정');
+                return `<div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f5f5f5;">
+                    <div>
+                        <div style="font-size:13px; font-weight:700; color:#333;">${p.name}</div>
+                        <div style="font-size:11px; color:#aaa; margin-top:2px;">${catName}</div>
+                    </div>
+                    <div style="font-size:13px; font-weight:900; color:${type==='refill'?'#FF5A5F':'#E67E22'};">
+                        ${type==='refill' ? '재고 0개' : '재고 1개'}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+        popup.style.display = 'block';
+    }
+
+    function closeDashProductPopup() {
+        const popup = document.getElementById('dashProductPopup');
+        if (popup) popup.style.display = 'none';
+    }
+
     function showDashDateDetail(dateStr) {
         const detail = document.getElementById('dashDateDetail');
         const content = document.getElementById('dashDateDetailContent');
