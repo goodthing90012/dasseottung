@@ -2757,6 +2757,13 @@
         const name = document.getElementById('newCatName').value.trim(); 
         const days = parseInt(document.getElementById('newCatDays').value); 
         if(!name || isNaN(days)) { showToast('정확한 카테고리명과 일수를 기입해주세요.'); return; }
+
+        // 중복 이름 체크
+        const isDuplicate = categories.some(c => c.name.trim() === name);
+        if (isDuplicate) {
+            showToast(`⚠️ [${name}] 카테고리가 이미 있어요! 다른 이름을 사용해주세요.`);
+            return;
+        }
         
         categories.push({ id: Date.now(), name: name, days: days }); 
         document.getElementById('newCatName').value = ''; 
