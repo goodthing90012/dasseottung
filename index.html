@@ -566,7 +566,7 @@
         <div class="section-title" style="display:flex; align-items:center; justify-content:space-between;">
             <span id="routineDateTitle">오늘의 루틴</span>
             <div style="display:flex; gap:6px; align-items:center;">
-                <button onclick="changeRoutineDate(-1)" style="background:none; border:none; font-size:18px; cursor:pointer; color:#555;">‹</button>
+                <button onclick="changeRoutineDate(-1)" id="routineDatePrev" style="background:none; border:none; font-size:18px; cursor:pointer; color:#555;">‹</button>
                 <span id="routineDateLabel" style="font-size:12px; font-weight:bold; min-width:80px; text-align:center;"></span>
                 <button onclick="changeRoutineDate(1)" id="routineDateNext" style="background:none; border:none; font-size:18px; cursor:pointer; color:#555;">›</button>
             </div>
@@ -2551,6 +2551,8 @@
         }
         // 오늘이면 다음(미래) 버튼 비활성화
         if (nextBtn) nextBtn.style.opacity = routineDateOffset === 0 ? '0.25' : '1';
+        const prevBtn = document.getElementById('routineDatePrev');
+        if (prevBtn) prevBtn.style.opacity = routineDateOffset <= -1 ? '0.25' : '1';
 
         // 오늘의 루틴
         const listEl = document.getElementById('todayRoutineList');
