@@ -1978,6 +1978,23 @@
         return formatDateString(getTodayTimeline());
     }
 
+    // [V1 정책] 해당 날짜에 루틴을 1개 이상 체크했으면 완료로 인정
+    function isRoutineDayDone(dateStr) {
+        return routines.some(r => {
+            const rec = r.checkHistory.find(h => h.date === dateStr);
+            return rec && rec.checkedProductIds && rec.checkedProductIds.length > 0;
+        });
+    }
+    // 해당 날짜에 등록된 모든 루틴 100% 완료(올클리어) 여부
+    function isRoutineDayAllClear(dateStr) {
+        if (routines.length === 0) return false;
+        return routines.every(r => {
+            if (r.productIds.length === 0) return true;
+            const rec = r.checkHistory.find(h => h.date === dateStr);
+            return rec && r.productIds.every(pid => rec.checkedProductIds.includes(pid));
+        });
+    }
+
     // 루틴 탭에서 선택된 날짜 (기본: 오늘). 어제까지만 이동 가능
     let routineDateOffset = 0; // 0=오늘, -1=어제
     function getSelectedRoutineStr() {
@@ -2072,6 +2089,7 @@
         }
         todayRecord.checkedProductIds = [...r.productIds];
         saveToStorage();
+        const allClearMsg = () => isRoutineDayAllClear(todayStr) ? `⭐ 오늘 루틴 올클리어!` : `💚 오늘의 루틴 기록 완료`;
         // 바운스 애니메이션
         const bottle = el.querySelector('.tung-bottle-wrapper');
         if (bottle) {
@@ -2079,12 +2097,12 @@
             setTimeout(() => {
                 bottle.classList.remove('pressing');
                 renderRoutineTab();
-                showToast(`🎉 ${r.emoji} ${r.name} 전체 완료!`);
+                showToast(allClearMsg());
                 fireParticles();
             }, 480);
         } else {
             renderRoutineTab();
-            showToast(`🎉 ${r.emoji} ${r.name} 전체 완료!`);
+            showToast(allClearMsg());
             fireParticles();
         }
     }
@@ -2100,12 +2118,7 @@
 
         for (let d = 1; d <= today; d++) {
             const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-            const allDone = routines.length > 0 && routines.every(r => {
-                if (r.productIds.length === 0) return true;
-                const rec = r.checkHistory.find(h => h.date === dateStr);
-                return rec && r.productIds.every(pid => rec.checkedProductIds.includes(pid));
-            });
-            if (allDone) doneDays++;
+            if (isRoutineDayDone(dateStr)) doneDays++;
         }
 
         const pct = today > 0 ? Math.round((doneDays / today) * 100) : 0;
@@ -2116,11 +2129,7 @@
         const sortedDates = [...allDates].sort();
         let maxStreak = 0, curStreak = 0, prevDate = null;
         sortedDates.forEach(dateStr => {
-            const allDone = routines.length > 0 && routines.every(r => {
-                if (r.productIds.length === 0) return true;
-                const rec = r.checkHistory.find(h => h.date === dateStr);
-                return rec && r.productIds.every(pid => rec.checkedProductIds.includes(pid));
-            });
+            const allDone = isRoutineDayDone(dateStr);
             if (allDone) {
                 if (prevDate) {
                     const prev = new Date(prevDate);
@@ -2152,11 +2161,7 @@
                 const d = i + 1;
                 const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                 const isPast = d <= today;
-                const allDone = isPast && routines.length > 0 && routines.every(r => {
-                    if (r.productIds.length === 0) return true;
-                    const rec = r.checkHistory.find(h => h.date === dateStr);
-                    return rec && r.productIds.every(pid => rec.checkedProductIds.includes(pid));
-                });
+                const allDone = isPast && isRoutineDayDone(dateStr);
                 const bg = allDone ? 'rgba(255,255,255,0.95)' : (isPast ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.15)');
                 return `<div style="flex:1; height:6px; border-radius:3px; background:${bg};"></div>`;
             }).join('');
@@ -2200,14 +2205,15 @@
             } else {
                 renderRoutineTab();
             }
-            // 루틴 전체 완료 체크
-            const allDone = r.productIds.every(pid => todayRecord.checkedProductIds.includes(pid));
-            if (allDone) {
-                setTimeout(() => {
-                    showToast(`🎉 ${r.emoji} ${r.name} 완료!`);
+            // [V1 정책] 메시지: 올클리어 ⭐ / 1개 이상 체크 💚
+            setTimeout(() => {
+                if (isRoutineDayAllClear(todayStr)) {
+                    showToast(`⭐ 오늘 루틴 올클리어!`);
                     fireParticles();
-                }, 500);
-            }
+                } else {
+                    showToast(`💚 오늘의 루틴 기록 완료`);
+                }
+            }, 500);
         } else {
             todayRecord.checkedProductIds.splice(idx, 1);
             saveToStorage();
@@ -2222,11 +2228,7 @@
         const today = getTodayTimeline();
         for (let i = 0; i < 365; i++) {
             const checkDate = formatDateString(today - i * 24 * 60 * 60 * 1000);
-            const allDone = routines.every(r => {
-                if (r.productIds.length === 0) return true;
-                const rec = r.checkHistory.find(h => h.date === checkDate);
-                return rec && r.productIds.every(pid => rec.checkedProductIds.includes(pid));
-            });
+            const allDone = isRoutineDayDone(checkDate);
             if (allDone) streak++;
             else if (i > 0) break; // 오늘은 아직 안 했어도 카운트 유지
         }
@@ -2264,12 +2266,7 @@
         let doneDays = 0;
         for (let d = 1; d <= daysInMonth; d++) {
             const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-            const allDone = routines.length > 0 && routines.every(r => {
-                if (r.productIds.length === 0) return true;
-                const rec = r.checkHistory.find(h => h.date === dateStr);
-                return rec && r.productIds.every(pid => rec.checkedProductIds.includes(pid));
-            });
-            if (allDone) doneDays++;
+            if (isRoutineDayDone(dateStr)) doneDays++;
         }
         const pct = daysInMonth > 0 ? Math.round(doneDays / daysInMonth * 100) : 0;
         if (dc('dash-routine-pct')) dc('dash-routine-pct').textContent = pct + '%';
@@ -2428,11 +2425,7 @@
             const isToday = dateStr === todayStr;
 
             // 루틴 완료 여부
-            const routineDone = routines.length > 0 && routines.every(r => {
-                if (r.productIds.length === 0) return true;
-                const rec = r.checkHistory.find(h => h.date === dateStr);
-                return rec && r.productIds.every(pid => rec.checkedProductIds.includes(pid));
-            });
+            const routineDone = isRoutineDayDone(dateStr);
 
             // 텅 여부 (formatDateString으로 로컬 날짜 비교)
             const tungDone = products.some(p =>
