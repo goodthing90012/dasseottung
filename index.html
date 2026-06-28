@@ -563,7 +563,14 @@
         </div>
 
         <!-- 오늘의 루틴 -->
-        <div class="section-title">오늘의 루틴</div>
+        <div class="section-title" style="display:flex; align-items:center; justify-content:space-between;">
+            <span id="routineDateTitle">오늘의 루틴</span>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <button onclick="changeRoutineDate(-1)" style="background:none; border:none; font-size:18px; cursor:pointer; color:#555;">‹</button>
+                <span id="routineDateLabel" style="font-size:12px; font-weight:bold; min-width:80px; text-align:center;"></span>
+                <button onclick="changeRoutineDate(1)" id="routineDateNext" style="background:none; border:none; font-size:18px; cursor:pointer; color:#555;">›</button>
+            </div>
+        </div>
         <div id="todayRoutineList"></div>
 
 
@@ -952,6 +959,7 @@
         document.querySelectorAll('.tab-item').forEach(el => el.classList.remove('active'));
         document.getElementById(`tab-${tabName}`).classList.add('active');
         document.getElementById(`btn-tab-${tabName}`).classList.add('active');
+        if (tabName === 'routine') routineDateOffset = 0; // 루틴 탭 진입 시 오늘로 초기화
         syncAllAndRender();
     }
 
@@ -1970,6 +1978,20 @@
         return formatDateString(getTodayTimeline());
     }
 
+    // 루틴 탭에서 선택된 날짜 (기본: 오늘). 어제까지만 이동 가능
+    let routineDateOffset = 0; // 0=오늘, -1=어제
+    function getSelectedRoutineStr() {
+        const ts = getTodayTimeline() + routineDateOffset * 24 * 60 * 60 * 1000;
+        return formatDateString(ts);
+    }
+    function changeRoutineDate(dir) {
+        const next = routineDateOffset + dir;
+        // 미래 불가, 어제(-1)까지만
+        if (next > 0 || next < -1) return;
+        routineDateOffset = next;
+        renderRoutineTab();
+    }
+
     // 루틴 추가
     function addRoutine() {
         const emoji = document.getElementById('newRoutineEmoji').value.trim() || '✅';
@@ -2042,7 +2064,7 @@
     function checkAllRoutine(routineId, el) {
         const r = routines.find(rt => rt.id === routineId);
         if (!r) return;
-        const todayStr = getTodayStr();
+        const todayStr = getSelectedRoutineStr();
         let todayRecord = r.checkHistory.find(h => h.date === todayStr);
         if (!todayRecord) {
             todayRecord = { date: todayStr, checkedProductIds: [] };
@@ -2156,7 +2178,7 @@
     function toggleRoutineCheck(routineId, productId, el) {
         const r = routines.find(rt => rt.id === routineId);
         if (!r) return;
-        const todayStr = getTodayStr();
+        const todayStr = getSelectedRoutineStr();
         let todayRecord = r.checkHistory.find(h => h.date === todayStr);
         if (!todayRecord) {
             todayRecord = { date: todayStr, checkedProductIds: [] };
@@ -2517,6 +2539,19 @@
     function renderRoutineTab() {
         updateMonthlyStats();
 
+        // 날짜 레이블/타이틀 업데이트
+        const selectedStr = getSelectedRoutineStr();
+        const titleEl = document.getElementById('routineDateTitle');
+        const labelEl = document.getElementById('routineDateLabel');
+        const nextBtn = document.getElementById('routineDateNext');
+        if (titleEl) titleEl.textContent = routineDateOffset === 0 ? '오늘의 루틴' : '어제의 루틴';
+        if (labelEl) {
+            const [yy,mm,dd] = selectedStr.split('-');
+            labelEl.textContent = `${mm}.${dd}${routineDateOffset === 0 ? ' (오늘)' : ' (어제)'}`;
+        }
+        // 오늘이면 다음(미래) 버튼 비활성화
+        if (nextBtn) nextBtn.style.opacity = routineDateOffset === 0 ? '0.25' : '1';
+
         // 오늘의 루틴
         const listEl = document.getElementById('todayRoutineList');
         if (!listEl) return;
@@ -2524,7 +2559,7 @@
         if (routines.length === 0) {
             listEl.innerHTML = `<div style="text-align:center; color:#BBB; font-size:13px; padding:30px 0;">마이페이지 → 루틴에서 루틴을 만들어보세요</div>`;
         } else {
-            const todayStr = getTodayStr();
+            const todayStr = selectedStr;
             listEl.innerHTML = routines.map(r => {
                 const todayRecord = r.checkHistory.find(h => h.date === todayStr);
                 const checkedIds = todayRecord ? todayRecord.checkedProductIds : [];
