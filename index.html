@@ -302,6 +302,15 @@
             </div>
         </div>
     </div>
+    <div class="confirm-overlay" id="resetTungOverlay">
+        <div class="confirm-box">
+            <p>누적 텅을 0으로 초기화할까요?<br><span style="font-size:11px; color:#999;">제품·루틴·카테고리는 유지되고<br>홈의 누적 텅 수치만 0이 돼요</span></p>
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelResetTungCount()">아니오</button>
+                <button class="confirm-btn yes" onclick="proceedResetTungCount()">예, 초기화</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="editScheduleOverlay">
         <div class="confirm-box" style="width:86%; max-width:320px;">
             <p style="margin-bottom:10px; font-weight:bold;">행사 일정 수정</p>
@@ -686,6 +695,14 @@
                 </div>
                 <input type="file" id="backupFileInput" accept="application/json" style="display:none;" onchange="importBackup(this.files[0])">
                 <button class="btn-save" style="background-color: var(--accent);" onclick="document.getElementById('backupFileInput').click()">📤 백업 파일 선택해서 불러오기</button>
+            </div>
+            <div class="setting-form">
+                <div class="section-title">↺ 누적 텅 초기화</div>
+                <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
+                    홈 화면의 누적 텅(누적 공병) 수치를 0으로 되돌려요.<br>
+                    제품·루틴·카테고리 데이터는 그대로 유지돼요. 테스트 데이터를 정리할 때 사용하세요.
+                </div>
+                <button class="btn-save" style="background-color:#FF5A5F;" onclick="confirmResetTungCount()">↺ 누적 텅 0으로 초기화</button>
             </div>
             <div style="font-size:11px; color:var(--gray); text-align:center; margin-top:8px;">
                 마지막 자동 저장: <span id="lastSavedAt">-</span>
@@ -1646,6 +1663,20 @@
     }
 
     let pendingResetId = null;
+    function confirmResetTungCount() {
+        document.getElementById('resetTungOverlay').classList.add('active');
+    }
+    function cancelResetTungCount() {
+        document.getElementById('resetTungOverlay').classList.remove('active');
+    }
+    function proceedResetTungCount() {
+        totalTungCount = 0;
+        saveToStorage();
+        document.getElementById('resetTungOverlay').classList.remove('active');
+        renderDashboard();
+        showToast('↺ 누적 텅이 0으로 초기화됐어요');
+    }
+
     function confirmResetHistory(productId) {
         pendingResetId = productId;
         document.getElementById('resetHistoryOverlay').classList.add('active');
