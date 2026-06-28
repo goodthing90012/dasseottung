@@ -1956,18 +1956,7 @@
             }
         });
 
-        // 최고 기록을 루틴 데이터에 영구 저장 (90일 제한으로 인한 누락 방지)
-        routines.forEach(r => {
-            if (!r.allTimeMaxStreak) r.allTimeMaxStreak = 0;
-        });
-        const savedMax = routines.length > 0 ? Math.max(...routines.map(r => r.allTimeMaxStreak || 0)) : 0;
-        if (maxStreak > savedMax) {
-            routines.forEach(r => { r.allTimeMaxStreak = maxStreak; });
-            saveToStorage();
-        } else {
-            maxStreak = savedMax;
-        }
-
+        // maxStreak는 현재 체크 기록 기준으로만 실시간 계산 (체크 해제 시 같이 감소)
         const el = (id) => document.getElementById(id);
         if (el('routineMonthDone')) el('routineMonthDone').textContent = doneDays;
         if (el('routineMonthTotal')) el('routineMonthTotal').textContent = daysInMonth;
