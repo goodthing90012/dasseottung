@@ -425,7 +425,7 @@
             <div class="add-form" style="padding:12px; text-align:center; margin-bottom:0;">
                 <div style="font-size:20px;">🩷</div>
                 <div style="font-size:22px; font-weight:900; color:var(--primary);" id="dash-tung-count">0</div>
-                <div style="font-size:10px; color:#888; margin-top:2px;">텅 (이번 달 공병)</div>
+                <div style="font-size:10px; color:#888; margin-top:2px;">누적 텅(누적 공병)</div>
             </div>
             <div class="add-form" style="padding:12px; text-align:center; margin-bottom:0;">
                 <div style="font-size:20px;">💚</div>
@@ -826,7 +826,7 @@
     // 현재 데이터를 로컬스토리지에 저장
     function saveToStorage() {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ categories, schedules, products, reviews, routines }));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ categories, schedules, products, reviews, routines, totalTungCount }));
             localStorage.setItem(STORAGE_KEY + '_savedAt', String(Date.now()));
             updateLastSavedLabel();
         } catch (e) {
@@ -901,6 +901,10 @@
     let products = savedData ? savedData.products : defaultProducts;
     let reviews = (savedData && Array.isArray(savedData.reviews)) ? savedData.reviews : defaultReviews;
     let routines = (savedData && Array.isArray(savedData.routines)) ? savedData.routines : [];
+    let totalTungCount = (savedData && typeof savedData.totalTungCount === 'number') ? savedData.totalTungCount : null;
+    if (totalTungCount === null) {
+        totalTungCount = products.reduce((sum, p) => sum + (p.tungHistory || []).length, 0);
+    }
 
     window.onload = () => {
         renderDashboard();
@@ -1409,6 +1413,7 @@
         p.stock = lastTungAction.prevStock;
         p.openedDate = lastTungAction.prevOpenedDate;
         p.tungCount = lastTungAction.prevTungCount;
+        totalTungCount = Math.max((totalTungCount || 0) - 1, 0);
 
         // 취소된 텅 차수에 달려있던 리뷰가 있다면 같이 제거 (그 텅 자체가 없던 일이 되므로)
         reviews = reviews.filter(r => !(r.productId === productId && r.tungNo === undoneTungNo));
@@ -1450,6 +1455,7 @@
 
         // 텅 횟수 카운트 — 재고가 남아있어도 누를 때마다 1씩 증가 (낱개 단위 소진 = 텅 1회)
         p.tungCount = (p.tungCount || 0) + 1;
+        totalTungCount = (totalTungCount || 0) + 1;
 
         // 소진일 자동 기록 — 모든 카테고리에서, 재고 남아있어도 매번 기록
         if (p.openedDate) {
@@ -2196,13 +2202,8 @@
         const firstOfMonth = new Date(y, m, 1).getTime();
         const lastOfMonth  = new Date(y, m+1, 0).getTime() + 86399999;
 
-        // 이번 달 공병(텅) 수
-        let tungCount = 0;
-        products.forEach(p => {
-            (p.tungHistory||[]).forEach(h => {
-                if (h.date >= firstOfMonth && h.date <= lastOfMonth) tungCount++;
-            });
-        });
+        // 누적 공병(텅) 수 — 삭제된 상품도 포함
+        let tungCount = totalTungCount || 0;
         const dc = id => document.getElementById(id);
         if (dc('dash-tung-count')) dc('dash-tung-count').textContent = tungCount;
 
