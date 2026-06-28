@@ -429,7 +429,7 @@
                 <div style="font-size:10px; color:#888; margin-top:2px;">재고 없음</div>
             </div>
         </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:14px;">
             <div class="add-form" style="padding:12px; text-align:center; margin-bottom:0;">
                 <div style="font-size:18px;">🧴</div>
                 <div style="font-size:20px; font-weight:900; color:#333;" id="dash-opened-count">0</div>
@@ -439,6 +439,12 @@
                 <div style="font-size:18px;">📦</div>
                 <div style="font-size:20px; font-weight:900; color:#333;" id="dash-sealed-count">0</div>
                 <div style="font-size:10px; color:#888; margin-top:2px;">미개봉</div>
+            </div>
+            <div class="add-form" style="padding:12px; text-align:center; margin-bottom:0;">
+                <div style="font-size:18px;">⏰</div>
+                <div style="font-size:20px; font-weight:900; color:#E67E22;" id="dash-soon-count">0</div>
+                <div style="font-size:10px; color:#888; margin-top:2px;">소진 예정</div>
+                <div style="font-size:9px; color:#bbb; margin-top:1px;">재고 1개</div>
             </div>
         </div>
 
@@ -2176,6 +2182,10 @@
         // 리필 예정 (재고 1개 이하)
         const refillCount = products.filter(p => p.stock === 0).length;
         if (dc('dash-refill-count')) dc('dash-refill-count').textContent = refillCount;
+
+        // 소진 예정 (재고 1개 남은 제품 수)
+        const soonCount = products.filter(p => p.stock === 1 && !p.unopened).length;
+        if (dc('dash-soon-count')) dc('dash-soon-count').textContent = soonCount;
 
         // 개봉중 / 미개봉
         const openedCount = products.filter(p => p.stock > 0 && !p.unopened).length;
