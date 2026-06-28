@@ -2327,7 +2327,7 @@
             }
             if (isToday) { bg = '#FF5A5F'; color = 'white'; }
 
-            const containerW = (routineDone && tungDone) ? '100%' : '160%';
+            const containerW = (routineDone && tungDone && filterMode === 'all') ? '100%' : '160%';
             html += `<div onclick="showDashDateDetail('${dateStr}')" style="padding:3px 1px; border-radius:8px; background:${bg}; color:${color}; font-size:11px; font-weight:${isToday?'bold':'normal'}; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; overflow:visible; box-sizing:border-box; min-height:54px; cursor:pointer;">
                 <div style="line-height:1;">${d}</div>
                 <div style="width:${containerW};aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;overflow:hidden;">${indicator}</div>
