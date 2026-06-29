@@ -1450,6 +1450,12 @@
         p.tungCount = lastTungAction.prevTungCount;
         totalTungCount = Math.max((totalTungCount || 0) - 1, 0);
 
+        // 텅 전에 쉬는 중이었다면(자동 재개됨) 다시 쉬는 중 상태로 복원
+        if (lastTungAction.wasPausedBeforeTung && p.pauseHistory && p.pauseHistory.length > 0) {
+            const last = p.pauseHistory[p.pauseHistory.length - 1];
+            if (last && last.resumedAt) last.resumedAt = null;
+        }
+
         // 취소된 텅 차수에 달려있던 리뷰가 있다면 같이 제거 (그 텅 자체가 없던 일이 되므로)
         reviews = reviews.filter(r => !(r.productId === productId && r.tungNo === undoneTungNo));
 
@@ -1464,11 +1470,13 @@
         const p = products.find(prod => prod.id === id);
         if (!p || p.stock <= 0) return;
 
-        // 중단 중이면 자동 재개
+        // 중단 중이면 자동 재개 (취소 대비 상태 기록)
+        let wasPausedBeforeTung = false;
         if (p.pauseHistory && p.pauseHistory.length > 0) {
             const last = p.pauseHistory[p.pauseHistory.length - 1];
             if (!last.resumedAt) {
                 last.resumedAt = getTodayTimeline();
+                wasPausedBeforeTung = true;
                 showToast('▶️ 사용 재개 후 텅 처리됐어요');
             }
         }
@@ -1482,7 +1490,8 @@
             prevStock: p.stock,
             prevOpenedDate: p.openedDate,
             prevTungCount: p.tungCount || 0,
-            hadHistoryPush: willPushHistory
+            hadHistoryPush: willPushHistory,
+            wasPausedBeforeTung: wasPausedBeforeTung
         };
 
         // 데이터 먼저 업데이트
