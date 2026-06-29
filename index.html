@@ -1998,17 +1998,17 @@
             <div style="background:#FFF8E6; border:1.5px solid #FFD9B3; border-radius:12px; padding:12px; margin-bottom:14px;">
                 <div style="font-size:12px; font-weight:bold; color:#FF922B; margin-bottom:8px;">✏️ 아직 작성 안 한 상품평 ${pending.length}건</div>
                 ${pending.map(p => `
-                    <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid #FFE8C0;">
-                        <div>
+                    <div style="padding:10px 0; border-bottom:1px solid #FFE8C0;">
+                        <div style="margin-bottom:8px;">
                             <span style="font-size:13px; font-weight:bold;">${p.productName}</span>
                             <span style="font-size:11px; color:#FF922B; margin-left:5px;">${getTungOrdinalLabel(p.tungNo)}</span>
                             <div style="font-size:10px; color:#AAA;">${formatDateString(p.date)} 텅</div>
                         </div>
-                        <div style="display:flex; gap:6px;">
+                        <div style="display:flex; gap:6px; justify-content:flex-end;">
                             <button onclick="deletePendingReview(${p.productId}, ${p.tungNo})"
-                                style="background:#F0F0F0; color:#888; border:none; border-radius:14px; padding:5px 10px; font-size:11px; font-weight:bold; cursor:pointer;">삭제</button>
+                                style="background:#F0F0F0; color:#888; border:none; border-radius:14px; padding:6px 14px; font-size:11px; font-weight:bold; cursor:pointer;">삭제</button>
                             <button onclick="openReviewModal(${p.productId}, '${p.productName.replace(/'/g,"\\'")}', ${p.tungNo})"
-                                style="background:#FF922B; color:white; border:none; border-radius:14px; padding:5px 12px; font-size:11px; font-weight:bold; cursor:pointer;">작성하기</button>
+                                style="background:#FF922B; color:white; border:none; border-radius:14px; padding:6px 14px; font-size:11px; font-weight:bold; cursor:pointer;">작성하기</button>
                         </div>
                     </div>
                 `).join('')}
