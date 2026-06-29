@@ -1382,7 +1382,7 @@
         // 1일 이상 썼으면(=쓰다 멈춘 것) openedDate 유지하고 이어서 카운트
         if (p.openedDate) {
             const usedBeforePause = Math.round((last.pausedAt - p.openedDate) / (1000 * 60 * 60 * 24));
-            if (usedBeforePause <= 0) {
+            if (usedBeforePause === 0) {
                 p.openedDate = getTodayTimeline();
                 // 이 재고는 사실상 오늘부터 시작이므로 이전 쉬는 기록 정리
                 p.pauseHistory.pop();
