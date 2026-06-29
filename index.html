@@ -2551,12 +2551,17 @@
             });
         });
 
-        // 루틴
+        // 루틴 [V1 정책: 1개 이상 체크 = 완료]
         const doneRoutines = [];
         routines.forEach(r => {
             const rec = r.checkHistory.find(h => h.date === dateStr);
-            if (rec && r.productIds.every(pid => rec.checkedProductIds.includes(pid))) {
-                doneRoutines.push((r.emoji||'') + ' ' + r.name);
+            if (rec && rec.checkedProductIds && rec.checkedProductIds.length > 0) {
+                const allClear = isRoutineDayAllClear(dateStr);
+                const checkedNames = rec.checkedProductIds.map(pid => {
+                    const prod = products.find(p => p.id === pid);
+                    return prod ? prod.name : null;
+                }).filter(Boolean);
+                doneRoutines.push({ label: (r.emoji||'') + ' ' + r.name, allClear, checkedNames });
             }
         });
 
@@ -2573,14 +2578,39 @@
             html += '</div>';
         }
         if (doneRoutines.length > 0) {
-            html += `<div><div style="font-size:12px;font-weight:700;color:#4CAF50;margin-bottom:4px;">💚 루틴 완료</div>`;
-            html += doneRoutines.map(n => `<div style="font-size:12px;color:#555;padding:2px 0;">• ${n}</div>`).join('');
+            const allClearDay = isRoutineDayAllClear(dateStr);
+            const allClearBadge = allClearDay ? `<span style="font-size:10px;background:#E8F5E9;color:#2E7D32;border-radius:8px;padding:1px 6px;margin-left:6px;">올클리어 ⭐</span>` : '';
+            html += `<div><div style="font-size:12px;font-weight:700;color:#4CAF50;margin-bottom:6px;">💚 루틴 완료${allClearBadge}</div>`;
+            html += doneRoutines.map((r, i) => {
+                const detailId = `routineDetail_${i}`;
+                const checkedList = r.checkedNames.map(n => `<div style="font-size:11px;color:#888;padding:1px 0 1px 8px;">· ${n}</div>`).join('');
+                return `
+                    <div style="margin-bottom:6px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;">
+                            <div style="font-size:12px;color:#555;">• ${r.label}</div>
+                            <button onclick="toggleRoutineDetail('${detailId}')" style="background:none;border:none;font-size:10px;color:#aaa;cursor:pointer;padding:0 4px;">더보기 ▾</button>
+                        </div>
+                        <div id="${detailId}" style="display:none;margin-top:4px;padding:6px 8px;background:#F1F8F1;border-radius:8px;">
+                            ${checkedList}
+                        </div>
+                    </div>`;
+            }).join('');
             html += '</div>';
         }
 
         content.innerHTML = html;
         detail.style.display = 'block';
         detail.scrollIntoView({behavior:'smooth', block:'nearest'});
+    }
+
+    function toggleRoutineDetail(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const isOpen = el.style.display !== 'none';
+        el.style.display = isOpen ? 'none' : 'block';
+        // 버튼 텍스트 토글
+        const btn = el.previousElementSibling?.querySelector('button');
+        if (btn) btn.textContent = isOpen ? '더보기 ▾' : '접기 ▴';
     }
 
     // 홈 달력 렌더
