@@ -306,15 +306,6 @@
             </div>
         </div>
     </div>
-    <div class="confirm-overlay" id="decreaseTungOverlay">
-        <div class="confirm-box">
-            <p>누적 텅을 1개 줄일까요?<br><span style="font-size:11px; color:#999;">실수로 텅을 눌렀을 때 사용하세요</span></p>
-            <div class="confirm-btn-row">
-                <button class="confirm-btn no" onclick="cancelDecreaseTungCount()">아니오</button>
-                <button class="confirm-btn yes" onclick="proceedDecreaseTungCount()">예, 1개 줄이기</button>
-            </div>
-        </div>
-    </div>
     <div class="confirm-overlay" id="sameDayTungOverlay">
         <div class="confirm-box">
             <p id="sameDayTungLabel">오늘 이미 텅 처리했어요. 또 누를까요?</p>
@@ -755,17 +746,14 @@
                 <button class="btn-save" style="background-color: var(--accent);" onclick="document.getElementById('backupFileInput').click()">📤 백업 파일 선택해서 불러오기</button>
             </div>
             <div class="setting-form">
-                <div class="section-title">↺ 누적 텅 조정</div>
+                <div class="section-title">↺ 잘못 누른 텅 되돌리기</div>
                 <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
-                    홈 화면의 누적 텅(누적 공병) 수치를 조정해요.<br>
-                    제품·루틴·카테고리 데이터는 그대로 유지돼요.
+                    실수로 누른 텅을 되돌려요.<br>
+                    가장 최근에 누른 텅 <b>1개</b>를 찾아, 홈의 누적 텅과 달력 기록을 함께 -1 해요.
                 </div>
-                <div style="display:flex; gap:8px; align-items:stretch;">
-                    <button class="btn-save" style="background-color:#FF922B; flex:1;" onclick="decreaseTungCount()">➖ 1개 줄이기</button>
-                    <button class="btn-save" style="background-color:#7C5CFF; flex:1;" onclick="decreaseTungWithCalendar()">📅 텅 기록까지 같이 -1</button>
-                </div>
+                <button class="btn-save" style="background-color:#7C5CFF; width:100%;" onclick="decreaseTungWithCalendar()">📅 가장 최근 텅 1개 되돌리기 (-1)</button>
                 <div style="font-size:11px; color:var(--gray); line-height:1.5; margin-top:6px;">
-                    위 버튼은 누적 텅과 함께 <b>달력에 찍힌 가장 최근 텅 기록</b>도 같이 지워요. 실수로 누른 기록을 깔끔히 되돌릴 때 쓰세요.
+                    누적 텅과 달력 기록이 <b>항상 같이</b> 줄어 정합성이 유지돼요. 재고·개봉 상태·루틴·카테고리는 바뀌지 않아요.
                 </div>
             </div>
             <div style="font-size:11px; color:var(--gray); text-align:center; margin-top:8px;">
@@ -1968,24 +1956,6 @@
     }
 
     let pendingResetId = null;
-    function decreaseTungCount() {
-        if ((totalTungCount || 0) <= 0) {
-            showToast('⚠️ 누적 텅이 이미 0이에요');
-            return;
-        }
-        document.getElementById('decreaseTungOverlay').classList.add('active');
-    }
-    function cancelDecreaseTungCount() {
-        document.getElementById('decreaseTungOverlay').classList.remove('active');
-    }
-    function proceedDecreaseTungCount() {
-        totalTungCount = Math.max((totalTungCount || 0) - 1, 0);
-        saveToStorage();
-        document.getElementById('decreaseTungOverlay').classList.remove('active');
-        renderDashboard();
-        showToast(`➖ 누적 텅 -1 (현재 ${totalTungCount}개)`);
-    }
-
     // 달력에 찍힌 가장 최근 텅 기록 1건 + 누적 텅을 함께 -1
     function decreaseTungWithCalendar() {
         // 모든 제품의 tungHistory를 모아 가장 최근(date 큰) 1건을 찾음
