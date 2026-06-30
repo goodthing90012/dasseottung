@@ -2740,14 +2740,14 @@
         const dc = id => document.getElementById(id);
         if (dc('dash-tung-count')) dc('dash-tung-count').textContent = tungCount;
 
-        // 루틴 달성률
-        const daysInMonth = new Date(y, m+1, 0).getDate();
+        // 루틴 달성률 — 이번 달, '오늘까지 지난 일수' 기준 (아직 안 온 날은 분모에서 제외)
+        const dayOfMonth = new Date(today).getDate();
         let doneDays = 0;
-        for (let d = 1; d <= daysInMonth; d++) {
+        for (let d = 1; d <= dayOfMonth; d++) {
             const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             if (isRoutineDayDone(dateStr)) doneDays++;
         }
-        const pct = daysInMonth > 0 ? Math.round(doneDays / daysInMonth * 100) : 0;
+        const pct = dayOfMonth > 0 ? Math.round(doneDays / dayOfMonth * 100) : 0;
         if (dc('dash-routine-pct')) dc('dash-routine-pct').textContent = pct + '%';
 
         // 리필 예정 (재고 1개 이하)
