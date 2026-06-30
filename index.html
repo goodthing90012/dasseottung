@@ -760,8 +760,10 @@
                     홈 화면의 누적 텅(누적 공병) 수치를 조정해요.<br>
                     제품·루틴·카테고리 데이터는 그대로 유지돼요.
                 </div>
-                <button class="btn-save" style="background-color:#FF922B; width:100%;" onclick="decreaseTungCount()">➖ 1개 줄이기</button>
-                <button class="btn-save" style="background-color:#7C5CFF; width:100%; margin-top:8px;" onclick="decreaseTungWithCalendar()">📅 가장 최근 텅 기록까지 같이 -1</button>
+                <div style="display:flex; gap:8px; align-items:stretch;">
+                    <button class="btn-save" style="background-color:#FF922B; flex:1;" onclick="decreaseTungCount()">➖ 1개 줄이기</button>
+                    <button class="btn-save" style="background-color:#7C5CFF; flex:1;" onclick="decreaseTungWithCalendar()">📅 텅 기록까지 같이 -1</button>
+                </div>
                 <div style="font-size:11px; color:var(--gray); line-height:1.5; margin-top:6px;">
                     위 버튼은 누적 텅과 함께 <b>달력에 찍힌 가장 최근 텅 기록</b>도 같이 지워요. 실수로 누른 기록을 깔끔히 되돌릴 때 쓰세요.
                 </div>
