@@ -951,8 +951,9 @@
         const backupData = {
             exportedAt: new Date().toISOString(),
             app: 'dasseottung',
-            version: 1,
-            categories, schedules, products, reviews
+            version: 2,
+            categories, schedules, products, reviews, routines, totalTungCount,
+            reviewFeatureEnabled
         };
         const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -983,6 +984,17 @@
                 products = parsed.products;
                 reviews = Array.isArray(parsed.reviews) ? parsed.reviews : [];
                 routines = Array.isArray(parsed.routines) ? parsed.routines : [];
+                if (typeof parsed.totalTungCount === 'number') {
+                    totalTungCount = parsed.totalTungCount;
+                } else {
+                    totalTungCount = products.reduce((sum, p) => sum + (p.tungHistory || []).length, 0);
+                }
+                if (typeof parsed.reviewFeatureEnabled === 'boolean') {
+                    reviewFeatureEnabled = parsed.reviewFeatureEnabled;
+                    localStorage.setItem(STORAGE_KEY + '_reviewEnabled', String(reviewFeatureEnabled));
+                    const tgl = document.getElementById('reviewFeatureToggle');
+                    if (tgl) tgl.checked = reviewFeatureEnabled;
+                }
                 syncAllAndRender();
                 showToast('✅ 백업 데이터를 불러왔어요');
             } catch (err) {
