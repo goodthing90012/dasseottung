@@ -52,6 +52,9 @@
         .btn-quick-cycle { flex: 1; background: #FFF0F1; color: var(--primary); border: 1px solid #FFD9DA; padding: 8px; border-radius: 8px; font-size: 11px; font-weight: bold; cursor: pointer; transition: 0.15s; }
         .btn-quick-cycle:hover, .btn-quick-cycle.active { background: var(--primary); color: white; border-color: var(--primary); }
 
+        .seg-btn { flex: 1; background: #F4F4F6; color: #666; border: 1px solid #E5E5EA; padding: 9px 6px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; transition: 0.15s; }
+        .seg-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
         .preset-scroll { display: flex; gap: 8px; overflow-x: auto; padding: 4px 4px 12px 4px; margin-top: 4px; scrollbar-width: none; -ms-overflow-style: none; }
         .preset-scroll::-webkit-scrollbar { display: none; }
         .preset-btn { flex: 0 0 auto; background: #FFF4E6; color: var(--accent); border: 1px solid #FFE8CC; padding: 8px 14px; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
@@ -281,7 +284,7 @@
     </div>
     <div class="confirm-overlay" id="closeProductOverlay">
         <div class="confirm-box">
-            <p>미개봉으로 되돌릴까요?<br><span style="font-size:11px; color:#999;">개봉일, 사용 기록이 모두 초기화돼요</span></p>
+            <p>미개봉으로 되돌릴까요?<br><span style="font-size:11px; color:#999;">개봉일과 현재 통 사용 기록만 초기화돼요.<br>지난 텅(소진) 기록은 그대로 유지돼요</span></p>
             <div class="confirm-btn-row">
                 <button class="confirm-btn no" onclick="cancelCloseProduct()">아니오</button>
                 <button class="confirm-btn yes" onclick="proceedCloseProduct()">예</button>
@@ -535,15 +538,40 @@
             </div>
             <div class="form-group">
                 <label>카테고리 선택 (권장 사용 주기 자동 반영)</label>
-                <select id="prodCategorySelect"></select>
+                <select id="prodCategorySelect" onchange="refreshRemainBlock()"></select>
             </div>
             <div class="form-group">
                 <label>연동할 세일/구매 일정</label>
                 <select id="prodScheduleTarget"></select>
             </div>
             <div class="form-group">
-                <label>언제부터 쓰기 시작했나요? (이미 쓰던 제품이면 변경)</label>
-                <input type="date" id="prodOpenedDate">
+                <label>사용 상태</label>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" id="segSealed" class="seg-btn active" onclick="setUsageState('sealed')">📦 미개봉</button>
+                    <button type="button" id="segInUse" class="seg-btn" onclick="setUsageState('inuse')">✏️ 지금 쓰는 중</button>
+                </div>
+            </div>
+            <div class="form-group" id="inUseDetail" style="display:none;">
+                <label>시작일을 아시나요?</label>
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <button type="button" id="segStartKnown" class="seg-btn active" onclick="setStartKnown(true)">📅 날짜 알아요</button>
+                    <button type="button" id="segStartUnknown" class="seg-btn" onclick="setStartKnown(false)">🤔 잘 몰라요</button>
+                </div>
+                <div id="startDateBlock">
+                    <input type="date" id="prodOpenedDate">
+                </div>
+                <div id="remainBlock" style="display:none;">
+                    <div id="remainQty">
+                        <label style="font-size:11px; color:var(--gray);">남은 양이 어느 정도인가요?</label>
+                        <div style="display:flex; gap:8px;">
+                            <button type="button" class="seg-btn remain-btn active" data-remain="0.85" onclick="setRemain(this)">거의 새것</button>
+                            <button type="button" class="seg-btn remain-btn" data-remain="0.5" onclick="setRemain(this)">절반쯤</button>
+                            <button type="button" class="seg-btn remain-btn" data-remain="0.2" onclick="setRemain(this)">얼마 안 남음</button>
+                        </div>
+                    </div>
+                    <div id="remainKnownNote" style="font-size:10px; color:#BBB; margin-top:5px; line-height:1.5;">남은 양으로 시작일을 추정해 재구매 시점만 잡아요. 이 통의 첫 소진 기록은 평균에서 빼고, <b>다음 통부터 정확</b>해져요.</div>
+                    <div id="remainUnknownNote" style="display:none; font-size:11px; color:var(--gray); line-height:1.5; background:#F6F6F8; padding:9px 11px; border-radius:9px; margin-top:2px;">📂 카테고리가 미지정이라 소진 주기를 몰라요. 추정 없이 <b>오늘부터 새로 학습</b>하고, 이 통의 첫 소진은 평균에서 빼요. (다음 통부터 정확)</div>
+                </div>
             </div>
             <button class="btn-add" onclick="addProduct()">화장대에 추가</button>
         </div>
@@ -1067,6 +1095,19 @@
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
         {
+            version: 'v1.5.0',
+            date: '2026.07',
+            title: '쓰던 제품 등록 · 텅 되돌리기 정리',
+            items: [
+                '✏️ 쓰던 제품도 등록 — 미개봉 / 지금 쓰는 중 선택',
+                '📅 시작일 알면 그날부터, 모르면 남은 양(거의 새것·절반·얼마 안 남음)으로 추정',
+                '📊 앱 쓰기 전부터 쓰던 통의 첫 소진은 평균에서 제외 · 다음 통부터 정확해져요',
+                '📂 카테고리 미지정 제품은 오늘부터 새로 학습',
+                '↺ 누적 텅 조정을 \'잘못 누른 텅 되돌리기\'로 단일화 (누적·달력 같이 -1, 정합성 유지)',
+                '🛠️ 미개봉 되돌리기 안내 문구를 실제 동작에 맞게 수정'
+            ]
+        },
+        {
             version: 'v1.4.0',
             date: '2026.06',
             title: '소진위험 + 지난 루틴 기록',
@@ -1248,7 +1289,7 @@
 
             // [변경점] 일반 카테고리는 텅 기록이 쌓일수록 실제 평균 비중을 점점 높이는 가중평균 사용
             // (기록 5회 이상이면 실제 평균 100% 반영, 그 전엔 카테고리 기준값과 섞어서 완만하게 전환)
-            const realHistory = p.tungHistory || [];
+            const realHistory = (p.tungHistory || []).filter(h => !h.provisional);
             const realAvgDays = realHistory.length >= 2
                 ? Math.round(realHistory.reduce((s, h) => s + h.days, 0) / realHistory.length)
                 : null;
@@ -1280,7 +1321,7 @@
                     statusBadge = '<span class="badge danger">재고 없음</span>';
                     alertText = '즉시 구매 필요';
                 } else {
-                    const history = p.tungHistory || [];
+                    const history = (p.tungHistory || []).filter(h => !h.provisional);
                     // 평균 소진일은 텅 기록 2회 이상부터 계산 (그 전엔 비교 불가)
                     const avgDays = history.length >= 2
                         ? Math.round(history.reduce((s, h) => s + h.days, 0) / history.length)
@@ -1297,8 +1338,11 @@
                     if (!matchedSched) {
                         // 세일/구매 일정이 연동 안 된 경우 — 기존처럼 분석 단계 안내만
                         if (history.length === 0) {
+                            const hasProvisional = (p.tungHistory || []).some(h => h.provisional);
                             statusBadge = '<span class="badge neutral">🫙 분석 대기 중</span>';
-                            alertText = '텅을 누를수록 소진 패턴이 자동으로 분석돼요';
+                            alertText = hasProvisional
+                                ? '앱 쓰기 전부터 쓰던 통이라 첫 소진은 평균에서 빼요 · 다음 텅부터 정확해져요'
+                                : '텅을 누를수록 소진 패턴이 자동으로 분석돼요';
                         } else if (history.length === 1) {
                             statusBadge = '<span class="badge neutral">📊 데이터 1개 수집됨</span>';
                             alertText = `첫 소진: ${history[0].days}일 걸렸어요 · 1번 더 누르면 평균 계산!`;
@@ -1723,7 +1767,9 @@
             if (!p.tungHistory) p.tungHistory = [];
             const pausedDays = getTotalPausedDays(p, getTodayTimeline());
             const daysUsedNow = Math.max(Math.round((getTodayTimeline() - p.openedDate) / (1000 * 60 * 60 * 24)) - pausedDays, 0);
-            p.tungHistory.push({ date: getTodayTimeline(), days: daysUsedNow, tungNo: p.tungCount });
+            const entry = { date: getTodayTimeline(), days: daysUsedNow, tungNo: p.tungCount };
+            if (p.provisionalFirstTung) { entry.provisional = true; p.provisionalFirstTung = false; } // 앱 사용 전부터 쓰던 통의 첫 소진 → 평균 제외
+            p.tungHistory.push(entry);
             if (p.tungHistory.length > 10) p.tungHistory.shift();
         }
 
@@ -1734,8 +1780,9 @@
         if (goingEmpty) {
             toastMsg = '🎉 텅! 다 썼어요! 리필 타이밍이에요';
         } else {
-            const cnt = (p.tungHistory || []).length;
-            const avg = cnt >= 2 ? Math.round(p.tungHistory.reduce((s,h)=>s+h.days,0)/cnt) : null;
+            const realHist = (p.tungHistory || []).filter(h => !h.provisional);
+            const cnt = realHist.length;
+            const avg = cnt >= 2 ? Math.round(realHist.reduce((s,h)=>s+h.days,0)/cnt) : null;
             toastMsg = avg !== null
                 ? `📊 ${getTungOrdinalLabel(p.tungCount)}! 평균 ${avg}일 소진 패턴이에요`
                 : `🫙 ${getTungOrdinalLabel(p.tungCount)}!`;
@@ -2558,7 +2605,7 @@
         const daysUsed = p.openedDate ? Math.max(diffDaysFrom(p.openedDate, today) - totalPausedDays, 0) : 0;
 
         if (isUnknownCat) {
-            const history = p.tungHistory || [];
+            const history = (p.tungHistory || []).filter(h => !h.provisional);
             const avgDays = history.length >= 2
                 ? Math.round(history.reduce((s, h) => s + h.days, 0) / history.length)
                 : null;
@@ -2567,7 +2614,7 @@
             const totalRemainingDays = remainingInCurrentBottle + ((p.stock - 1) * avgDays);
             return totalRemainingDays < dDayLeft;
         } else {
-            const realHistory = p.tungHistory || [];
+            const realHistory = (p.tungHistory || []).filter(h => !h.provisional);
             const realAvgDays = realHistory.length >= 2
                 ? Math.round(realHistory.reduce((s, h) => s + h.days, 0) / realHistory.length)
                 : null;
@@ -3315,6 +3362,40 @@
         syncAllAndRender(); 
     }
     
+    // ── 등록 폼: 사용 상태 / 잔량 토글 상태 ──
+    let regUsageState = 'sealed';   // 'sealed' | 'inuse'
+    let regStartKnown = true;       // 쓰는 중일 때 시작일을 아는지
+    let regRemainRatio = 0.85;      // 시작일 모를 때 선택한 잔량 비율
+    function setUsageState(state) {
+        regUsageState = state;
+        document.getElementById('segSealed').classList.toggle('active', state === 'sealed');
+        document.getElementById('segInUse').classList.toggle('active', state === 'inuse');
+        document.getElementById('inUseDetail').style.display = (state === 'inuse') ? 'block' : 'none';
+        refreshRemainBlock();
+    }
+    function setStartKnown(known) {
+        regStartKnown = known;
+        document.getElementById('segStartKnown').classList.toggle('active', known);
+        document.getElementById('segStartUnknown').classList.toggle('active', !known);
+        document.getElementById('startDateBlock').style.display = known ? 'block' : 'none';
+        refreshRemainBlock();
+    }
+    // 잔량 블록: '쓰는 중 + 시작일 몰라요'일 때만 보이고, 카테고리 미지정이면 추정 대신 안내를 보여줌
+    function refreshRemainBlock() {
+        const catVal = parseInt(document.getElementById('prodCategorySelect').value);
+        const isUnknownCat = (catVal === 0 || isNaN(catVal));
+        const show = (regUsageState === 'inuse' && !regStartKnown);
+        document.getElementById('remainBlock').style.display = show ? 'block' : 'none';
+        document.getElementById('remainQty').style.display = isUnknownCat ? 'none' : 'block';
+        document.getElementById('remainKnownNote').style.display = isUnknownCat ? 'none' : 'block';
+        document.getElementById('remainUnknownNote').style.display = isUnknownCat ? 'block' : 'none';
+    }
+    function setRemain(btn) {
+        regRemainRatio = parseFloat(btn.getAttribute('data-remain'));
+        document.querySelectorAll('.remain-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
     function addProduct() {
         const raw = document.getElementById('prodName').value;
         const names = [...new Set(raw.split('\n').map(n => n.trim()).filter(n => n.length > 0))];
@@ -3324,6 +3405,35 @@
         const targetScheduleId = parseInt(document.getElementById('prodScheduleTarget').value);
         const today = getTodayTimeline();
         const isUnknown = (categoryId === 0 || isNaN(categoryId));
+
+        // ── 사용 상태에 따른 개봉 정보 계산 ──
+        // sealed: 미개봉 / inuse+날짜: 정확한 개봉일 / inuse+잔량: 추정 개봉일 + 첫 텅 provisional 처리
+        let initOpenedDate = null;
+        let initUnopened = true;
+        let initProvisional = false;
+        if (regUsageState === 'inuse') {
+            initUnopened = false;
+            if (regStartKnown) {
+                const v = document.getElementById('prodOpenedDate').value;
+                initOpenedDate = v ? new Date(v + 'T00:00:00').getTime() : today;
+                if (initOpenedDate > today) initOpenedDate = today; // 미래 방지
+            } else {
+                // 시작일 몰라요 → 첫 소진은 추정/꼬리값이라 평균에서 제외
+                initProvisional = true;
+                if (isUnknown) {
+                    // 카테고리(주기) 미지정 → 추정 불가, 오늘부터 새로 학습 (0 시작)
+                    initOpenedDate = today;
+                } else {
+                    // 카테고리 주기가 있으면 남은 양으로 시작일 역산 (재구매 ETA용)
+                    const baseDays = (categories.find(c => Number(c.id) === Number(categoryId)) || { days: 45 }).days || 45;
+                    const elapsed = Math.round((1 - regRemainRatio) * baseDays);
+                    initOpenedDate = today - elapsed * 24 * 60 * 60 * 1000;
+                }
+            }
+        }
+        // 폼 리셋 전에 토스트 표기용으로 상태 스냅샷
+        const regUsageStateAtAdd = regUsageState;
+        const regStartKnownAtAdd = regStartKnown;
 
         const duplicates = [];
         const toAdd = [];
@@ -3344,8 +3454,9 @@
                 categoryId: isUnknown ? 0 : categoryId,
                 stock: 1,
                 targetScheduleId: isNaN(targetScheduleId) ? 0 : targetScheduleId,
-                openedDate: null,
-                unopened: true,
+                openedDate: initOpenedDate,
+                unopened: initUnopened,
+                provisionalFirstTung: initProvisional,
                 tungHistory: [],
                 memos: []
             });
@@ -3355,17 +3466,24 @@
         textarea.value = '';
         textarea.style.height = 'auto';
         document.getElementById('prodOpenedDate').value = formatDateString(today);
+        setUsageState('sealed');
+        setStartKnown(true);
 
         if (duplicates.length > 0 && toAdd.length === 0) {
             showToast(`⚠️ [${duplicates.join(', ')}] 이미 등록된 제품이라 중복 등록은 어려워요`);
             return;
         }
+        const stateLabel = (regUsageStateAtAdd === 'inuse')
+            ? (regStartKnownAtAdd
+                ? '쓰는 중 · 개봉일 기준'
+                : (isUnknown ? '쓰는 중 · 오늘부터 학습(첫 소진 제외)' : '쓰는 중 · 잔량 추정(첫 소진 제외)'))
+            : '미개봉';
         if (duplicates.length > 0) {
             showToast(`📦 ${toAdd.length}개 등록 완료! [${duplicates.join(', ')}]은 중복이라 제외됐어요`);
         } else if (toAdd.length === 1) {
-            showToast(`📦 [${toAdd[0]}] 화장대 추가 완료! 미개봉 상태예요`);
+            showToast(`📦 [${toAdd[0]}] 추가 완료! (${stateLabel})`);
         } else {
-            showToast(`📦 ${toAdd.length}개 상품이 한 번에 등록됐어요!`);
+            showToast(`📦 ${toAdd.length}개 등록 완료! (${stateLabel})`);
         }
         if (toAdd.length > 0) syncAllAndRender();
     }
