@@ -419,10 +419,19 @@
     </div>
     <div class="confirm-overlay" id="confirmOverlay">
         <div class="confirm-box">
-            <p>삭제하시겠습니까?</p>
+            <p>이 제품을 목록에서 치울까요?<br><span style="font-size:11px; color:#999;">보관함으로 이동해요. 텅·소진·달력 기록은 그대로 보존되고,<br>보관함에서 되돌리거나 영구 삭제할 수 있어요</span></p>
             <div class="confirm-btn-row">
                 <button class="confirm-btn no" onclick="cancelDeleteProduct()">아니오</button>
-                <button class="confirm-btn yes" onclick="proceedDeleteProduct()">예</button>
+                <button class="confirm-btn yes" onclick="proceedDeleteProduct()">보관함으로</button>
+            </div>
+        </div>
+    </div>
+    <div class="confirm-overlay" id="purgeProductOverlay">
+        <div class="confirm-box">
+            <p>영구 삭제할까요?<br><span style="font-size:11px; color:#999;">제품 정보와 텅·소진·달력 기록이 완전히 사라져요.<br>이 작업은 되돌릴 수 없어요</span></p>
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelPurgeProduct()">아니오</button>
+                <button class="confirm-btn yes" style="background-color:#E03131;" onclick="proceedPurgeProduct()">영구 삭제</button>
             </div>
         </div>
     </div>
@@ -744,6 +753,15 @@
                 <button class="btn-save" style="background-color:#845EF7;" onclick="showUpdateHistory()">📋 업데이트 내역 보기</button>
             </div>
             <div class="setting-form">
+                <div class="section-title">🗄️ 보관함</div>
+                <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
+                    목록에서 치운 제품이 여기 보관돼요. <b>텅·소진·달력 기록은 그대로</b> 남아 있어요.<br>
+                    되돌리거나 영구 삭제할 수 있어요.
+                </div>
+                <div id="storageUsage" style="margin-bottom:12px;"></div>
+                <div id="archivedList"></div>
+            </div>
+            <div class="setting-form">
                 <div class="section-title">📝 텅 리뷰 입력</div>
                 <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
                     켜두면 제품을 다 쓸 때(텅!)마다 상품평을 입력할 수 있는 창이 떠요.<br>
@@ -952,14 +970,50 @@
     }
 
     // 현재 데이터를 로컬스토리지에 저장
+    let lastStorageBytes = 0;
+    let storageWarned = false;
+    const STORAGE_BUDGET_BYTES = 5 * 1024 * 1024; // localStorage 일반 한도(약 5MB) 기준 추정치
+
     function saveToStorage() {
+        let payload;
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ categories, schedules, products, reviews, routines, totalTungCount }));
+            payload = JSON.stringify({ categories, schedules, products, reviews, routines, totalTungCount });
+            localStorage.setItem(STORAGE_KEY, payload);
             localStorage.setItem(STORAGE_KEY + '_savedAt', String(Date.now()));
+            lastStorageBytes = new Blob([payload]).size;
+            storageWarned = false;
             updateLastSavedLabel();
+            updateStorageUsage();
         } catch (e) {
             console.error('로컬스토리지 저장 실패:', e);
+            // 용량 초과 등으로 저장이 안 된 경우 — 세션당 한 번만 알림(토스트 도배 방지)
+            if (!storageWarned) {
+                storageWarned = true;
+                try { showToast('⚠️ 저장 공간이 가득 찼어요. 설정 > 보관함에서 영구 삭제로 정리해 주세요'); } catch (_) {}
+            }
+            if (payload) { try { lastStorageBytes = new Blob([payload]).size; } catch (_) {} }
+            updateStorageUsage();
         }
+    }
+
+    // 보관함 섹션에 현재 저장 용량을 막대로 표시 (한도에 닿기 전에 정리 유도)
+    function updateStorageUsage() {
+        const el = document.getElementById('storageUsage');
+        if (!el) return;
+        let bytes = lastStorageBytes;
+        if (!bytes) { try { bytes = new Blob([localStorage.getItem(STORAGE_KEY) || '']).size; } catch (_) { bytes = 0; } }
+        const pct = Math.min(Math.round(bytes / STORAGE_BUDGET_BYTES * 100), 100);
+        const kb = bytes < 1024 * 100 ? (bytes / 1024).toFixed(1) : Math.round(bytes / 1024);
+        const archivedCount = products.filter(p => p.archived).length;
+        const barColor = pct >= 90 ? '#E03131' : (pct >= 70 ? '#E67E22' : '#4C6EF5');
+        el.innerHTML = `
+            <div style="font-size:11px; color:var(--gray); margin-bottom:5px;">
+                저장 공간 약 <b>${pct}%</b> 사용 (${kb}KB)${archivedCount > 0 ? ` · 보관 ${archivedCount}개` : ''}
+            </div>
+            <div style="height:6px; background:#EEE; border-radius:4px; overflow:hidden;">
+                <div style="height:100%; width:${pct}%; background:${barColor}; transition:width 0.3s;"></div>
+            </div>
+            ${pct >= 70 ? `<div style="font-size:10px; color:${barColor}; margin-top:5px;">공간이 넉넉지 않아요. 보관함에서 안 쓰는 제품을 영구 삭제하면 공간이 늘어나요.</div>` : ''}`;
     }
 
     // 마이페이지 > 백업 탭에 마지막 저장 시각 표시
@@ -1094,6 +1148,18 @@
 
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
+        {
+            version: 'v1.6.0',
+            date: '2026.07',
+            title: '보관함 · 안전한 제품 정리',
+            items: [
+                '🗄️ 제품 삭제가 \'보관함\'으로 이동하는 방식으로 변경',
+                '📊 보관해도 텅·소진·달력·루틴 기록은 그대로 보존',
+                '↩️ 보관함에서 되돌리기 / 영구 삭제 선택 가능',
+                '🧩 제품을 치워도 루틴이 깨지지 않게 정리',
+                '📈 저장 공간 사용량 표시 + 공간 부족 시 알림'
+            ]
+        },
         {
             version: 'v1.5.0',
             date: '2026.07',
@@ -1254,6 +1320,7 @@
         const keywords = searchRaw.split('\n').map(k => k.trim().toLowerCase()).filter(k => k.length > 0);
 
         let filteredProducts = products.filter(p => {
+            if (p.archived) return false;
             const matchCat = (catFilter === 'all' || Number(p.categoryId) === Number(catFilter));
             const matchSched = (schedFilter === 'all' || Number(p.targetScheduleId) === Number(schedFilter));
             const matchSearch = keywords.length === 0 || keywords.some(k => p.name.toLowerCase().includes(k));
@@ -1512,6 +1579,32 @@
                 </div>`;
             listEl.appendChild(card);
         });
+        renderArchivedList();
+    }
+
+    // 보관함 목록 렌더 (되돌리기 / 영구삭제)
+    function renderArchivedList() {
+        updateStorageUsage();
+        const el = document.getElementById('archivedList');
+        if (!el) return;
+        const archived = products.filter(p => p.archived).sort((a, b) => (b.archivedAt || 0) - (a.archivedAt || 0));
+        if (archived.length === 0) {
+            el.innerHTML = '<div style="text-align:center; color:#BBB; font-size:12px; padding:14px 0;">보관된 제품이 없어요</div>';
+            return;
+        }
+        el.innerHTML = archived.map(p => {
+            const cat = categories.find(c => Number(c.id) === Number(p.categoryId));
+            const catName = cat ? cat.name : (Number(p.categoryId) === 0 ? '🫙 일단 쓰고 봄' : '미지정');
+            const tungN = p.tungCount || (p.tungHistory ? p.tungHistory.length : 0);
+            return `<div style="display:flex; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid #f5f5f5;">
+                <div style="flex:1; min-width:0;">
+                    <div style="font-size:13px; font-weight:700; color:#333; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${p.name}</div>
+                    <div style="font-size:11px; color:#aaa; margin-top:2px;">${catName} · 텅 ${tungN}회 기록 보존</div>
+                </div>
+                <button onclick="restoreProduct(${p.id})" style="flex-shrink:0; background:#EEF2FF; color:#4C6EF5; border:1px solid #D7DEFF; padding:6px 11px; border-radius:9px; font-size:12px; font-weight:700; cursor:pointer;">↩️ 되돌리기</button>
+                <button onclick="confirmPurgeProduct(${p.id})" style="flex-shrink:0; background:#FFF0F0; color:#E03131; border:1px solid #FFD6D6; padding:6px 11px; border-radius:9px; font-size:12px; font-weight:700; cursor:pointer;">🗑️</button>
+            </div>`;
+        }).join('');
     }
 
     function renderMypageLists() {
@@ -2311,13 +2404,19 @@
             return rec && rec.checkedProductIds && rec.checkedProductIds.length > 0;
         });
     }
+    // 보관(archive)된 제품 id인지 — 완료 판정에서 '필요 항목' 제외용
+    function isArchivedId(pid) {
+        const p = products.find(prod => prod.id === pid);
+        return p ? !!p.archived : false;
+    }
     // 해당 날짜에 등록된 모든 루틴 100% 완료(올클리어) 여부
     function isRoutineDayAllClear(dateStr) {
         if (routines.length === 0) return false;
         return routines.every(r => {
-            if (r.productIds.length === 0) return true;
+            const req = r.productIds.filter(pid => !isArchivedId(pid));
+            if (req.length === 0) return true;
             const rec = r.checkHistory.find(h => h.date === dateStr);
-            return rec && r.productIds.every(pid => rec.checkedProductIds.includes(pid));
+            return rec && req.every(pid => rec.checkedProductIds.includes(pid));
         });
     }
 
@@ -2652,20 +2751,20 @@
         if (dc('dash-routine-pct')) dc('dash-routine-pct').textContent = pct + '%';
 
         // 리필 예정 (재고 1개 이하)
-        const refillCount = products.filter(p => p.stock === 0).length;
+        const refillCount = products.filter(p => !p.archived && p.stock === 0).length;
         if (dc('dash-refill-count')) dc('dash-refill-count').textContent = refillCount;
 
         // 소진 예정 (재고 1개 남은 제품 수)
-        const soonCount = products.filter(p => p.stock === 1 && !p.unopened).length;
+        const soonCount = products.filter(p => !p.archived && p.stock === 1 && !p.unopened).length;
         if (dc('dash-soon-count')) dc('dash-soon-count').textContent = soonCount;
 
         // 소진위험 (화장대에서 '주기 전 소진위험' 배지가 붙은 제품 수)
-        const riskCount = products.filter(p => isExhaustionRisk(p, today)).length;
+        const riskCount = products.filter(p => !p.archived && isExhaustionRisk(p, today)).length;
         if (dc('dash-risk-count')) dc('dash-risk-count').textContent = riskCount;
 
         // 개봉중 / 미개봉
-        const openedCount = products.filter(p => p.stock > 0 && !p.unopened).length;
-        const sealedCount = products.filter(p => !!p.unopened).length;
+        const openedCount = products.filter(p => !p.archived && p.stock > 0 && !p.unopened).length;
+        const sealedCount = products.filter(p => !p.archived && !!p.unopened).length;
         if (dc('dash-opened-count')) dc('dash-opened-count').textContent = openedCount;
         if (dc('dash-sealed-count')) dc('dash-sealed-count').textContent = sealedCount;
 
@@ -2705,17 +2804,17 @@
         let items = [];
         if (type === 'refill') {
             title.textContent = '📦 재고 없음 제품';
-            items = products.filter(p => p.stock === 0);
+            items = products.filter(p => !p.archived && p.stock === 0);
         } else if (type === 'soon') {
             title.textContent = '⏰ 소진 예정 제품 (재고 1개)';
-            items = products.filter(p => p.stock === 1 && !p.unopened);
+            items = products.filter(p => !p.archived && p.stock === 1 && !p.unopened);
         } else if (type === 'sealed') {
             title.textContent = '📦 미개봉 제품';
-            items = products.filter(p => !!p.unopened);
+            items = products.filter(p => !p.archived && !!p.unopened);
         } else if (type === 'risk') {
             title.textContent = '🚨 소진위험 제품 (구매일 전 바닥날 위험)';
             const today = getTodayTimeline();
-            items = products.filter(p => isExhaustionRisk(p, today));
+            items = products.filter(p => !p.archived && isExhaustionRisk(p, today));
         }
 
         if (items.length === 0) {
@@ -2929,9 +3028,10 @@
             const dateStr = `${calendarYear}-${String(calendarMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const isToday = dateStr === todayStr;
             const allDone = routines.length > 0 && routines.every(r => {
-                if (r.productIds.length === 0) return true;
+                const req = r.productIds.filter(pid => !isArchivedId(pid));
+                if (req.length === 0) return true;
                 const rec = r.checkHistory.find(h => h.date === dateStr);
-                return rec && r.productIds.every(pid => rec.checkedProductIds.includes(pid));
+                return rec && req.every(pid => rec.checkedProductIds.includes(pid));
             });
             const anyDone = routines.some(r => r.checkHistory.some(h => h.date === dateStr && h.checkedProductIds.length > 0));
 
@@ -2988,18 +3088,19 @@
             listEl.innerHTML = noticeHtml + routines.map(r => {
                 const todayRecord = r.checkHistory.find(h => h.date === todayStr);
                 const checkedIds = todayRecord ? todayRecord.checkedProductIds : [];
-                const allDone = r.productIds.length > 0 && r.productIds.every(pid => checkedIds.includes(pid));
+                const activeIds = r.productIds.filter(pid => !isArchivedId(pid));
+                const allDone = activeIds.length > 0 && activeIds.every(pid => checkedIds.includes(pid));
 
-                const productsHtml = r.productIds.length === 0
+                const productsHtml = activeIds.length === 0
                     ? '<div style="font-size:11px; color:#BBB;">연결된 제품 없음</div>'
-                    : r.productIds.map((pid, idx) => {
+                    : activeIds.map((pid, idx) => {
                         const p = products.find(prod => prod.id === pid);
                         if (!p) return '';
                         const checked = checkedIds.includes(pid);
                         const fillColor = checked ? '#B2F2CC' : 'var(--liquid-full)';
                         const strokeColor = checked ? '#1EA94A' : '#444';
                         const isFirst = idx === 0;
-                        const isLast = idx === r.productIds.length - 1;
+                        const isLast = idx === activeIds.length - 1;
                         return `<div class="routine-product-row" data-routine-id="${r.id}" data-pid="${pid}">
                             <div class="order-btn-group">
                                 <button class="order-btn" ${isFirst || !editable ? 'disabled' : ''} ${editable ? `onclick="moveRoutineProduct(${r.id}, ${pid}, -1)"` : ''}>▲</button>
@@ -3073,7 +3174,7 @@
         // 제품 선택 피커
         const picker = document.getElementById('routineProductPicker');
         if (picker) {
-            const sortedProducts = [...products].sort((a,b) => b.id - a.id);
+            const sortedProducts = [...products].filter(p => !p.archived).sort((a,b) => b.id - a.id);
             picker.innerHTML = sortedProducts.length === 0
                 ? '<div style="font-size:12px; color:#BBB;">화장대에 제품을 먼저 등록해주세요</div>'
                 : sortedProducts.map(p => `
@@ -3093,7 +3194,7 @@
         listEl.innerHTML = [...routines].reverse().map(r => {
             const productNames = r.productIds.map(pid => {
                 const p = products.find(prod => prod.id === pid);
-                return p ? p.name : '';
+                return (p && !p.archived) ? p.name : '';
             }).filter(Boolean).join(', ') || '연결된 제품 없음';
             return `<div class="list-item-card" style="padding:10px 14px;">
                 <div style="flex:1;">
@@ -3293,9 +3394,50 @@
         }
     }
 
-    function deleteProduct(productId) { 
-        products = products.filter(p => p.id !== productId); 
-        renderProducts(); 
+    // 목록에서 치우기 = 보관(archive). 데이터(텅·소진·달력 기록)는 그대로 보존
+    function deleteProduct(productId) {
+        const p = products.find(prod => prod.id === productId);
+        if (p) {
+            p.archived = true;
+            p.archivedAt = Date.now();
+        }
+        syncAllAndRender();
+    }
+    // 보관 해제 = 다시 목록으로
+    function restoreProduct(productId) {
+        const p = products.find(prod => prod.id === productId);
+        if (p) {
+            p.archived = false;
+            delete p.archivedAt;
+            showToast('↩️ 목록으로 되돌렸어요');
+        }
+        syncAllAndRender();
+    }
+    // 영구 삭제: 제품과 루틴 참조까지 완전히 제거 (체크 기록은 보존)
+    let pendingPurgeId = null;
+    function confirmPurgeProduct(productId) {
+        pendingPurgeId = productId;
+        document.getElementById('purgeProductOverlay').classList.add('active');
+    }
+    function cancelPurgeProduct() {
+        pendingPurgeId = null;
+        document.getElementById('purgeProductOverlay').classList.remove('active');
+    }
+    function proceedPurgeProduct() {
+        if (pendingPurgeId !== null) {
+            const purgeId = pendingPurgeId;
+            products = products.filter(p => p.id !== purgeId);
+            // 루틴의 구성원 참조만 제거 — 과거 체크 기록(checkHistory)은 보존
+            routines.forEach(r => {
+                if (Array.isArray(r.productIds)) {
+                    r.productIds = r.productIds.filter(pid => pid !== purgeId);
+                }
+            });
+            showToast('🗑️ 영구 삭제됐어요');
+        }
+        pendingPurgeId = null;
+        document.getElementById('purgeProductOverlay').classList.remove('active');
+        syncAllAndRender();
     }
     
     let pendingDeleteCategoryId = null;
@@ -3439,7 +3581,7 @@
         const toAdd = [];
 
         names.forEach(name => {
-            const exists = products.some(p => p.name === name);
+            const exists = products.some(p => !p.archived && p.name === name);
             if (exists) {
                 duplicates.push(name);
             } else {
