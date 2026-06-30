@@ -838,6 +838,9 @@
         </div>
     </div>
 
+    <!-- 화면 뒤로가기 버튼 (팝업이 열렸을 때만 표시) -->
+    <button id="globalBackBtn" onclick="history.back()" aria-label="뒤로가기" style="display:none; position:fixed; top:14px; left:14px; z-index:2000; width:38px; height:38px; border-radius:50%; border:none; background:rgba(0,0,0,0.55); color:#fff; font-size:22px; line-height:1; cursor:pointer; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.25); padding:0;">‹</button>
+
     <div class="toast" id="toast"></div>
 </div>
 
@@ -3307,6 +3310,65 @@
         toast.style.display = 'block'; 
         setTimeout(() => toast.style.display = 'none', 2200); 
     }
+
+    /* ===== 뒤로가기 (휴대폰 뒤로가기 + 화면 ← 버튼) ===== */
+    // 현재 열려있는 오버레이/팝업 중 맨 위 것을 닫는다. 닫았으면 true.
+    function closeTopOverlay() {
+        const confirms = document.querySelectorAll('.confirm-overlay.active');
+        if (confirms.length) {
+            confirms[confirms.length - 1].classList.remove('active');
+            return true;
+        }
+        const popups = ['dashProductPopup', 'appIntroPopup', 'updateHistoryPopup'];
+        for (let i = 0; i < popups.length; i++) {
+            const el = document.getElementById(popups[i]);
+            if (el && el.style.display === 'block') {
+                el.style.display = 'none';
+                return true;
+            }
+        }
+        return false;
+    }
+    function isAnyOverlayOpen() {
+        if (document.querySelector('.confirm-overlay.active')) return true;
+        const popups = ['dashProductPopup', 'appIntroPopup', 'updateHistoryPopup'];
+        return popups.some(id => {
+            const el = document.getElementById(id);
+            return el && el.style.display === 'block';
+        });
+    }
+    // 화면 ← 버튼은 팝업/오버레이가 열려 있을 때만 보인다.
+    function updateBackButton() {
+        const btn = document.getElementById('globalBackBtn');
+        if (btn) btn.style.display = isAnyOverlayOpen() ? 'flex' : 'none';
+    }
+    function getActiveTabName() {
+        const el = document.querySelector('.tab-item.active');
+        return el ? el.id.replace('btn-tab-', '') : 'dashboard';
+    }
+    function ensureHistoryBuffer() { try { history.pushState({ qb: true }, ''); } catch (e) {} }
+
+    let _qbLastBack = 0;
+    window.addEventListener('popstate', function () {
+        // 1) 팝업이 열려 있으면 팝업만 닫고 앱은 유지
+        if (closeTopOverlay()) { updateBackButton(); ensureHistoryBuffer(); return; }
+        // 2) 홈(대시보드)이 아니면 홈으로 이동
+        if (getActiveTabName() !== 'dashboard') { switchTab('dashboard'); ensureHistoryBuffer(); return; }
+        // 3) 홈 + 닫을 것 없음 → 한 번 더 누르면 종료
+        const now = Date.now();
+        if (now - _qbLastBack < 2000) { return; } // 종료 허용 (버퍼 재생성 안 함)
+        _qbLastBack = now;
+        showToast('한 번 더 누르면 종료돼요');
+        ensureHistoryBuffer();
+    });
+    // 팝업이 열리고 닫힐 때마다 ← 버튼 표시 상태 자동 동기화
+    try {
+        new MutationObserver(updateBackButton).observe(document.body, {
+            attributes: true, attributeFilter: ['style', 'class'], subtree: true
+        });
+    } catch (e) {}
+    window.addEventListener('load', function () { ensureHistoryBuffer(); updateBackButton(); });
+    /* ===== /뒤로가기 ===== */
 
     // 서비스워커 등록 (HTTPS 또는 localhost 환경에서만 동작)
     if ('serviceWorker' in navigator) {
