@@ -586,6 +586,15 @@
                     <option value="all">전체 세일 일정</option>
                 </select>
             </div>
+            <div class="filter-group" style="margin-top:6px;">
+                <select id="filterStatus" class="filter-select" onchange="renderProducts()">
+                    <option value="all">전체 상태</option>
+                    <option value="sealed">📦 미개봉</option>
+                    <option value="using">🟢 개봉 · 사용중</option>
+                    <option value="paused">😴 개봉 · 쉬는중</option>
+                    <option value="empty">🙅‍♀️ 재고 없음</option>
+                </select>
+            </div>
             <textarea id="filterSearch" placeholder="제품명 검색 (엔터로 여러 개 동시 검색)" rows="1"
                 style="width:100%; resize:none; font-size:13px; padding:8px 10px; border:1px solid var(--light-gray); border-radius:10px; box-sizing:border-box; font-family:inherit; line-height:1.5; overflow:hidden; margin-top:6px; color:#333;"
                 oninput="this.style.height='auto'; this.style.height=this.scrollHeight+'px'; renderProducts();"></textarea>
@@ -1140,6 +1149,15 @@
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
         {
+            version: 'v1.8.0',
+            date: '2026.07',
+            title: '상태별 필터링 추가',
+            items: [
+                '🔍 리스트를 상태로 골라 보기: 미개봉 / 개봉·사용중 / 개봉·쉬는중 / 재고 없음',
+                '📂 기존 카테고리·세일 일정 필터와 함께 조합 가능'
+            ]
+        },
+        {
             version: 'v1.7.0',
             date: '2026.07',
             title: '홈에 최고 꾸준함 표시',
@@ -1316,16 +1334,26 @@
 
         const catFilter = document.getElementById('filterCategory') ? document.getElementById('filterCategory').value : 'all';
         const schedFilter = document.getElementById('filterSchedule') ? document.getElementById('filterSchedule').value : 'all';
+        const statusFilter = document.getElementById('filterStatus') ? document.getElementById('filterStatus').value : 'all';
 
         const searchRaw = (document.getElementById('filterSearch')?.value || '');
         const keywords = searchRaw.split('\n').map(k => k.trim().toLowerCase()).filter(k => k.length > 0);
+
+        // 제품의 현재 상태를 하나로 판정 (서로 겹치지 않음)
+        const getProductStatus = (p) => {
+            if (p.unopened) return 'sealed';
+            if ((p.stock || 0) <= 0) return 'empty';
+            const paused = !!(p.pauseHistory && p.pauseHistory.length > 0 && !p.pauseHistory[p.pauseHistory.length - 1].resumedAt);
+            return paused ? 'paused' : 'using';
+        };
 
         let filteredProducts = products.filter(p => {
             if (p.archived) return false;
             const matchCat = (catFilter === 'all' || Number(p.categoryId) === Number(catFilter));
             const matchSched = (schedFilter === 'all' || Number(p.targetScheduleId) === Number(schedFilter));
+            const matchStatus = (statusFilter === 'all' || getProductStatus(p) === statusFilter);
             const matchSearch = keywords.length === 0 || keywords.some(k => p.name.toLowerCase().includes(k));
-            return matchCat && matchSched && matchSearch;
+            return matchCat && matchSched && matchStatus && matchSearch;
         }).sort((a, b) => b.id - a.id);
 
         if(filteredProducts.length === 0) {
