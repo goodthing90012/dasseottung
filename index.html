@@ -453,9 +453,9 @@
                 <div style="font-size:10px; color:#888; margin-top:2px;">누적 텅(누적 공병)</div>
             </div>
             <div class="add-form" style="padding:12px; text-align:center; margin-bottom:0;">
-                <div style="font-size:20px;">💚</div>
-                <div style="font-size:22px; font-weight:900; color:#4CAF50;" id="dash-routine-pct">0%</div>
-                <div style="font-size:10px; color:#888; margin-top:2px;">루틴 달성률</div>
+                <div style="font-size:20px;">🔥</div>
+                <div style="font-size:22px; font-weight:900; color:#FF6B35;"><span id="dash-routine-streak">0</span><span style="font-size:13px; font-weight:700;">일</span></div>
+                <div style="font-size:10px; color:#888; margin-top:2px;">최고 꾸준함 · 달성 <span id="dash-routine-pct">0%</span></div>
             </div>
             <div class="add-form" style="padding:12px; text-align:center; margin-bottom:0; cursor:pointer;" onclick="showDashProductPopup('refill')">
                 <div style="font-size:20px;">📦</div>
@@ -1148,6 +1148,15 @@
 
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
+        {
+            version: 'v1.7.0',
+            date: '2026.07',
+            title: '홈에 최고 꾸준함 표시',
+            items: [
+                '🔥 홈 카드에 최고 연속(꾸준함) 일수 표시',
+                '💚 달성률도 같은 카드에 함께 표시 (자주 vs 안 끊김)'
+            ]
+        },
         {
             version: 'v1.6.0',
             date: '2026.07',
@@ -2404,6 +2413,24 @@
             return rec && rec.checkedProductIds && rec.checkedProductIds.length > 0;
         });
     }
+    // 최고 꾸준함: 전체 체크 기록에서 하루도 안 끊긴 최장 연속 일수 (루틴 탭과 동일 기준)
+    function getMaxRoutineStreak() {
+        const allDates = new Set();
+        routines.forEach(r => (r.checkHistory || []).forEach(h => allDates.add(h.date)));
+        const sortedDates = [...allDates].sort();
+        let maxStreak = 0, curStreak = 0, prevDate = null;
+        sortedDates.forEach(dateStr => {
+            if (isRoutineDayDone(dateStr)) {
+                if (prevDate) {
+                    const diff = (new Date(dateStr) - new Date(prevDate)) / (1000 * 60 * 60 * 24);
+                    curStreak = (diff === 1) ? curStreak + 1 : 1;
+                } else curStreak = 1;
+                maxStreak = Math.max(maxStreak, curStreak);
+                prevDate = dateStr;
+            } else { curStreak = 0; prevDate = null; }
+        });
+        return maxStreak;
+    }
     // 보관(archive)된 제품 id인지 — 완료 판정에서 '필요 항목' 제외용
     function isArchivedId(pid) {
         const p = products.find(prod => prod.id === pid);
@@ -2749,6 +2776,7 @@
         }
         const pct = dayOfMonth > 0 ? Math.round(doneDays / dayOfMonth * 100) : 0;
         if (dc('dash-routine-pct')) dc('dash-routine-pct').textContent = pct + '%';
+        if (dc('dash-routine-streak')) dc('dash-routine-streak').textContent = getMaxRoutineStreak();
 
         // 리필 예정 (재고 1개 이하)
         const refillCount = products.filter(p => !p.archived && p.stock === 0).length;
