@@ -73,7 +73,7 @@
         .prod-name { font-weight: bold; font-size: 16px; margin-bottom: 4px; color: #111; }
         .prod-status { font-size: 12px; color: #555; line-height: 1.4; margin-top: 6px; }
         .prod-used { font-size: 11px; color: var(--used-purple); font-weight: bold; margin-top: 2px; }
-        .btn-reset-history { background: none; border: none; color: #999; font-size: 10px; cursor: pointer; padding: 2px 0; margin-top: 2px; text-decoration: underline; }
+
         .review-preview { font-size: 11px; color: #777; margin-top: 4px; cursor: pointer; background: #F7F7F7; padding: 4px 8px; border-radius: 8px; display: inline-block; }
         .tung-count-badge { font-size: 11px; color: #888; margin-top: 4px; font-weight: bold; }
         .btn-undo-tung { background: #FFF0EE; border: none; color: var(--primary, #FF5A5F); font-size: 10px; font-weight: bold; cursor: pointer; padding: 2px 6px; border-radius: 6px; margin-left: 4px; }
@@ -405,15 +405,6 @@
             <div class="confirm-btn-row">
                 <button class="confirm-btn no" onclick="cancelDeleteReview()">아니오</button>
                 <button class="confirm-btn yes" onclick="proceedDeleteReview()">예</button>
-            </div>
-        </div>
-    </div>
-    <div class="confirm-overlay" id="resetHistoryOverlay">
-        <div class="confirm-box">
-            <p>이 항목의 사용 기록을 초기화할까요?<br><span style="font-size:11px; color:#888; font-weight:normal;">(지금까지 쌓인 텅 기록이 사라지고, 다시 기준값부터 시작해요)</span></p>
-            <div class="confirm-btn-row">
-                <button class="confirm-btn no" onclick="cancelResetHistory()">아니오</button>
-                <button class="confirm-btn yes" onclick="proceedResetHistory()">예</button>
             </div>
         </div>
     </div>
@@ -1154,7 +1145,8 @@
             title: '홈에 최고 꾸준함 표시',
             items: [
                 '🔥 홈 카드에 최고 연속(꾸준함) 일수 표시',
-                '💚 달성률도 같은 카드에 함께 표시 (자주 vs 안 끊김)'
+                '💚 달성률도 같은 카드에 함께 표시 (자주 vs 안 끊김)',
+                '🧹 실수 유발하던 \'사용 기록 초기화\' 버튼 제거 (보정은 텅 1개씩 되돌리기로)'
             ]
         },
         {
@@ -1515,7 +1507,7 @@
                     <div>${statusBadge}</div>
                     <div class="prod-status">${alertText}</div>
                     ${usedText ? `<div class="prod-used">⏱ ${usedText}</div>` : ''}
-                    ${(p.tungHistory && p.tungHistory.length > 0) ? `<button class="btn-reset-history" onclick="confirmResetHistory(${p.id})">↺ 사용 기록 초기화</button>` : ''}
+
                     ${(p.tungCount > 0) ? `<div class="tung-count-badge">🫙 ${getTungOrdinalLabel(p.tungCount)}${latestReview ? '' : ' · 리뷰 없음'}${(lastTungAction && lastTungAction.productId === p.id) ? ` <button class="btn-undo-tung" onclick="undoLastTung(${p.id})">↩️ 방금 텅 취소</button>` : ''}</div>` : ''}
                     ${latestReview ? `<div class="review-preview" onclick="openReviewFromCard(${p.id})">📝 ${getTungOrdinalLabel(latestReview.tungNo || 1)} 리뷰: "${latestReview.text.length > 18 ? latestReview.text.slice(0, 18) + '…' : latestReview.text}"</div>` : ''}
                     <div style="margin-top:6px;">
@@ -2104,7 +2096,6 @@
         document.getElementById('confirmOverlay').classList.remove('active');
     }
 
-    let pendingResetId = null;
     // 달력에 찍힌 가장 최근 텅 기록 1건 + 누적 텅을 함께 -1
     function decreaseTungWithCalendar() {
         // 모든 제품의 tungHistory를 모아 가장 최근(date 큰) 1건을 찾음
@@ -2147,25 +2138,6 @@
         saveToStorage();
         syncAllAndRender();
         showToast(`📅 텅 기록 1건과 누적 텅을 줄였어요 (현재 ${totalTungCount}개)`);
-    }
-
-    function confirmResetHistory(productId) {
-        pendingResetId = productId;
-        document.getElementById('resetHistoryOverlay').classList.add('active');
-    }
-    function cancelResetHistory() {
-        pendingResetId = null;
-        document.getElementById('resetHistoryOverlay').classList.remove('active');
-    }
-    function proceedResetHistory() {
-        const p = products.find(prod => prod.id === pendingResetId);
-        if (p) {
-            p.tungHistory = [];
-            showToast('↺ 사용 기록이 초기화됐어요');
-            renderProducts();
-        }
-        pendingResetId = null;
-        document.getElementById('resetHistoryOverlay').classList.remove('active');
     }
 
     // 텅 차수를 "첫 텅", "두번째 텅", "N번째 텅"으로 표현
@@ -3293,12 +3265,15 @@
         if (!r) return;
         const cat = categories.find(c => c.id === r.categoryId);
         const ordinalLabel = getTungOrdinalLabel(r.tungNo || 1);
+        // 리뷰 본문이 여러 줄이면, 이어지는 줄을 '📝 ' 뒤에 맞춰 들여쓰기 (열 정렬)
+        const bodyIndent = '     ';
+        const indentedText = String(r.text || '').split('\n').join('\n' + bodyIndent);
         const lines = [
             `🧴 ${r.productName} · ${ordinalLabel} 리뷰`,
             cat ? `📂 ${cat.name}` : '',
             `🫙 ${formatDateString(r.date)} 다썼텅! 🎉`,
             ``,
-            `📝 ${r.text}`,
+            `📝 ${indentedText}`,
         ].filter(l => l !== null).join('\n');
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
