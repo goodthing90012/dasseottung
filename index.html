@@ -284,7 +284,7 @@
     </div>
     <div class="confirm-overlay" id="closeProductOverlay">
         <div class="confirm-box">
-            <p>미개봉으로 되돌릴까요?<br><span style="font-size:11px; color:#999;">개봉일과 현재 통 사용 기록만 초기화돼요.<br>지난 텅(소진) 기록은 그대로 유지돼요</span></p>
+            <p>미개봉으로 되돌릴까요?<br><span style="font-size:11px; color:#999;">현재 통 사용일수가 0으로 초기화돼요. 다시 개봉하면 그날부터 새로 세요.<br>지난 텅(소진) 기록은 그대로 유지돼요.<br><span style="color:#F08C00;">💡 잠깐 안 쓰는 거면 '😴 쉬는 중'을 쓰면 사용일수가 이어져요.</span></span></p>
             <div class="confirm-btn-row">
                 <button class="confirm-btn no" onclick="cancelCloseProduct()">아니오</button>
                 <button class="confirm-btn yes" onclick="proceedCloseProduct()">예</button>
@@ -1693,7 +1693,7 @@
         const last = p.pauseHistory[p.pauseHistory.length - 1];
         if (last && !last.resumedAt) return;
         p.pauseHistory.push({ pausedAt: getTodayTimeline(), resumedAt: null });
-        showToast('😴 쉬는 중으로 변경됐어요. 카운트가 멈춰요');
+        showToast('😴 쉬는 중! 카운트가 멈춰요 · 다시 켜면 쉰 기간만 빼고 이어서 세요');
         syncAllAndRender();
     }
 
@@ -1719,7 +1719,7 @@
         }
 
         last.resumedAt = getTodayTimeline();
-        showToast('🟢 사용 중으로 변경됐어요. 카운트가 다시 시작돼요');
+        showToast('🟢 사용 중! 쉰 기간 빼고 이어서 카운트해요');
         syncAllAndRender();
     }
 
