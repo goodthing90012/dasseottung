@@ -600,7 +600,7 @@
                 oninput="this.style.height='auto'; this.style.height=this.scrollHeight+'px'; renderProducts();"></textarea>
         </div>
 
-        <div class="section-title">내 화장대 재고 현황</div>
+        <div class="section-title">내 화장대 재고 현황 <span id="productCount" style="font-size:12px; color:#999; font-weight:normal;"></span></div>
         <div id="productList"></div>
     </div>
 
@@ -1154,7 +1154,9 @@
             title: '상태별 필터링 추가',
             items: [
                 '🔍 리스트를 상태로 골라 보기: 미개봉 / 개봉·사용중 / 개봉·쉬는중 / 재고 없음',
-                '📂 기존 카테고리·세일 일정 필터와 함께 조합 가능'
+                '📂 기존 카테고리·세일 일정 필터와 함께 조합 가능',
+                '🔢 화장대에 상품 개수 표시 (필터 시 보이는 개수 / 전체)',
+                '🔢 루틴마다 연결된 상품 개수 표시'
             ]
         },
         {
@@ -1355,6 +1357,15 @@
             const matchSearch = keywords.length === 0 || keywords.some(k => p.name.toLowerCase().includes(k));
             return matchCat && matchSched && matchStatus && matchSearch;
         }).sort((a, b) => b.id - a.id);
+
+        // 활성 상품 개수 표시 (보관함 제외). 필터가 걸리면 '보이는 개수 (전체 N개)'
+        const totalActive = products.filter(p => !p.archived).length;
+        const countEl = document.getElementById('productCount');
+        if (countEl) {
+            countEl.textContent = (filteredProducts.length === totalActive)
+                ? `${totalActive}개`
+                : `${filteredProducts.length}개 (전체 ${totalActive}개)`;
+        }
 
         if(filteredProducts.length === 0) {
             listEl.innerHTML = '<div style="text-align:center; color:#888; padding:30px; font-size:12px;">조건에 맞는 품목이 없습니다.</div>'; 
@@ -3170,7 +3181,7 @@
 
                 return `<div style="background:white; border-radius:14px; padding:14px; margin-bottom:12px; box-shadow:0 1px 6px rgba(0,0,0,0.06); ${allDone ? 'border:1.5px solid #1EA94A;' : ''}">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <span style="font-size:15px; font-weight:bold;">${r.emoji} ${r.name}</span>
+                        <span style="font-size:15px; font-weight:bold;">${r.emoji} ${r.name} <span style="font-size:12px; color:#aaa; font-weight:normal;">${activeIds.length}개</span></span>
                         ${allCheckBtn}
                     </div>
                     ${productsHtml}
