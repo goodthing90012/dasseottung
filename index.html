@@ -1156,7 +1156,8 @@
                 '🔍 리스트를 상태로 골라 보기: 미개봉 / 개봉·사용중 / 개봉·쉬는중 / 재고 없음',
                 '📂 기존 카테고리·세일 일정 필터와 함께 조합 가능',
                 '🔢 화장대에 상품 개수 표시 (필터 시 보이는 개수 / 전체)',
-                '🔢 루틴마다 연결된 상품 개수 표시'
+                '🔢 루틴마다 연결된 상품 개수 표시',
+                '⏸️ 쉰 날이 있으면 \'쉰 날 N일은 집계에서 제외\' 안내 표시'
             ]
         },
         {
@@ -1546,6 +1547,13 @@
                     <div>${statusBadge}</div>
                     <div class="prod-status">${alertText}</div>
                     ${usedText ? `<div class="prod-used">⏱ ${usedText}</div>` : ''}
+                    ${usedText ? (
+                        isPaused
+                            ? `<div style="font-size:10px; color:#B0B0B0; margin-top:2px;">⏸️ 쉬는 중 · 사용일수 카운트 멈춤</div>`
+                            : (totalPausedDays >= 1
+                                ? `<div style="font-size:10px; color:#B0B0B0; margin-top:2px;">⏸️ 쉰 날 ${totalPausedDays}일은 사용기간 집계에서 제외</div>`
+                                : '')
+                    ) : ''}
 
                     ${(p.tungCount > 0) ? `<div class="tung-count-badge">🫙 ${getTungOrdinalLabel(p.tungCount)}${latestReview ? '' : ' · 리뷰 없음'}${(lastTungAction && lastTungAction.productId === p.id) ? ` <button class="btn-undo-tung" onclick="undoLastTung(${p.id})">↩️ 방금 텅 취소</button>` : ''}</div>` : ''}
                     ${latestReview ? `<div class="review-preview" onclick="openReviewFromCard(${p.id})">📝 ${getTungOrdinalLabel(latestReview.tungNo || 1)} 리뷰: "${latestReview.text.length > 18 ? latestReview.text.slice(0, 18) + '…' : latestReview.text}"</div>` : ''}
