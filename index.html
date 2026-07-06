@@ -1149,6 +1149,15 @@
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
         {
+            version: 'v1.9.0',
+            date: '2026.07',
+            title: '재고 소진돼도 정보 유지',
+            items: [
+                '📊 재고가 0이 돼도 평균 소진일·텅 기록이 카드에 계속 표시',
+                '🛒 재구매 판단할 때 \'이거 평균 며칠 쓰던 제품\'을 바로 확인'
+            ]
+        },
+        {
             version: 'v1.8.0',
             date: '2026.07',
             title: '상태별 필터링 추가',
@@ -1425,16 +1434,25 @@
                 alertText = '개봉 버튼을 누르면 사용 카운트가 시작돼요';
             } else if (isUnknownCat) {
                 // 🫙 일단 쓰고 봄 전용 분기
+                const history = (p.tungHistory || []).filter(h => !h.provisional);
+                // 평균 소진일은 텅 기록 2회 이상부터 계산 (그 전엔 비교 불가)
+                const avgDays = history.length >= 2
+                    ? Math.round(history.reduce((s, h) => s + h.days, 0) / history.length)
+                    : null;
+
                 if (p.stock === 0) {
                     statusBadge = '<span class="badge danger">재고 없음</span>';
-                    alertText = '즉시 구매 필요';
+                    // 재고가 0이어도 그동안 쌓은 소진 정보는 계속 보여줌 (재구매 판단에 필요)
+                    if (avgDays !== null) {
+                        alertText = `즉시 구매 필요 · 평균 ${avgDays}일마다 소진했어요 (${history.length}회 기록)`;
+                        usedText = `지금까지 텅 ${history.length}회 · 평균 ${avgDays}일 주기`;
+                    } else if (history.length === 1) {
+                        alertText = '즉시 구매 필요';
+                        usedText = `첫 소진 ${history[0].days}일 기록됨 · 다음 통부터 평균 계산`;
+                    } else {
+                        alertText = '즉시 구매 필요';
+                    }
                 } else {
-                    const history = (p.tungHistory || []).filter(h => !h.provisional);
-                    // 평균 소진일은 텅 기록 2회 이상부터 계산 (그 전엔 비교 불가)
-                    const avgDays = history.length >= 2
-                        ? Math.round(history.reduce((s, h) => s + h.days, 0) / history.length)
-                        : null;
-
                     // [변경점] 평균값이 있으면(0일 수도 있음) openedDate 기준으로 totalRemainingDays도 계산
                     // avgDays가 0이면 falsy라 if(avgDays)로 체크하면 안 됨 → null 여부로 명확히 체크
                     if (avgDays !== null) {
@@ -1479,7 +1497,14 @@
                 }
             } else {
                 if (p.stock === 0) {
-                    statusBadge = '<span class="badge danger">재고 없음</span>'; alertText = '즉시 구매 필요';
+                    statusBadge = '<span class="badge danger">재고 없음</span>';
+                    // 재고가 0이어도 그동안 쌓은 소진 정보는 계속 보여줌 (재구매 판단에 필요)
+                    if (realAvgDays !== null) {
+                        alertText = `즉시 구매 필요 · 평균 ${effectiveCategoryDays}일마다 소진했어요 (내 기록 ${realHistory.length}회 반영)`;
+                        usedText = `지금까지 텅 ${realHistory.length}회 · 평균 ${effectiveCategoryDays}일 주기`;
+                    } else {
+                        alertText = '즉시 구매 필요';
+                    }
                 } else if (!matchedSched) {
                     statusBadge = '<span class="badge neutral">일단 씀</span>'; alertText = `소진까지 약 ${totalRemainingDays}일 남음`;
                 } else if (totalRemainingDays >= dDayLeft) {
