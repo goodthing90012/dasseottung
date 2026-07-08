@@ -1066,6 +1066,7 @@
                 products = parsed.products;
                 reviews = Array.isArray(parsed.reviews) ? parsed.reviews : [];
                 routines = Array.isArray(parsed.routines) ? parsed.routines : [];
+                migrateRoutineSnapshots();
                 if (typeof parsed.totalTungCount === 'number') {
                     totalTungCount = parsed.totalTungCount;
                 } else {
@@ -1099,6 +1100,19 @@
     if (totalTungCount === null) {
         totalTungCount = products.reduce((sum, p) => sum + (p.tungHistory || []).length, 0);
     }
+
+    // [마이그레이션] 과거 루틴 기록에 '그날 루틴 구성' 스냅샷(requiredIds)이 없으면
+    // 그날 체크한 목록으로 채워둠 → 이후 루틴 구성을 바꿔도 과거 판정·표시가 안 흔들림
+    function migrateRoutineSnapshots() {
+        (routines || []).forEach(r => {
+            (r.checkHistory || []).forEach(rec => {
+                if (!Array.isArray(rec.requiredIds)) {
+                    rec.requiredIds = [...(rec.checkedProductIds || [])];
+                }
+            });
+        });
+    }
+    migrateRoutineSnapshots();
 
     window.onload = () => {
         renderDashboard();
@@ -1148,6 +1162,16 @@
 
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
+        {
+            version: 'v2.0.0',
+            date: '2026.07',
+            title: '과거 루틴 기록 고정 (중요 수정)',
+            items: [
+                '🔒 루틴 구성을 바꿔도 과거 날짜의 완료·올클리어 기록이 그대로 유지',
+                '📅 지난 날짜는 \'그날 루틴에 있던 제품\' 기준으로 표시',
+                '✨ 각 기록에 그날 구성을 저장해 과거가 소급해서 바뀌지 않게 함'
+            ]
+        },
         {
             version: 'v1.9.0',
             date: '2026.07',
@@ -2484,9 +2508,11 @@
     function isRoutineDayAllClear(dateStr) {
         if (routines.length === 0) return false;
         return routines.every(r => {
-            const req = r.productIds.filter(pid => !isArchivedId(pid));
-            if (req.length === 0) return true;
             const rec = r.checkHistory.find(h => h.date === dateStr);
+            // 그날 구성 스냅샷이 있으면 그걸 기준으로 (루틴을 나중에 바꿔도 과거는 고정)
+            const reqSource = (rec && Array.isArray(rec.requiredIds)) ? rec.requiredIds : r.productIds;
+            const req = reqSource.filter(pid => !isArchivedId(pid));
+            if (req.length === 0) return true;
             return rec && req.every(pid => rec.checkedProductIds.includes(pid));
         });
     }
@@ -2590,6 +2616,7 @@
             r.checkHistory.push(todayRecord);
         }
         todayRecord.checkedProductIds = [...r.productIds];
+        todayRecord.requiredIds = [...r.productIds];
         saveToStorage();
         const allClearMsg = () => isRoutineDayAllClear(todayStr) ? `⭐ 오늘 루틴 올클리어!` : `💚 오늘의 루틴 기록 완료`;
         // 바운스 애니메이션
@@ -2689,11 +2716,12 @@
         const todayStr = getSelectedRoutineStr();
         let todayRecord = r.checkHistory.find(h => h.date === todayStr);
         if (!todayRecord) {
-            todayRecord = { date: todayStr, checkedProductIds: [] };
+            todayRecord = { date: todayStr, checkedProductIds: [], requiredIds: [...r.productIds] };
             r.checkHistory.push(todayRecord);
             const cutoff = getTodayTimeline() - (90 * 24 * 60 * 60 * 1000);
             r.checkHistory = r.checkHistory.filter(h => parseInputDateToTimestamp(h.date) >= cutoff);
         }
+        if (!Array.isArray(todayRecord.requiredIds)) todayRecord.requiredIds = [...r.productIds];
         const idx = todayRecord.checkedProductIds.indexOf(productId);
         if (idx === -1) {
             todayRecord.checkedProductIds.push(productId);
@@ -3099,12 +3127,7 @@
         for (let d = 1; d <= daysInMonth; d++) {
             const dateStr = `${calendarYear}-${String(calendarMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const isToday = dateStr === todayStr;
-            const allDone = routines.length > 0 && routines.every(r => {
-                const req = r.productIds.filter(pid => !isArchivedId(pid));
-                if (req.length === 0) return true;
-                const rec = r.checkHistory.find(h => h.date === dateStr);
-                return rec && req.every(pid => rec.checkedProductIds.includes(pid));
-            });
+            const allDone = isRoutineDayAllClear(dateStr);
             const anyDone = routines.some(r => r.checkHistory.some(h => h.date === dateStr && h.checkedProductIds.length > 0));
 
             let bg = 'transparent', color = '#333', indicator = '';
@@ -3160,7 +3183,10 @@
             listEl.innerHTML = noticeHtml + routines.map(r => {
                 const todayRecord = r.checkHistory.find(h => h.date === todayStr);
                 const checkedIds = todayRecord ? todayRecord.checkedProductIds : [];
-                const activeIds = r.productIds.filter(pid => !isArchivedId(pid));
+                // 과거(수정 불가) 날짜는 그날 구성 스냅샷 기준, 오늘·어제는 현재 구성 기준
+                const baseIds = (!editable && todayRecord && Array.isArray(todayRecord.requiredIds))
+                    ? todayRecord.requiredIds : r.productIds;
+                const activeIds = baseIds.filter(pid => !isArchivedId(pid));
                 const allDone = activeIds.length > 0 && activeIds.every(pid => checkedIds.includes(pid));
 
                 const productsHtml = activeIds.length === 0
