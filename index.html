@@ -2537,14 +2537,23 @@
     }
 
     // 루틴 추가
+    let newRoutineSelectedIds = new Set();
+    function toggleNewRoutinePick(val, checked) {
+        const id = Number(val);
+        if (checked) newRoutineSelectedIds.add(id);
+        else newRoutineSelectedIds.delete(id);
+    }
     function addRoutine() {
         const emoji = document.getElementById('newRoutineEmoji').value.trim() || '✅';
         const name = document.getElementById('newRoutineName').value.trim();
         if (!name) { showToast('루틴 이름을 입력해주세요'); return; }
-        const selectedIds = [...document.querySelectorAll('.routine-product-pick:checked')].map(el => Number(el.value));
+        const selectedIds = [...newRoutineSelectedIds];
         routines.push({ id: Date.now(), name, emoji, productIds: selectedIds, checkHistory: [] });
         document.getElementById('newRoutineEmoji').value = '';
         document.getElementById('newRoutineName').value = '';
+        newRoutineSelectedIds = new Set();
+        const searchEl = document.getElementById('routineProductSearch');
+        if (searchEl) { searchEl.value = ''; searchEl.style.height = 'auto'; }
         saveToStorage();
         syncAllAndRender();
         showToast(`${emoji} [${name}] 루틴이 추가됐어요!`);
@@ -2552,18 +2561,29 @@
 
     // 루틴 수정
     let editingRoutineId = null;
+    let editRoutineSelectedIds = new Set();
+    function toggleEditRoutinePick(val, checked) {
+        const id = Number(val);
+        if (checked) editRoutineSelectedIds.add(id);
+        else editRoutineSelectedIds.delete(id);
+    }
     function editRoutine(id) {
         const r = routines.find(rt => rt.id === id);
         if (!r) return;
         editingRoutineId = id;
         document.getElementById('editRoutineEmoji').value = r.emoji;
         document.getElementById('editRoutineName').value = r.name;
+        // 선택 상태를 JS에서 단일 기준으로 관리 (검색 필터와 무관하게 정확)
+        editRoutineSelectedIds = new Set(r.productIds);
+        // 검색어 초기화 + 필터 해제 (이전에 남은 검색 때문에 목록이 걸러진 채 열리는 것 방지)
+        const searchEl = document.getElementById('editRoutineProductSearch');
+        if (searchEl) { searchEl.value = ''; searchEl.style.height = 'auto'; }
         const picker = document.getElementById('editRoutineProductPicker');
         picker.innerHTML = products.length === 0
             ? '<div style="font-size:12px; color:#BBB;">등록된 제품 없음</div>'
             : [...products].sort((a,b) => b.id - a.id).map(p => `
                 <label style="display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid #f0f0f0; cursor:pointer; font-size:13px; color:#333;">
-                    <input type="checkbox" class="edit-routine-product-pick" value="${p.id}" ${r.productIds.includes(p.id) ? 'checked' : ''} style="flex-shrink:0; width:16px; height:16px; accent-color:var(--primary);">
+                    <input type="checkbox" class="edit-routine-product-pick" value="${p.id}" ${editRoutineSelectedIds.has(p.id) ? 'checked' : ''} onchange="toggleEditRoutinePick(this.value, this.checked)" style="flex-shrink:0; width:16px; height:16px; accent-color:var(--primary);">
                     <span>${p.name}</span>
                 </label>`).join('');
         document.getElementById('editRoutineOverlay').classList.add('active');
@@ -2576,7 +2596,8 @@
         const emoji = document.getElementById('editRoutineEmoji').value.trim() || '✅';
         const name = document.getElementById('editRoutineName').value.trim();
         if (!name) { showToast('루틴 이름을 입력해주세요'); return; }
-        const selectedIds = [...document.querySelectorAll('.edit-routine-product-pick:checked')].map(el => Number(el.value));
+        // DOM 체크박스가 아니라 JS 선택 상태에서 읽음 (검색/필터 영향 없음)
+        const selectedIds = [...editRoutineSelectedIds];
         const r = routines.find(rt => rt.id === editingRoutineId);
         if (r) { r.emoji = emoji; r.name = name; r.productIds = selectedIds; }
         cancelEditRoutine();
@@ -3183,8 +3204,9 @@
             listEl.innerHTML = noticeHtml + routines.map(r => {
                 const todayRecord = r.checkHistory.find(h => h.date === todayStr);
                 const checkedIds = todayRecord ? todayRecord.checkedProductIds : [];
-                // 과거(수정 불가) 날짜는 그날 구성 스냅샷 기준, 오늘·어제는 현재 구성 기준
-                const baseIds = (!editable && todayRecord && Array.isArray(todayRecord.requiredIds))
+                // 오늘만 현재 구성(추가/삭제 즉시 반영), 어제 이하 지난 날은 '그날 구성 스냅샷'으로 고정
+                const isTodayView = (routineDateOffset === 0);
+                const baseIds = (!isTodayView && todayRecord && Array.isArray(todayRecord.requiredIds))
                     ? todayRecord.requiredIds : r.productIds;
                 const activeIds = baseIds.filter(pid => !isArchivedId(pid));
                 const allDone = activeIds.length > 0 && activeIds.every(pid => checkedIds.includes(pid));
@@ -3277,7 +3299,7 @@
                 ? '<div style="font-size:12px; color:#BBB;">화장대에 제품을 먼저 등록해주세요</div>'
                 : sortedProducts.map(p => `
                     <label style="display:flex; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid #f0f0f0; cursor:pointer; font-size:13px; color:#333;">
-                        <input type="checkbox" class="routine-product-pick" value="${p.id}" style="flex-shrink:0; width:16px; height:16px; accent-color:var(--primary);">
+                        <input type="checkbox" class="routine-product-pick" value="${p.id}" ${newRoutineSelectedIds.has(p.id) ? 'checked' : ''} onchange="toggleNewRoutinePick(this.value, this.checked)" style="flex-shrink:0; width:16px; height:16px; accent-color:var(--primary);">
                         <span>${p.name}</span>
                     </label>`).join('');
         }
