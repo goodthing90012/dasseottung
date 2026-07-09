@@ -1109,6 +1109,11 @@
                 if (!Array.isArray(rec.requiredIds)) {
                     rec.requiredIds = [...(rec.checkedProductIds || [])];
                 }
+                // 무결성: 체크 목록은 '그날 구성'의 부분집합이어야 함
+                // (옛 버그로 그날 없던 제품이 체크된 경우 자동 정리 → 과거 표시가 안 흔들림)
+                if (Array.isArray(rec.checkedProductIds)) {
+                    rec.checkedProductIds = rec.checkedProductIds.filter(pid => rec.requiredIds.includes(pid));
+                }
             });
         });
     }
@@ -2636,8 +2641,13 @@
             todayRecord = { date: todayStr, checkedProductIds: [] };
             r.checkHistory.push(todayRecord);
         }
-        todayRecord.checkedProductIds = [...r.productIds];
-        todayRecord.requiredIds = [...r.productIds];
+        // 오늘은 현재 구성 기준, 지난 날(어제)은 그날 구성 스냅샷 기준으로 '전체 완료'
+        const isToday = (routineDateOffset === 0);
+        const composition = isToday
+            ? [...r.productIds]
+            : (Array.isArray(todayRecord.requiredIds) ? [...todayRecord.requiredIds] : [...r.productIds]);
+        todayRecord.requiredIds = composition;
+        todayRecord.checkedProductIds = [...composition];
         saveToStorage();
         const allClearMsg = () => isRoutineDayAllClear(todayStr) ? `⭐ 오늘 루틴 올클리어!` : `💚 오늘의 루틴 기록 완료`;
         // 바운스 애니메이션
@@ -2742,7 +2752,12 @@
             const cutoff = getTodayTimeline() - (90 * 24 * 60 * 60 * 1000);
             r.checkHistory = r.checkHistory.filter(h => parseInputDateToTimestamp(h.date) >= cutoff);
         }
-        if (!Array.isArray(todayRecord.requiredIds)) todayRecord.requiredIds = [...r.productIds];
+        // 오늘은 현재 구성으로 스냅샷 갱신(오늘 추가한 제품도 반영), 지난 날은 그날 스냅샷 고정
+        if (routineDateOffset === 0) {
+            todayRecord.requiredIds = [...r.productIds];
+        } else if (!Array.isArray(todayRecord.requiredIds)) {
+            todayRecord.requiredIds = [...r.productIds];
+        }
         const idx = todayRecord.checkedProductIds.indexOf(productId);
         if (idx === -1) {
             todayRecord.checkedProductIds.push(productId);
