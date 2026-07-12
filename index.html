@@ -3036,12 +3036,16 @@
         const box = document.getElementById('dashCalendarLegend');
         if (!box) return;
 
+        // 범례의 scale은 달력과 다르다.
+        // 달력에서는 '루틴 일부'를 작게 그려 부분 완료를 표현하지만,
+        // 범례의 역할은 '이게 누구인지 알아보게 하는 것'이므로 모두 같은 크기(30px)로 정규화한다.
+        // (각 이미지의 여백 비율이 달라서 캐릭터마다 보정값이 다르다)
         const items = [
-            { img: CHAR_TUNG,              scale: 1.0, label: '텅 (공병)' },
-            { img: CHAR_ROUTINE_PARTIAL,   scale: 0.5, label: '루틴 일부' },
-            { img: CHAR_ROUTINE_ALLCLEAR,  scale: 1.0, label: '루틴 올클리어' },
-            { img: CHAR_DUO,               scale: 0.5, label: '루틴 + 텅' },
-            { img: CHAR_REGISTER,          scale: 1.0, label: '화장대 등록' }
+            { img: CHAR_TUNG,              scale: 1.55, label: '텅 (공병)' },
+            { img: CHAR_ROUTINE_PARTIAL,   scale: 0.71, label: '루틴 일부' },
+            { img: CHAR_ROUTINE_ALLCLEAR,  scale: 1.31, label: '루틴 올클리어' },
+            { img: CHAR_DUO,               scale: 0.88, label: '루틴 + 텅' },
+            { img: CHAR_REGISTER,          scale: 1.55, label: '화장대 등록' }
         ];
 
         // 헤더 아래 인라인 위치이므로 카드가 아니라 가벼운 한 줄로 배치한다
@@ -3049,7 +3053,7 @@
             <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:2px; align-items:start;">
                 ${items.map(it => `
                     <div style="display:flex; flex-direction:column; align-items:center; gap:1px;">
-                        <div style="width:30px; height:30px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                        <div style="width:42px; height:42px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
                             <img src="${it.img}" style="width:100%;height:100%;object-fit:contain;transform:scale(${it.scale});">
                         </div>
                         <div style="font-size:9px; color:#888; text-align:center; line-height:1.15; word-break:keep-all;">${it.label}</div>
