@@ -762,6 +762,21 @@
                 </div>
             </div>
             <div class="setting-form">
+                <div class="section-title">🔊 효과음</div>
+                <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
+                    텅을 누르거나 루틴을 체크할 때 빈 통을 두드리는 '텅~' 소리가 나요.
+                </div>
+                <label style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; cursor:pointer;">
+                    <span style="font-size:14px; font-weight:600;">효과음 사용</span>
+                    <input type="checkbox" id="soundToggle" onchange="onSoundToggle(this.checked)" style="width:20px; height:20px; accent-color:var(--primary); cursor:pointer;">
+                </label>
+                <div id="soundLevelRow" style="display:flex; gap:6px;">
+                    <button type="button" class="vibe-level-btn" data-slevel="light"  onclick="onSoundLevel('light')">작게</button>
+                    <button type="button" class="vibe-level-btn" data-slevel="medium" onclick="onSoundLevel('medium')">보통</button>
+                    <button type="button" class="vibe-level-btn" data-slevel="strong" onclick="onSoundLevel('strong')">크게</button>
+                </div>
+            </div>
+            <div class="setting-form">
                 <div class="section-title">📖 앱 소개</div>
                 <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
                     다썼텅과 캐릭터들을 소개해요.
@@ -1000,6 +1015,99 @@
         try { navigator.vibrate(pattern); } catch (e) {}
     }
 
+    // ===== [효과음: 텅] =====
+    // Web Audio로 실시간 합성 (음원 파일 0KB). 빈 통을 두드리는 경쾌한 '텅~' 공명음.
+    // 캐릭터 이름(텅이)과 맞닿은 소리. iOS도 지원.
+    const SOUND_KEY = 'dasseottung_sound';
+    const SOUND_GAIN = { light: 0.3, medium: 0.6, strong: 1.0 };
+    function getSoundSetting() {
+        try {
+            const raw = localStorage.getItem(SOUND_KEY);
+            if (raw) return JSON.parse(raw);
+        } catch (e) {}
+        return { on: false, level: 'medium' };   // 기본: 꺼짐 (소리는 조용한 곳 배려로 opt-in)
+    }
+    function setSoundSetting(next) {
+        try { localStorage.setItem(SOUND_KEY, JSON.stringify(next)); } catch (e) {}
+    }
+
+    // AudioContext는 사용자 제스처 이후에만 생성/재개 가능 → 최초 재생 시 lazy init
+    let _audioCtx = null;
+    const soundSupported = () => (typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext));
+    function _getCtx() {
+        if (!soundSupported()) return null;
+        if (!_audioCtx) {
+            try { _audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+            catch (e) { return null; }
+        }
+        if (_audioCtx.state === 'suspended') { _audioCtx.resume().catch(() => {}); }
+        return _audioCtx;
+    }
+
+    // 소리끼리 겹쳐 뭉개지는 것 방지: 직전 재생 후 60ms 내 재호출은 무시
+    let _lastSoundAt = 0;
+    function playTung() {
+        const s = getSoundSetting();
+        if (!s.on) return;
+        const now = performance.now();
+        if (now - _lastSoundAt < 60) return;     // 연타/중복 이벤트 가드
+        _lastSoundAt = now;
+
+        const ctx = _getCtx();
+        if (!ctx) return;
+        const t0 = ctx.currentTime;
+
+        const master = ctx.createGain();
+        master.gain.value = SOUND_GAIN[s.level] || SOUND_GAIN.medium;
+        master.connect(ctx.destination);
+
+        // 저역 정리(고역통과)로 붕 뜨는 소리 제거 + 과한 고역 억제
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass'; hp.frequency.value = 110;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 4000;
+        hp.connect(lp); lp.connect(master);
+
+        // 1) 타격 순간 '딱' — 아주 짧은 노이즈 클릭
+        const clen = Math.floor(ctx.sampleRate * 0.02);
+        const cbuf = ctx.createBuffer(1, clen, ctx.sampleRate);
+        const cdata = cbuf.getChannelData(0);
+        for (let j = 0; j < clen; j++) {
+            const tt = j / ctx.sampleRate;
+            cdata[j] = (Math.random() * 2 - 1) * Math.exp(-tt * 750);
+        }
+        const csrc = ctx.createBufferSource(); csrc.buffer = cbuf;
+        const cg = ctx.createGain(); cg.gain.value = 0.38;
+        csrc.connect(cg); cg.connect(hp);
+        csrc.start(t0); csrc.stop(t0 + 0.03);
+
+        // 2) 빈 통 공명 '텅~' — 밝은 배음(경쾌)과 여운(묵직)의 중간 톤
+        //    어택에서 살짝 위로 튀는 피치 = 통통 튀는 탄력감
+        const partials = [
+            { f: 250,  a: 1.00, d: 11 },
+            { f: 500,  a: 0.50, d: 14 },
+            { f: 780,  a: 0.28, d: 19 },
+            { f: 1050, a: 0.15, d: 24 }
+        ];
+        partials.forEach(p => {
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(p.f * 1.05, t0);            // 살짝 높게 시작
+            osc.frequency.exponentialRampToValueAtTime(p.f, t0 + 0.05); // 빠르게 안정 → 튀는 느낌
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(p.a * 0.9, t0);
+            g.gain.exponentialRampToValueAtTime(0.0008, t0 + 3 / p.d); // 감쇠상수 d 반영
+            osc.connect(g); g.connect(hp);
+            osc.start(t0); osc.stop(t0 + 0.5);
+        });
+    }
+
+    // 텅·루틴에서 한 번에 호출: 소리 + 진동을 함께 (각자 설정에 따라 독립 동작)
+    function triggerFeedback() {
+        playTung();
+        triggerVibe();
+    }
+
     // 최초 접속(저장된 데이터 없음) 시에만 사용할 기본 목업 데이터
     const defaultCategories = [
         { id: 1, name: "선크림", days: 40 },
@@ -1229,47 +1337,96 @@
         document.querySelectorAll('.sub-content').forEach(el => el.classList.remove('active'));
         document.getElementById(`sub-btn-${subTabName}`).classList.add('active');
         document.getElementById(`sub-content-${subTabName}`).classList.add('active');
-        if (subTabName === 'backup') syncVibeUI();   // 진동 설정 화면 상태 반영
+        if (subTabName === 'backup') syncFeedbackUI();   // 진동·효과음 설정 화면 상태 반영
         syncAllAndRender();
     }
 
     // ===== [진동 설정] UI 동기화 & 핸들러 =====
-    function syncVibeUI() {
+    function syncFeedbackUI() {
+        // --- 진동 ---
         const s = getVibeSetting();
         const toggle = document.getElementById('vibeToggle');
         const note = document.getElementById('vibeUnsupportedNote');
-        const levelBtns = document.querySelectorAll('.vibe-level-btn');
-        if (!toggle) return;
-
-        const supported = vibrateSupported();
-        toggle.checked = supported && s.on;
-        toggle.disabled = !supported;
-        if (note) note.style.display = supported ? 'none' : 'block';
-
-        levelBtns.forEach(b => {
-            b.classList.toggle('active', b.dataset.level === s.level);
-            b.disabled = !supported || !s.on;
-        });
+        const vibeBtns = document.querySelectorAll('.vibe-level-btn[data-level]');
+        if (toggle) {
+            const supported = vibrateSupported();
+            toggle.checked = supported && s.on;
+            toggle.disabled = !supported;
+            if (note) note.style.display = supported ? 'none' : 'block';
+            vibeBtns.forEach(b => {
+                b.classList.toggle('active', b.dataset.level === s.level);
+                b.disabled = !supported || !s.on;
+            });
+        }
+        // --- 효과음 ---
+        const ss = getSoundSetting();
+        const sToggle = document.getElementById('soundToggle');
+        const soundBtns = document.querySelectorAll('.vibe-level-btn[data-slevel]');
+        if (sToggle) {
+            const supported = !!soundSupported();
+            sToggle.checked = supported && ss.on;
+            sToggle.disabled = !supported;
+            soundBtns.forEach(b => {
+                b.classList.toggle('active', b.dataset.slevel === ss.level);
+                b.disabled = !supported || !ss.on;
+            });
+        }
     }
 
     function onVibeToggle(checked) {
         const s = getVibeSetting();
         s.on = checked;
         setVibeSetting(s);
-        if (checked) triggerVibe();   // 켠 순간 한 번 울려 체감 확인
-        syncVibeUI();
+        if (checked) triggerVibe();
+        syncFeedbackUI();
     }
 
     function onVibeLevel(level) {
         const s = getVibeSetting();
         s.level = level;
         setVibeSetting(s);
-        triggerVibe();   // 고른 강도를 바로 느껴보게
-        syncVibeUI();
+        triggerVibe();
+        syncFeedbackUI();
+    }
+
+    function onSoundToggle(checked) {
+        const s = getSoundSetting();
+        s.on = checked;
+        setSoundSetting(s);
+        if (checked) playTung();   // 켠 순간 한 번 들려줌 (제스처 내라 재생 허용됨)
+        syncFeedbackUI();
+    }
+
+    function onSoundLevel(level) {
+        const s = getSoundSetting();
+        s.level = level;
+        setSoundSetting(s);
+        playTung();   // 고른 볼륨 바로 들려주기
+        syncFeedbackUI();
     }
 
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
+        {
+            version: 'v2.4.0',
+            date: '2026.07',
+            title: '텅~ 효과음',
+            items: [
+                '🔊 텅을 누르거나 루틴을 체크할 때 빈 통을 두드리는 경쾌한 \'텅~\' 소리가 나요',
+                '⚙️ 설정에서 효과음 켜기/끄기와 볼륨(작게·보통·크게)을 선택할 수 있어요',
+                '📴 효과음은 기본 꺼짐 — 원하면 설정에서 켜세요'
+            ]
+        },
+        {
+            version: 'v2.3.0',
+            date: '2026.07',
+            title: '진동 피드백',
+            items: [
+                '📳 텅을 누르거나 루틴을 체크할 때 짧게 진동해요',
+                '⚙️ 설정에서 진동 켜기/끄기와 강도(약·중·강)를 선택할 수 있어요',
+                'ℹ️ 진동은 안드로이드에서 지원돼요 (아이폰은 미지원)'
+            ]
+        },
         {
             version: 'v2.2.0',
             date: '2026.07',
@@ -2058,7 +2215,7 @@
     // 실제 텅 처리 (확인 통과 후 실행)
     function doPressTung(p, id, el) {
         lastTungPressTime = Date.now();
-        triggerVibe();   // [햅틱] 텅 성공 순간
+        triggerFeedback();   // [피드백] 텅 성공 순간 (소리+진동)
         // 중단 중이면 자동 재개 (취소 대비 상태 기록)
         let wasPausedBeforeTung = false;
         if (p.pauseHistory && p.pauseHistory.length > 0) {
@@ -2894,7 +3051,7 @@
         const idx = todayRecord.checkedProductIds.indexOf(productId);
         if (idx === -1) {
             todayRecord.checkedProductIds.push(productId);
-            triggerVibe();   // [햅틱] 루틴 체크-온 (체크 해제 시엔 울리지 않음)
+            triggerFeedback();   // [피드백] 루틴 체크-온 (체크 해제 시엔 반응 없음)
             saveToStorage();
             // 애니메이션 먼저, 렌더는 후에
             if (el) {
