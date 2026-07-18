@@ -39,6 +39,9 @@
         .sub-tab-container { display: flex; background: var(--sub-tab-bg); padding: 4px; border-radius: 10px; margin-bottom: 16px; }
         .sub-tab-item { flex: 1; text-align: center; padding: 6px 2px; font-size: 11px; font-weight: bold; color: var(--gray); cursor: pointer; border-radius: 8px; transition: 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .sub-tab-item.active { background: white; color: #111; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+        .vibe-level-btn { flex:1; padding:8px 0; font-size:13px; font-weight:700; color:var(--gray); background:#F1F3F5; border:2px solid transparent; border-radius:8px; cursor:pointer; transition:0.15s; }
+        .vibe-level-btn.active { background:#FFF0F1; color:var(--primary); border-color:var(--primary); }
+        .vibe-level-btn:disabled { opacity:0.4; cursor:not-allowed; }
         
         .sub-content { display: none; }
         .sub-content.active { display: block; }
@@ -741,6 +744,24 @@
         <!-- 서브 탭: 데이터 백업 -->
         <div id="sub-content-backup" class="sub-content">
             <div class="setting-form">
+                <div class="section-title">📳 진동 피드백</div>
+                <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
+                    텅을 누르거나 루틴을 체크할 때 짧게 진동해요.
+                </div>
+                <label style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; cursor:pointer;">
+                    <span style="font-size:14px; font-weight:600;">진동 사용</span>
+                    <input type="checkbox" id="vibeToggle" onchange="onVibeToggle(this.checked)" style="width:20px; height:20px; accent-color:var(--primary); cursor:pointer;">
+                </label>
+                <div id="vibeLevelRow" style="display:flex; gap:6px; margin-bottom:10px;">
+                    <button type="button" class="vibe-level-btn" data-level="light"  onclick="onVibeLevel('light')">약</button>
+                    <button type="button" class="vibe-level-btn" data-level="medium" onclick="onVibeLevel('medium')">중</button>
+                    <button type="button" class="vibe-level-btn" data-level="strong" onclick="onVibeLevel('strong')">강</button>
+                </div>
+                <div id="vibeUnsupportedNote" style="display:none; font-size:11px; color:#C0392B; background:#FDEDEC; border-radius:8px; padding:8px 10px; line-height:1.5;">
+                    ⚠️ 이 기기(브라우저)는 진동을 지원하지 않아요. 아이폰(iOS)에서는 웹앱 진동이 동작하지 않습니다.
+                </div>
+            </div>
+            <div class="setting-form">
                 <div class="section-title">📖 앱 소개</div>
                 <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
                     다썼텅과 캐릭터들을 소개해요.
@@ -953,6 +974,31 @@
 
     // 로컬스토리지 키
     const STORAGE_KEY = 'dasseottung_data_v1';
+
+    // ===== [햅틱 진동] =====
+    // navigator.vibrate는 지속시간(ms)만 제어 가능 — 진폭 조절은 웹 표준에 없다.
+    // 그래서 '강도'는 실제로는 진동 길이/패턴으로 흉내낸다. iOS 사파리는 API 미지원(무반응).
+    const VIBE_KEY = 'dasseottung_vibe';
+    const VIBE_PATTERNS = { light: 15, medium: 35, strong: [40, 30, 40] };
+    // 저장 형식: { on: boolean, level: 'light'|'medium'|'strong' }
+    function getVibeSetting() {
+        try {
+            const raw = localStorage.getItem(VIBE_KEY);
+            if (raw) return JSON.parse(raw);
+        } catch (e) {}
+        return { on: true, level: 'light' };   // 기본: 켬 + 약하게
+    }
+    function setVibeSetting(next) {
+        try { localStorage.setItem(VIBE_KEY, JSON.stringify(next)); } catch (e) {}
+    }
+    const vibrateSupported = () => (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function');
+    function triggerVibe() {
+        if (!vibrateSupported()) return;         // iOS 등 미지원 기기는 조용히 무시
+        const s = getVibeSetting();
+        if (!s.on) return;
+        const pattern = VIBE_PATTERNS[s.level] || VIBE_PATTERNS.light;
+        try { navigator.vibrate(pattern); } catch (e) {}
+    }
 
     // 최초 접속(저장된 데이터 없음) 시에만 사용할 기본 목업 데이터
     const defaultCategories = [
@@ -1183,7 +1229,43 @@
         document.querySelectorAll('.sub-content').forEach(el => el.classList.remove('active'));
         document.getElementById(`sub-btn-${subTabName}`).classList.add('active');
         document.getElementById(`sub-content-${subTabName}`).classList.add('active');
+        if (subTabName === 'backup') syncVibeUI();   // 진동 설정 화면 상태 반영
         syncAllAndRender();
+    }
+
+    // ===== [진동 설정] UI 동기화 & 핸들러 =====
+    function syncVibeUI() {
+        const s = getVibeSetting();
+        const toggle = document.getElementById('vibeToggle');
+        const note = document.getElementById('vibeUnsupportedNote');
+        const levelBtns = document.querySelectorAll('.vibe-level-btn');
+        if (!toggle) return;
+
+        const supported = vibrateSupported();
+        toggle.checked = supported && s.on;
+        toggle.disabled = !supported;
+        if (note) note.style.display = supported ? 'none' : 'block';
+
+        levelBtns.forEach(b => {
+            b.classList.toggle('active', b.dataset.level === s.level);
+            b.disabled = !supported || !s.on;
+        });
+    }
+
+    function onVibeToggle(checked) {
+        const s = getVibeSetting();
+        s.on = checked;
+        setVibeSetting(s);
+        if (checked) triggerVibe();   // 켠 순간 한 번 울려 체감 확인
+        syncVibeUI();
+    }
+
+    function onVibeLevel(level) {
+        const s = getVibeSetting();
+        s.level = level;
+        setVibeSetting(s);
+        triggerVibe();   // 고른 강도를 바로 느껴보게
+        syncVibeUI();
     }
 
     // 업데이트 내역 데이터 (최신순)
@@ -1976,6 +2058,7 @@
     // 실제 텅 처리 (확인 통과 후 실행)
     function doPressTung(p, id, el) {
         lastTungPressTime = Date.now();
+        triggerVibe();   // [햅틱] 텅 성공 순간
         // 중단 중이면 자동 재개 (취소 대비 상태 기록)
         let wasPausedBeforeTung = false;
         if (p.pauseHistory && p.pauseHistory.length > 0) {
@@ -2811,6 +2894,7 @@
         const idx = todayRecord.checkedProductIds.indexOf(productId);
         if (idx === -1) {
             todayRecord.checkedProductIds.push(productId);
+            triggerVibe();   // [햅틱] 루틴 체크-온 (체크 해제 시엔 울리지 않음)
             saveToStorage();
             // 애니메이션 먼저, 렌더는 후에
             if (el) {
