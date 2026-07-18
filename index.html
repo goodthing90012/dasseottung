@@ -296,6 +296,15 @@
             </div>
         </div>
     </div>
+    <div class="confirm-overlay" id="refreshAppOverlay">
+        <div class="confirm-box">
+            <p>최신 버전으로 새로고침할까요?<br><span style="font-size:11px; color:#999;">저장된 기록(제품·루틴·텅 기록)은 그대로 유지돼요.<br>앱 파일만 서버에서 새로 받아옵니다.<br><span style="color:#F08C00;">💡 인터넷 연결이 필요해요.</span></span></p>
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelRefreshApp()">아니오</button>
+                <button class="confirm-btn yes" onclick="proceedRefreshApp()">새로고침</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="deleteCategoryOverlay">
         <div class="confirm-box">
             <p>카테고리를 삭제할까요?<br><span style="font-size:11px; color:#999;">연결된 상품은 '일단 쓰고봄'으로 변경돼요</span></p>
@@ -764,7 +773,7 @@
             <div class="setting-form">
                 <div class="section-title">🔊 효과음</div>
                 <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
-                    텅을 누르거나 루틴을 체크할 때 빈 통을 두드리는 '텅~' 소리가 나요.
+                    텅을 누르거나 루틴을 체크할 때 목탁처럼 맑은 소리가 나요.
                 </div>
                 <label style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; cursor:pointer;">
                     <span style="font-size:14px; font-weight:600;">효과음 사용</span>
@@ -775,6 +784,13 @@
                     <button type="button" class="vibe-level-btn" data-slevel="medium" onclick="onSoundLevel('medium')">보통</button>
                     <button type="button" class="vibe-level-btn" data-slevel="strong" onclick="onSoundLevel('strong')">크게</button>
                 </div>
+            </div>
+            <div class="setting-form">
+                <div class="section-title">🔄 앱 새로고침</div>
+                <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
+                    업데이트가 반영되지 않았을 때 눌러주세요. 앱 파일을 서버에서 새로 받아옵니다.
+                </div>
+                <button class="btn-save" style="background-color:#868E96;" onclick="askRefreshApp()">🔄 최신 버전으로 새로고침</button>
             </div>
             <div class="setting-form">
                 <div class="section-title">📖 앱 소개</div>
@@ -1015,9 +1031,9 @@
         try { navigator.vibrate(pattern); } catch (e) {}
     }
 
-    // ===== [효과음: 텅] =====
-    // Web Audio로 실시간 합성 (음원 파일 0KB). 빈 통을 두드리는 경쾌한 '텅~' 공명음.
-    // 캐릭터 이름(텅이)과 맞닿은 소리. iOS도 지원.
+    // ===== [효과음: 목탁] =====
+    // Web Audio로 실시간 합성 (음원 파일 0KB). 목탁처럼 맑게 딱 끊기는 나무 타격음.
+    // 저역을 잘라내는 것이 '청아함'의 핵심. iOS도 지원.
     const SOUND_KEY = 'dasseottung_sound';
     const SOUND_GAIN = { light: 0.3, medium: 0.6, strong: 1.0 };
     function getSoundSetting() {
@@ -1063,42 +1079,41 @@
 
         // 저역 정리(고역통과)로 붕 뜨는 소리 제거 + 과한 고역 억제
         const hp = ctx.createBiquadFilter();
-        hp.type = 'highpass'; hp.frequency.value = 110;
+        hp.type = 'highpass'; hp.frequency.value = 300;   // 저역 컷 = 청아함의 핵심
         const lp = ctx.createBiquadFilter();
-        lp.type = 'lowpass'; lp.frequency.value = 4000;
+        lp.type = 'lowpass'; lp.frequency.value = 7000;
         hp.connect(lp); lp.connect(master);
 
-        // 1) 타격 순간 '딱' — 아주 짧은 노이즈 클릭
-        const clen = Math.floor(ctx.sampleRate * 0.02);
+        // 1) 나무 타격 '딱' — 짧고 단단한 노이즈
+        const clen = Math.floor(ctx.sampleRate * 0.015);
         const cbuf = ctx.createBuffer(1, clen, ctx.sampleRate);
         const cdata = cbuf.getChannelData(0);
         for (let j = 0; j < clen; j++) {
             const tt = j / ctx.sampleRate;
-            cdata[j] = (Math.random() * 2 - 1) * Math.exp(-tt * 750);
+            cdata[j] = (Math.random() * 2 - 1) * Math.exp(-tt * 1400);
         }
         const csrc = ctx.createBufferSource(); csrc.buffer = cbuf;
-        const cg = ctx.createGain(); cg.gain.value = 0.38;
+        const cg = ctx.createGain(); cg.gain.value = 0.45;
         csrc.connect(cg); cg.connect(hp);
         csrc.start(t0); csrc.stop(t0 + 0.03);
 
-        // 2) 빈 통 공명 '텅~' — 밝은 배음(경쾌)과 여운(묵직)의 중간 톤
-        //    어택에서 살짝 위로 튀는 피치 = 통통 튀는 탄력감
+        // 2) 나무통 공명 — 비화성 배음 + 매우 빠른 감쇠 = 청아하게 딱 끊기는 목탁 음색
         const partials = [
-            { f: 250,  a: 1.00, d: 11 },
-            { f: 500,  a: 0.50, d: 14 },
-            { f: 780,  a: 0.28, d: 19 },
-            { f: 1050, a: 0.15, d: 24 }
+            { f: 520,  a: 1.00, d: 26 },
+            { f: 880,  a: 0.42, d: 34 },
+            { f: 1290, a: 0.22, d: 45 },
+            { f: 1760, a: 0.12, d: 58 },
+            { f: 2400, a: 0.06, d: 70 }
         ];
         partials.forEach(p => {
             const osc = ctx.createOscillator();
             osc.type = 'sine';
-            osc.frequency.setValueAtTime(p.f * 1.05, t0);            // 살짝 높게 시작
-            osc.frequency.exponentialRampToValueAtTime(p.f, t0 + 0.05); // 빠르게 안정 → 튀는 느낌
+            osc.frequency.value = p.f;
             const g = ctx.createGain();
             g.gain.setValueAtTime(p.a * 0.9, t0);
-            g.gain.exponentialRampToValueAtTime(0.0008, t0 + 3 / p.d); // 감쇠상수 d 반영
+            g.gain.exponentialRampToValueAtTime(0.0008, t0 + 3 / p.d);
             osc.connect(g); g.connect(hp);
-            osc.start(t0); osc.stop(t0 + 0.5);
+            osc.start(t0); osc.stop(t0 + 0.4);
         });
     }
 
@@ -1397,6 +1412,44 @@
         syncFeedbackUI();
     }
 
+    // ===== [앱 새로고침] =====
+    // 캐시 fetch 전략은 건드리지 않고, 사용자가 누를 때만 캐시를 비우고 다시 받는다.
+    // 데이터는 localStorage에 있으므로 캐시를 지워도 기록은 안전하다.
+    function askRefreshApp() {
+        if (navigator.onLine === false) {
+            showToast('📴 인터넷에 연결한 뒤 다시 시도해주세요.');
+            return;   // 오프라인에서 캐시를 지우면 앱을 다시 못 받으므로 차단
+        }
+        document.getElementById('refreshAppOverlay').classList.add('active');
+    }
+
+    function cancelRefreshApp() {
+        document.getElementById('refreshAppOverlay').classList.remove('active');
+    }
+
+    async function proceedRefreshApp() {
+        document.getElementById('refreshAppOverlay').classList.remove('active');
+        showToast('🔄 최신 버전을 불러오는 중...');
+        try {
+            // 1) 서비스워커에 업데이트 확인 요청
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map(r => r.update().catch(() => {})));
+            }
+            // 2) 캐시 스토리지 비우기 (localStorage는 건드리지 않음)
+            if (window.caches && caches.keys) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map(k => caches.delete(k).catch(() => {})));
+            }
+        } catch (e) {
+            // 실패해도 리로드는 시도한다
+        }
+        // 3) 캐시 우회 리로드
+        setTimeout(() => {
+            location.replace(location.pathname + '?v=' + Date.now());
+        }, 400);
+    }
+
     function onSoundLevel(level) {
         const s = getSoundSetting();
         s.level = level;
@@ -1410,9 +1463,9 @@
         {
             version: 'v2.4.0',
             date: '2026.07',
-            title: '텅~ 효과음',
+            title: '효과음',
             items: [
-                '🔊 텅을 누르거나 루틴을 체크할 때 빈 통을 두드리는 경쾌한 \'텅~\' 소리가 나요',
+                '🔊 텅을 누르거나 루틴을 체크할 때 목탁처럼 맑고 청아한 소리가 나요',
                 '⚙️ 설정에서 효과음 켜기/끄기와 볼륨(작게·보통·크게)을 선택할 수 있어요',
                 '📴 효과음은 기본 꺼짐 — 원하면 설정에서 켜세요'
             ]
