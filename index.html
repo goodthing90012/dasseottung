@@ -77,6 +77,14 @@
         .prod-status { font-size: 12px; color: #555; line-height: 1.4; margin-top: 6px; }
         .prod-used { font-size: 11px; color: var(--used-purple); font-weight: bold; margin-top: 2px; }
 
+        .photo-thumb { position: relative; width: 64px; height: 64px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+        .photo-thumb img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
+        .photo-thumb .del { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .photo-add-wrap { position: relative; width: 100%; height: 42px; }
+        .photo-add-face { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 5px; border: 1px dashed #ccc; border-radius: 9px; color: #888; font-size: 13px; font-weight: bold; background: #fafafa; pointer-events: none; }
+        .photo-add-wrap input[type=file] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .review-photos { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+        .review-photos img { width: 56px; height: 56px; object-fit: cover; border-radius: 7px; cursor: pointer; }
         .review-preview { font-size: 11px; color: #777; margin-top: 4px; cursor: pointer; background: #F7F7F7; padding: 4px 8px; border-radius: 8px; display: inline-block; }
         .tung-count-badge { font-size: 11px; color: #888; margin-top: 4px; font-weight: bold; }
         .btn-undo-tung { background: #FFF0EE; border: none; color: var(--primary, #FF5A5F); font-size: 10px; font-weight: bold; cursor: pointer; padding: 2px 6px; border-radius: 6px; margin-left: 4px; }
@@ -241,6 +249,14 @@
             <p id="editReviewModalTitle" style="margin-bottom:10px;">상품평 수정</p>
             <textarea id="editReviewTextInput" maxlength="200" placeholder="수정할 내용을 입력하세요"
                 style="width:100%; height:80px; border-radius:8px; border:1px solid #ddd; padding:8px; font-size:13px; resize:none; box-sizing:border-box;"></textarea>
+            <div id="editReviewPhotoArea" style="margin:10px 0; text-align:left;">
+                <div style="font-size:11px; font-weight:bold; color:#888; margin-bottom:4px;">사진 (최대 3장)</div>
+                <div id="editReviewPhotoList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
+                <div class="photo-add-wrap">
+                    <span class="photo-add-face">📷 사진 추가</span>
+                    <input type="file" id="editReviewPhotoInput" accept="image/*" multiple onchange="addReviewPhotos(this.files,'edit')">
+                </div>
+            </div>
             <div style="display:flex; gap:8px; margin-top:10px;">
                 <button class="confirm-btn no" onclick="cancelEditReview()">취소</button>
                 <button class="confirm-btn yes" onclick="saveEditReview()">수정 완료</button>
@@ -252,6 +268,14 @@
             <p id="reviewModalTitle" style="margin-bottom:10px;">상품평을 남겨볼까요?</p>
             <textarea id="reviewTextInput" maxlength="200" placeholder="이 제품, 어떻게 쓰셨나요? (예: 흡수는 좋았지만 향이 좀 강했어요)" 
                 style="width:100%; box-sizing:border-box; height:80px; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:13px; resize:none; margin-bottom:14px; font-family:inherit;"></textarea>
+            <div id="reviewPhotoArea" style="margin:0 0 12px; text-align:left;">
+                <div style="font-size:11px; font-weight:bold; color:#888; margin-bottom:4px;">사진 (최대 3장)</div>
+                <div id="reviewPhotoList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
+                <div class="photo-add-wrap">
+                    <span class="photo-add-face">📷 사진 추가</span>
+                    <input type="file" id="reviewPhotoInput" accept="image/*" multiple onchange="addReviewPhotos(this.files,'new')">
+                </div>
+            </div>
             <div class="confirm-btn-row">
                 <button class="confirm-btn no" onclick="skipReview()">나중에 할게요</button>
                 <button class="confirm-btn yes" onclick="saveReview()">저장</button>
@@ -295,6 +319,9 @@
                 <button class="confirm-btn yes" onclick="proceedCloseProduct()">예</button>
             </div>
         </div>
+    </div>
+    <div class="confirm-overlay" id="photoViewer" onclick="closePhotoViewer()" style="background:rgba(0,0,0,0.9);">
+        <img id="photoViewerImg" style="max-width:96%; max-height:88%; border-radius:10px;">
     </div>
     <div class="confirm-overlay" id="refreshAppOverlay">
         <div class="confirm-box">
@@ -1004,6 +1031,89 @@
     };
 
     // 로컬스토리지 키
+    // ══════════ 리뷰 사진 저장소 (IndexedDB) ══════════
+    // 사진은 용량이 커서 localStorage(약 5MB)에 넣으면 앱 전체가 저장 불가에 빠진다.
+    // 그래서 사진만 IndexedDB로 분리하고, 리뷰에는 사진 id만 저장한다.
+    const PHOTO_DB = 'dasseottung_photos', PHOTO_STORE = 'photos';
+    const REVIEW_PHOTO_MAX = 3;                 // 리뷰 1건당 사진 최대 장수
+    let photoCache = {};                        // id -> dataURL (렌더용 런타임 캐시)
+
+    function openPhotoDB() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(PHOTO_DB, 1);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(PHOTO_STORE)) db.createObjectStore(PHOTO_STORE);
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+    async function photoPut(id, dataUrl) {
+        photoCache[id] = dataUrl;
+        try {
+            const db = await openPhotoDB();
+            await new Promise((res, rej) => {
+                const tx = db.transaction(PHOTO_STORE, 'readwrite');
+                tx.objectStore(PHOTO_STORE).put(dataUrl, id);
+                tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+            });
+        } catch (e) { console.error('사진 저장 실패', e); showToast('⚠️ 사진 저장에 실패했어요'); }
+    }
+    async function photoDelete(id) {
+        delete photoCache[id];
+        try {
+            const db = await openPhotoDB();
+            await new Promise((res) => {
+                const tx = db.transaction(PHOTO_STORE, 'readwrite');
+                tx.objectStore(PHOTO_STORE).delete(id);
+                tx.oncomplete = res; tx.onerror = res;
+            });
+        } catch (e) { console.error('사진 삭제 실패', e); }
+    }
+    async function photoLoadAll() {
+        try {
+            const db = await openPhotoDB();
+            const all = await new Promise((res, rej) => {
+                const tx = db.transaction(PHOTO_STORE, 'readonly');
+                const store = tx.objectStore(PHOTO_STORE);
+                const keysReq = store.getAllKeys(), valsReq = store.getAll();
+                tx.oncomplete = () => res({ keys: keysReq.result, vals: valsReq.result });
+                tx.onerror = () => rej(tx.error);
+            });
+            photoCache = {};
+            all.keys.forEach((k, i) => { photoCache[k] = all.vals[i]; });
+        } catch (e) { console.error('사진 로드 실패', e); photoCache = {}; }
+    }
+    // 업로드 사진 축소 (가로 최대 1200px, JPEG 압축) — 원본 그대로 두면 몇 장에 용량이 터진다
+    function resizePhoto(file, maxW = 1200, quality = 0.8) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = new Image();
+                img.onload = () => {
+                    const scale = Math.min(1, maxW / img.width);
+                    const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = reject;
+                img.src = e.target.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+    // 어떤 리뷰에서도 참조하지 않는 사진 정리 (취소/삭제 누락 대비)
+    async function purgeOrphanPhotos() {
+        const used = new Set();
+        reviews.forEach(r => (r.photos || []).forEach(pid => used.add(pid)));
+        const orphans = Object.keys(photoCache).filter(pid => !used.has(pid));
+        for (const pid of orphans) await photoDelete(pid);
+    }
+
     const STORAGE_KEY = 'dasseottung_data_v1';
 
     // ===== [햅틱 진동] =====
@@ -1220,12 +1330,19 @@
 
     // [백업] 현재 데이터를 JSON 파일로 내려받기
     function exportBackup() {
+        // 사진은 IndexedDB에 따로 있으므로, 백업에 직접 담지 않으면 복원 시 사진만 사라진다.
+        // 리뷰가 실제로 참조하는 사진만 담는다.
+        const photos = {};
+        reviews.forEach(r => (r.photos || []).forEach(pid => {
+            if (photoCache[pid]) photos[pid] = photoCache[pid];
+        }));
         const backupData = {
             exportedAt: new Date().toISOString(),
             app: 'dasseottung',
-            version: 2,
+            version: 3,
             categories, schedules, products, reviews, routines, totalTungCount,
-            reviewFeatureEnabled
+            reviewFeatureEnabled,
+            photos
         };
         const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -1237,7 +1354,8 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showToast('💾 백업 파일을 내려받았어요');
+        const photoCount = Object.keys(backupData.photos).length;
+        showToast(photoCount ? `💾 백업 완료 (사진 ${photoCount}장 포함)` : '💾 백업 파일을 내려받았어요');
     }
 
     // [백업] 선택한 JSON 파일로부터 데이터 복원
@@ -1267,6 +1385,12 @@
                     localStorage.setItem(STORAGE_KEY + '_reviewEnabled', String(reviewFeatureEnabled));
                     const tgl = document.getElementById('reviewFeatureToggle');
                     if (tgl) tgl.checked = reviewFeatureEnabled;
+                }
+                // 사진 복원 (구버전 백업엔 photos가 없으므로 있을 때만)
+                if (parsed.photos && typeof parsed.photos === 'object') {
+                    const entries = Object.entries(parsed.photos);
+                    Promise.all(entries.map(([pid, dataUrl]) => photoPut(pid, dataUrl)))
+                        .then(() => { renderReviewList(); });
                 }
                 syncAllAndRender();
                 showToast('✅ 백업 데이터를 불러왔어요');
@@ -1316,6 +1440,11 @@
         document.getElementById('prodOpenedDate').max = formatDateString(getTodayTimeline());
         document.getElementById('reviewFeatureToggle').checked = reviewFeatureEnabled;
         syncAllAndRender();
+        // 사진은 IndexedDB(비동기)에 있으므로, 로드된 뒤 리뷰 목록을 다시 그려 썸네일을 채운다
+        photoLoadAll().then(() => {
+            purgeOrphanPhotos();
+            renderReviewList();
+        });
     };
 
     // 데이터 변경 발생 시 전체 뷰를 동기화 및 강제 새로고침하는 파이프라인 함수
@@ -2601,6 +2730,72 @@
         showToast(checked ? '📝 텅 리뷰 입력이 켜졌어요' : '🔕 텅 리뷰 입력이 꺼졌어요');
     }
 
+    // ── 리뷰 사진 (작성/수정 공용) ──
+    // mode: 'new' = 새 리뷰 작성 모달, 'edit' = 수정 모달
+    let reviewWorkingPhotos = [];        // 작성 중 사진 id
+    let editReviewWorkingPhotos = [];    // 수정 중 사진 id
+    let editReviewOriginalPhotos = [];   // 수정 취소 시 되돌리기용 원본
+
+    function _photoState(mode) {
+        return mode === 'edit' ? editReviewWorkingPhotos : reviewWorkingPhotos;
+    }
+    async function addReviewPhotos(files, mode) {
+        if (!files || !files.length) return;
+        const list = _photoState(mode);
+        const room = REVIEW_PHOTO_MAX - list.length;
+        if (room <= 0) {
+            showToast(`📷 사진은 최대 ${REVIEW_PHOTO_MAX}장까지예요`);
+            document.getElementById(mode === 'edit' ? 'editReviewPhotoInput' : 'reviewPhotoInput').value = '';
+            return;
+        }
+        const picked = Array.from(files).slice(0, room);   // 한도 초과분은 잘라낸다
+        const overflow = files.length - picked.length;
+        showToast('사진을 처리하는 중…');
+        let added = 0;
+        for (const f of picked) {
+            try {
+                const dataUrl = await resizePhoto(f);
+                const pid = 'p' + Date.now() + Math.floor(Math.random() * 10000);
+                await photoPut(pid, dataUrl);
+                list.push(pid);
+                added++;
+            } catch (e) { console.error(e); showToast('⚠️ 사진을 불러오지 못했어요'); }
+        }
+        document.getElementById(mode === 'edit' ? 'editReviewPhotoInput' : 'reviewPhotoInput').value = '';
+        renderReviewPhotos(mode);
+        if (added) showToast(overflow > 0
+            ? `📷 ${added}장 추가 (최대 ${REVIEW_PHOTO_MAX}장까지라 ${overflow}장은 제외됐어요)`
+            : `📷 사진 ${added}장 추가됐어요`);
+    }
+    function removeReviewPhoto(pid, mode) {
+        if (mode === 'edit') {
+            editReviewWorkingPhotos = editReviewWorkingPhotos.filter(x => x !== pid);
+            // 원본에 있던 사진은 '수정 완료'를 눌러야 실제 삭제 (취소 시 복구 가능하도록)
+            if (!editReviewOriginalPhotos.includes(pid)) photoDelete(pid);
+        } else {
+            reviewWorkingPhotos = reviewWorkingPhotos.filter(x => x !== pid);
+            photoDelete(pid);
+        }
+        renderReviewPhotos(mode);
+    }
+    function renderReviewPhotos(mode) {
+        const listEl = document.getElementById(mode === 'edit' ? 'editReviewPhotoList' : 'reviewPhotoList');
+        if (!listEl) return;
+        const list = _photoState(mode);
+        listEl.innerHTML = list.map(pid => `
+            <div class="photo-thumb">
+                <img src="${photoCache[pid] || ''}" onclick="openPhotoViewer('${pid}')">
+                <span class="del" onclick="removeReviewPhoto('${pid}','${mode}')">✕</span>
+            </div>`).join('');
+    }
+    function openPhotoViewer(pid) {
+        document.getElementById('photoViewerImg').src = photoCache[pid] || '';
+        document.getElementById('photoViewer').classList.add('active');
+    }
+    function closePhotoViewer() {
+        document.getElementById('photoViewer').classList.remove('active');
+    }
+
     // ── 상품평 (텅 비운 직후 입력) ──
     let pendingReviewProductId = null;
     let pendingReviewTungNo = 1;
@@ -2609,10 +2804,16 @@
         pendingReviewTungNo = tungNo || 1;
         document.getElementById('reviewModalTitle').textContent = `"${productName}" ${getTungOrdinalLabel(pendingReviewTungNo)}! 상품평을 남겨볼까요?`;
         document.getElementById('reviewTextInput').value = '';
+        reviewWorkingPhotos = [];
+        renderReviewPhotos('new');
         document.getElementById('reviewOverlay').classList.add('active');
         setTimeout(() => document.getElementById('reviewTextInput').focus(), 50);
     }
     function skipReview() {
+        // 저장하지 않고 닫으므로, 방금 올린 사진은 남기지 않는다
+        reviewWorkingPhotos.forEach(pid => photoDelete(pid));
+        reviewWorkingPhotos = [];
+        renderReviewPhotos('new');
         pendingReviewProductId = null;
         document.getElementById('reviewOverlay').classList.remove('active');
     }
@@ -2628,8 +2829,10 @@
             scheduleId: p.targetScheduleId,
             text: text,
             date: getTodayTimeline(),
-            tungNo: pendingReviewTungNo
+            tungNo: pendingReviewTungNo,
+            photos: reviewWorkingPhotos.slice()
         });
+        reviewWorkingPhotos = [];
         showToast('📝 상품평이 저장됐어요');
         saveToStorage();
         pendingReviewProductId = null;
@@ -2687,10 +2890,19 @@
         editingReviewId = reviewId;
         document.getElementById('editReviewModalTitle').textContent = `"${r.productName}" ${getTungOrdinalLabel(r.tungNo || 1)} 리뷰 수정`;
         document.getElementById('editReviewTextInput').value = r.text;
+        editReviewWorkingPhotos = (r.photos || []).slice();
+        editReviewOriginalPhotos = (r.photos || []).slice();
+        renderReviewPhotos('edit');
         document.getElementById('editReviewOverlay').classList.add('active');
         setTimeout(() => document.getElementById('editReviewTextInput').focus(), 50);
     }
     function cancelEditReview() {
+        // 수정 중 새로 올린 사진만 정리 (원본 사진은 그대로 둔다)
+        editReviewWorkingPhotos
+            .filter(pid => !editReviewOriginalPhotos.includes(pid))
+            .forEach(pid => photoDelete(pid));
+        editReviewWorkingPhotos = [];
+        editReviewOriginalPhotos = [];
         editingReviewId = null;
         document.getElementById('editReviewOverlay').classList.remove('active');
     }
@@ -2698,7 +2910,17 @@
         const text = document.getElementById('editReviewTextInput').value.trim();
         if (!text || !editingReviewId) { cancelEditReview(); return; }
         const r = reviews.find(rv => rv.id === editingReviewId);
-        if (r) { r.text = text; r.editedAt = getTodayTimeline(); }
+        if (r) {
+            r.text = text;
+            r.editedAt = getTodayTimeline();
+            // 수정 중 제거된 원본 사진은 이 시점에 실제 삭제
+            editReviewOriginalPhotos
+                .filter(pid => !editReviewWorkingPhotos.includes(pid))
+                .forEach(pid => photoDelete(pid));
+            r.photos = editReviewWorkingPhotos.slice();
+        }
+        editReviewWorkingPhotos = [];
+        editReviewOriginalPhotos = [];
         saveToStorage();
         showToast('✏️ 상품평이 수정됐어요');
         editingReviewId = null;
@@ -3859,6 +4081,8 @@
     }
     function proceedDeleteReview() {
         if (pendingDeleteReviewId == null) return;
+        const doomed = reviews.find(r => r.id === pendingDeleteReviewId);
+        if (doomed) (doomed.photos || []).forEach(pid => photoDelete(pid));   // 유령 사진 방지
         reviews = reviews.filter(r => r.id !== pendingDeleteReviewId);
         pendingDeleteReviewId = null;
         document.getElementById('deleteReviewOverlay').classList.remove('active');
@@ -3904,6 +4128,7 @@
                     </div>
                     <div class="review-meta">${cat ? cat.name : '카테고리 없음'} ${sched ? '· ' + sched.name : ''} · ${formatDateString(r.date)}${editedMark}</div>
                     <div class="review-text">${r.text}</div>
+                    ${(r.photos && r.photos.length) ? `<div class="review-photos">${r.photos.map(pid => `<img src="${photoCache[pid] || ''}" onclick="openPhotoViewer('${pid}')">`).join('')}</div>` : ''}
                 </div>
             `;
         }).join('');
