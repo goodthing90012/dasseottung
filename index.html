@@ -25,6 +25,12 @@
             --cycle-blue: #007AFF;
             --used-purple: #7C5CFF;
         }
+        /* 탭할 때 생기는 파란 하이라이트 제거 (앱처럼 보이게) */
+        * { -webkit-tap-highlight-color: transparent; }
+        /* 버튼·카드 등 조작 요소에서 글자가 드래그로 선택되지 않게 — 특히 더블탭 시 파란 선택 영역 방지.
+           단, 입력창과 리뷰 본문처럼 복사할 일이 있는 곳은 예외로 둔다. */
+        body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+        input, textarea, select, .review-text, .review-fs-text, .review-preview { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
         html, body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: var(--bg); margin: 0; height: 100%; }
         
         .phone-mockup { width: 100%; height: 100vh; background-color: var(--bg); overflow-y: auto; display: flex; flex-direction: column; position: relative; }
@@ -366,7 +372,7 @@
         <button class="pv-close" onclick="closePhotoViewer()">✕</button>
         <div class="pv-stage">
             <button class="pv-nav left" id="pvPrev" onclick="movePhoto(-1)">‹</button>
-            <img id="photoViewerImg" style="max-width:94%; max-height:100%; border-radius:10px; object-fit:contain;">
+            <img id="photoViewerImg" style="max-width:94%; max-height:100%; border-radius:10px; object-fit:contain; transform-origin:center center; will-change:transform;">
             <button class="pv-nav right" id="pvNext" onclick="movePhoto(1)">›</button>
         </div>
         <div class="pv-counter" id="pvCounter"></div>
@@ -2931,9 +2937,36 @@
         document.getElementById('photoViewer').classList.add('active');
         lockBodyScroll();
     }
+    // ── 확대/축소 상태 ──
+    // 앱이 브라우저 기본 핀치줌을 쓸 수 없는 구조(스와이프 제스처를 직접 처리)라
+    // 뷰어 안에서는 확대·이동을 직접 구현한다.
+    let zScale = 1, zX = 0, zY = 0;
+    const Z_MAX = 4, Z_MIN = 1;
+    function applyZoom() {
+        const img = document.getElementById('photoViewerImg');
+        if (!img) return;
+        img.style.transform = `translate(${zX}px, ${zY}px) scale(${zScale})`;
+        img.style.transition = 'none';
+    }
+    function resetZoom() {
+        zScale = 1; zX = 0; zY = 0;
+        const img = document.getElementById('photoViewerImg');
+        if (img) { img.style.transition = 'transform 0.2s'; img.style.transform = 'translate(0,0) scale(1)'; }
+    }
+    function clampPan() {
+        // 확대 배율에 비례해 이동 가능 범위를 제한 (사진이 화면 밖으로 완전히 나가지 않게)
+        const img = document.getElementById('photoViewerImg');
+        if (!img) return;
+        const maxX = (img.clientWidth  * (zScale - 1)) / 2;
+        const maxY = (img.clientHeight * (zScale - 1)) / 2;
+        zX = Math.max(-maxX, Math.min(maxX, zX));
+        zY = Math.max(-maxY, Math.min(maxY, zY));
+    }
+
     function renderPhotoViewer() {
         const pid = viewerPhotos[viewerIndex];
         document.getElementById('photoViewerImg').src = photoCache[pid] || '';
+        resetZoom();
         const multi = viewerPhotos.length > 1;
         document.getElementById('pvPrev').style.display = multi ? 'block' : 'none';
         document.getElementById('pvNext').style.display = multi ? 'block' : 'none';
@@ -2990,37 +3023,92 @@
         unlockBodyScroll();
     }
     // 좌우 스와이프로 넘기기 / 그냥 탭하면 닫기
-    (function initPhotoSwipe() {
+    (function initPhotoGestures() {
         const stage = document.getElementById('photoViewer');
         if (!stage) return;
         let startX = 0, startY = 0, moved = false;
+        let pinching = false, startDist = 0, startScale = 1;
+        let panX = 0, panY = 0, startZX = 0, startZY = 0;
+        let lastTapAt = 0;
+
+        const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
         stage.addEventListener('touchstart', e => {
-            const t = e.touches[0]; startX = t.clientX; startY = t.clientY; moved = false;
+            if (e.touches.length === 2) {
+                // 두 손가락 = 확대/축소 시작
+                pinching = true; moved = true;
+                startDist = dist(e.touches[0], e.touches[1]);
+                startScale = zScale;
+                return;
+            }
+            const t = e.touches[0];
+            startX = t.clientX; startY = t.clientY; moved = false;
+            panX = t.clientX; panY = t.clientY;
+            startZX = zX; startZY = zY;
         }, { passive: true });
+
         stage.addEventListener('touchmove', e => {
+            if (pinching && e.touches.length === 2) {
+                const ratio = dist(e.touches[0], e.touches[1]) / (startDist || 1);
+                zScale = Math.max(Z_MIN, Math.min(Z_MAX, startScale * ratio));
+                if (zScale === 1) { zX = 0; zY = 0; }
+                clampPan(); applyZoom();
+                return;
+            }
             const t = e.touches[0];
             if (Math.abs(t.clientX - startX) > 12 || Math.abs(t.clientY - startY) > 12) moved = true;
+            // 확대된 상태에서 한 손가락 = 사진 이동(팬)
+            if (zScale > 1 && e.touches.length === 1) {
+                zX = startZX + (t.clientX - panX);
+                zY = startZY + (t.clientY - panY);
+                clampPan(); applyZoom();
+            }
         }, { passive: true });
-        // passive:false — 터치 후 브라우저가 만들어내는 '가짜 클릭'을 막아야
-        // 뷰어가 닫힌 자리의 뒤쪽 요소가 대신 눌리는 클릭 통과 현상이 생기지 않는다.
+
         stage.addEventListener('touchend', e => {
-            // 버튼(닫기/화살표)을 눌렀을 땐 여기서 처리하지 않는다
             if (e.target.closest('.pv-nav') || e.target.closest('.pv-close')) return;
+            if (pinching) {
+                if (e.touches.length === 0) pinching = false;
+                if (zScale <= 1.02) resetZoom();
+                return;
+            }
             const t = e.changedTouches[0];
             const dx = t.clientX - startX, dy = t.clientY - startY;
+
+            // 더블탭으로 확대/원래대로
+            const now = Date.now();
+            if (!moved) {
+                if (now - lastTapAt < 300) {
+                    lastTapAt = 0;
+                    e.preventDefault();
+                    if (zScale > 1) { resetZoom(); }
+                    else { zScale = 2.5; clampPan(); applyZoom(); }
+                    return;
+                }
+                lastTapAt = now;
+            }
+
+            // 확대 중에는 넘기기/닫기를 하지 않는다 (사진을 살펴보는 중이므로)
+            if (zScale > 1) return;
+
             if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
                 e.preventDefault();
                 movePhoto(dx < 0 ? 1 : -1);
                 return;
             }
             if (!moved) {
-                e.preventDefault();      // 뒤따라오는 클릭 자체를 발생시키지 않음
-                swallowNextClick();      // 그래도 새는 경우를 대비한 2차 방어
-                closePhotoViewer();
+                // 더블탭 대기시간만큼 늦춰 닫아서, 두 번째 탭이 씹히지 않게 한다
+                setTimeout(() => {
+                    if (lastTapAt === 0) return;      // 더블탭으로 처리됐으면 취소
+                    if (zScale > 1) return;
+                    swallowNextClick();
+                    closePhotoViewer();
+                }, 300);
             }
         }, { passive: false });
-        // 마우스(데스크톱)에서는 빈 곳 클릭 시 닫기
+
         stage.addEventListener('click', e => {
+            if (zScale > 1) return;
             if (e.target === stage || e.target.classList.contains('pv-stage')) closePhotoViewer();
         });
     })();
