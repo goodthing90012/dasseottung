@@ -354,7 +354,7 @@
             <button class="review-fs-btn" style="background:var(--primary,#FF5A5F); color:#fff;" onclick="editReviewFromDetail()">수정</button>
         </div>
     </div>
-    <div class="confirm-overlay" id="photoViewer" onclick="closePhotoViewer()" style="background:rgba(0,0,0,0.9);">
+    <div class="confirm-overlay" id="photoViewer" onclick="closePhotoViewer()" style="background:rgba(0,0,0,0.9); z-index:1100;">
         <img id="photoViewerImg" style="max-width:96%; max-height:88%; border-radius:10px;">
     </div>
     <div class="confirm-overlay" id="refreshAppOverlay">
@@ -4556,6 +4556,12 @@
             confirms[confirms.length - 1].classList.remove('active');
             return true;
         }
+        // 리뷰 상세보기(전체화면)는 confirm-overlay보다 아래 레이어이므로 그다음에 닫는다
+        const reviewFS = document.getElementById('reviewDetailFS');
+        if (reviewFS && reviewFS.classList.contains('active')) {
+            closeReviewDetail();
+            return true;
+        }
         const popups = ['dashProductPopup', 'appIntroPopup', 'updateHistoryPopup'];
         for (let i = 0; i < popups.length; i++) {
             const el = document.getElementById(popups[i]);
@@ -4568,6 +4574,7 @@
     }
     function isAnyOverlayOpen() {
         if (document.querySelector('.confirm-overlay.active')) return true;
+        if (document.getElementById('reviewDetailFS')?.classList.contains('active')) return true;
         const popups = ['dashProductPopup', 'appIntroPopup', 'updateHistoryPopup'];
         return popups.some(id => {
             const el = document.getElementById(id);
