@@ -77,6 +77,20 @@
         .prod-status { font-size: 12px; color: #555; line-height: 1.4; margin-top: 6px; }
         .prod-used { font-size: 11px; color: var(--used-purple); font-weight: bold; margin-top: 2px; }
 
+        .review-fs { position: fixed; inset: 0; z-index: 1000; background: #fff; display: none; flex-direction: column; }
+        .review-fs.active { display: flex; }
+        .review-fs-header { padding: 16px 16px 12px; border-bottom: 1px solid #eee; flex-shrink: 0; }
+        .review-fs-top { display: flex; align-items: center; justify-content: space-between; }
+        .review-fs-label { font-size: 12px; font-weight: 700; color: var(--primary, #FF5A5F); }
+        .review-fs-close { background: none; border: none; font-size: 20px; color: #888; cursor: pointer; line-height: 1; padding: 0 4px; }
+        .review-fs-title { font-size: 18px; font-weight: 800; color: #111; margin-top: 8px; word-break: keep-all; }
+        .review-fs-meta { font-size: 11px; color: #999; margin-top: 4px; }
+        .review-fs-body { flex: 1; overflow-y: auto; padding: 16px; }
+        .review-fs-text { font-size: 14px; color: #333; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+        .review-fs-photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+        .review-fs-photos img { width: 100px; height: 100px; object-fit: cover; border-radius: 10px; cursor: pointer; }
+        .review-fs-footer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #eee; flex-shrink: 0; }
+        .review-fs-btn { flex: 1; padding: 12px 0; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; background: #F1F3F5; color: #555; }
         .photo-thumb { position: relative; width: 64px; height: 64px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
         .photo-thumb img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
         .photo-thumb .del { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -318,6 +332,26 @@
                 <button class="confirm-btn no" onclick="cancelCloseProduct()">아니오</button>
                 <button class="confirm-btn yes" onclick="proceedCloseProduct()">예</button>
             </div>
+        </div>
+    </div>
+    <!-- 리뷰 상세보기 (전체화면) -->
+    <div class="review-fs" id="reviewDetailFS">
+        <div class="review-fs-header">
+            <div class="review-fs-top">
+                <span class="review-fs-label">📝 상품평</span>
+                <button class="review-fs-close" onclick="closeReviewDetail()">✕</button>
+            </div>
+            <div class="review-fs-title" id="reviewDetailTitle"></div>
+            <div class="review-fs-meta" id="reviewDetailMeta"></div>
+        </div>
+        <div class="review-fs-body">
+            <div class="review-fs-text" id="reviewDetailText"></div>
+            <div class="review-fs-photos" id="reviewDetailPhotos"></div>
+        </div>
+        <div class="review-fs-footer">
+            <button class="review-fs-btn" onclick="deleteReviewFromDetail()">삭제</button>
+            <button class="review-fs-btn" onclick="shareReviewFromDetail()">공유</button>
+            <button class="review-fs-btn" style="background:var(--primary,#FF5A5F); color:#fff;" onclick="editReviewFromDetail()">수정</button>
         </div>
     </div>
     <div class="confirm-overlay" id="photoViewer" onclick="closePhotoViewer()" style="background:rgba(0,0,0,0.9);">
@@ -2730,6 +2764,53 @@
         showToast(checked ? '📝 텅 리뷰 입력이 켜졌어요' : '🔕 텅 리뷰 입력이 꺼졌어요');
     }
 
+    // ── 리뷰 상세보기 (전체화면) ──
+    let viewingReviewId = null;
+    function openReviewDetail(reviewId) {
+        const r = reviews.find(rv => rv.id === reviewId);
+        if (!r) return;
+        viewingReviewId = reviewId;
+        const cat = categories.find(c => c.id === r.categoryId);
+        const sched = schedules.find(s => s.id === r.scheduleId);
+        document.getElementById('reviewDetailTitle').textContent = r.productName;
+        document.getElementById('reviewDetailMeta').textContent =
+            `${getTungOrdinalLabel(r.tungNo || 1)} 리뷰 · ${formatDateString(r.date)}`
+            + `${cat ? ' · ' + cat.name : ''}${sched ? ' · ' + sched.name : ''}`
+            + `${r.editedAt ? ' · 수정됨' : ''}`;
+        document.getElementById('reviewDetailText').textContent = r.text;
+        document.getElementById('reviewDetailPhotos').innerHTML = (r.photos || [])
+            .map(pid => `<img src="${photoCache[pid] || ''}" onclick="openPhotoViewer('${pid}')">`).join('');
+        document.getElementById('reviewDetailFS').classList.add('active');
+    }
+    function closeReviewDetail() {
+        viewingReviewId = null;
+        document.getElementById('reviewDetailFS').classList.remove('active');
+    }
+    function editReviewFromDetail() {
+        const id = viewingReviewId;
+        closeReviewDetail();
+        openEditReview(id);
+    }
+    function deleteReviewFromDetail() {
+        const id = viewingReviewId;
+        closeReviewDetail();
+        deleteReview(id);
+    }
+    function shareReviewFromDetail() {
+        if (viewingReviewId != null) shareReview(viewingReviewId);
+    }
+
+    // 달력에서 텅 기록을 눌렀을 때: 리뷰가 있으면 상세보기, 없으면 바로 작성 모달
+    function openTungReview(productId, tungNo, tungDate) {
+        const r = (tungNo != null)
+            ? reviews.find(rv => rv.productId === productId && rv.tungNo === tungNo)
+            : null;
+        if (r) { openReviewDetail(r.id); return; }
+        const p = products.find(x => x.id === productId);
+        if (!p) { showToast('⚠️ 제품을 찾을 수 없어요'); return; }
+        openReviewModal(productId, p.name, tungNo || 1, tungDate);
+    }
+
     // ── 리뷰 사진 (작성/수정 공용) ──
     // mode: 'new' = 새 리뷰 작성 모달, 'edit' = 수정 모달
     let reviewWorkingPhotos = [];        // 작성 중 사진 id
@@ -2799,9 +2880,12 @@
     // ── 상품평 (텅 비운 직후 입력) ──
     let pendingReviewProductId = null;
     let pendingReviewTungNo = 1;
-    function openReviewModal(productId, productName, tungNo) {
+    let pendingReviewDate = null;   // 과거 텅에 리뷰 작성 시 사용할 날짜
+    function openReviewModal(productId, productName, tungNo, tungDate) {
         pendingReviewProductId = productId;
         pendingReviewTungNo = tungNo || 1;
+        // 달력에서 과거 텅에 리뷰를 쓰는 경우, 오늘이 아니라 그 텅의 날짜로 기록해야 한다
+        pendingReviewDate = (typeof tungDate === 'number') ? tungDate : null;
         document.getElementById('reviewModalTitle').textContent = `"${productName}" ${getTungOrdinalLabel(pendingReviewTungNo)}! 상품평을 남겨볼까요?`;
         document.getElementById('reviewTextInput').value = '';
         reviewWorkingPhotos = [];
@@ -2815,6 +2899,7 @@
         reviewWorkingPhotos = [];
         renderReviewPhotos('new');
         pendingReviewProductId = null;
+        pendingReviewDate = null;
         document.getElementById('reviewOverlay').classList.remove('active');
     }
     function saveReview() {
@@ -2828,7 +2913,7 @@
             categoryId: p.categoryId,
             scheduleId: p.targetScheduleId,
             text: text,
-            date: getTodayTimeline(),
+            date: pendingReviewDate != null ? pendingReviewDate : getTodayTimeline(),
             tungNo: pendingReviewTungNo,
             photos: reviewWorkingPhotos.slice()
         });
@@ -3583,10 +3668,13 @@
         if (!detail || !content) return;
 
         // 공병
+        // 리뷰로 연결하려면 제품명만으론 부족 — productId + tungNo가 리뷰를 특정하는 키다
         const tungs = [];
         products.forEach(p => {
             (p.tungHistory||[]).forEach(h => {
-                if (formatDateString(h.date) === dateStr) tungs.push(p.name);
+                if (formatDateString(h.date) === dateStr) {
+                    tungs.push({ id: p.id, name: p.name, tungNo: h.tungNo, date: h.date });
+                }
             });
         });
 
@@ -3624,7 +3712,19 @@
         }
         if (tungs.length > 0) {
             html += `<div style="margin-bottom:8px;"><div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:4px;">🩷 공병(텅)</div>`;
-            html += tungs.map(n => `<div style="font-size:12px;color:#555;padding:2px 0;">• ${n}</div>`).join('');
+            html += tungs.map(t => {
+                const rv = (t.tungNo != null)
+                    ? reviews.find(r => r.productId === t.id && r.tungNo === t.tungNo)
+                    : null;
+                const hasPhoto = rv && rv.photos && rv.photos.length;
+                const badge = rv
+                    ? `<span style="font-size:10px;color:#E8894A;">리뷰 보기${hasPhoto ? ' 📷' : ''} ›</span>`
+                    : `<span style="font-size:10px;color:#BBB;">리뷰 쓰기 ›</span>`;
+                return `<div onclick="openTungReview(${t.id}, ${t.tungNo == null ? 'null' : t.tungNo}, ${t.date})"
+                            style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;color:#555;padding:4px 0;cursor:pointer;">
+                            <span>• ${t.name}</span>${badge}
+                        </div>`;
+            }).join('');
             html += '</div>';
         }
         if (doneRoutines.length > 0) {
@@ -4121,14 +4221,17 @@
                     <div class="review-card-top">
                         <span class="review-prod-name">${r.productName} <span style="color:var(--primary, #FF5A5F); font-size:11px;">· ${ordinalLabel} 리뷰</span></span>
                         <div style="display:flex; gap:6px;">
-                            <button class="btn-del-action" style="background:#F0F0F0; color:#555;" onclick="shareReview(${r.id})">공유</button>
-                            <button class="btn-del-action" style="background:#F0F0F0; color:#555;" onclick="openEditReview(${r.id})">수정</button>
-                            <button class="btn-del-action" onclick="deleteReview(${r.id})">삭제</button>
+                            <button class="btn-del-action" style="background:#F0F0F0; color:#555;" onclick="event.stopPropagation(); shareReview(${r.id})">공유</button>
+                            <button class="btn-del-action" style="background:#F0F0F0; color:#555;" onclick="event.stopPropagation(); openEditReview(${r.id})">수정</button>
+                            <button class="btn-del-action" onclick="event.stopPropagation(); deleteReview(${r.id})">삭제</button>
                         </div>
                     </div>
+                    <!-- 본문 영역만 상세보기로 연결 (버튼은 위에서 stopPropagation) -->
+                    <div onclick="openReviewDetail(${r.id})" style="cursor:pointer;">
                     <div class="review-meta">${cat ? cat.name : '카테고리 없음'} ${sched ? '· ' + sched.name : ''} · ${formatDateString(r.date)}${editedMark}</div>
                     <div class="review-text">${r.text}</div>
-                    ${(r.photos && r.photos.length) ? `<div class="review-photos">${r.photos.map(pid => `<img src="${photoCache[pid] || ''}" onclick="openPhotoViewer('${pid}')">`).join('')}</div>` : ''}
+                    ${(r.photos && r.photos.length) ? `<div class="review-photos">${r.photos.map(pid => `<img src="${photoCache[pid] || ''}" onclick="event.stopPropagation(); openPhotoViewer('${pid}')">`).join('')}</div>` : ''}
+                    </div>
                 </div>
             `;
         }).join('');
