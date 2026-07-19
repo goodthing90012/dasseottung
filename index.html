@@ -77,6 +77,8 @@
         .prod-status { font-size: 12px; color: #555; line-height: 1.4; margin-top: 6px; }
         .prod-used { font-size: 11px; color: var(--used-purple); font-weight: bold; margin-top: 2px; }
 
+        #photoViewer { overscroll-behavior: contain; touch-action: none; }
+        .review-fs-body { overscroll-behavior: contain; }
         .pv-close { position: absolute; top: 14px; right: 14px; z-index: 3; background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 20px; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; line-height: 1; }
         .pv-stage { position: relative; width: 100%; flex: 1; display: flex; align-items: center; justify-content: center; }
         .pv-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 3; background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 26px; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; line-height: 1; display: none; }
@@ -2827,10 +2829,14 @@
         document.getElementById('reviewDetailPhotos').innerHTML = dPhotos
             .map(pid => `<img src="${photoCache[pid] || ''}" onclick="openPhotoViewer('${pid}','${dList}')">`).join('');
         document.getElementById('reviewDetailFS').classList.add('active');
+        lockBodyScroll();
     }
     function closeReviewDetail() {
+        const el = document.getElementById('reviewDetailFS');
+        if (!el.classList.contains('active')) return;
         viewingReviewId = null;
-        document.getElementById('reviewDetailFS').classList.remove('active');
+        el.classList.remove('active');
+        unlockBodyScroll();
     }
     function editReviewFromDetail() {
         const id = viewingReviewId;
@@ -2923,6 +2929,7 @@
         viewerIndex = Math.max(0, viewerPhotos.indexOf(pid));
         renderPhotoViewer();
         document.getElementById('photoViewer').classList.add('active');
+        lockBodyScroll();
     }
     function renderPhotoViewer() {
         const pid = viewerPhotos[viewerIndex];
@@ -2937,6 +2944,35 @@
         viewerIndex = (viewerIndex + dir + viewerPhotos.length) % viewerPhotos.length;
         renderPhotoViewer();
     }
+    // ── 배경 스크롤 잠금 ──
+    // 전체화면 오버레이가 떠 있을 때 뒤 화면이 스크롤되면 시선이 흔들린다.
+    // 상세보기 위에 사진 뷰어가 겹쳐 열리므로, 깊이를 세어 마지막 하나가 닫힐 때만 푼다.
+    let _scrollLockDepth = 0, _scrollLockY = 0;
+    function lockBodyScroll() {
+        if (_scrollLockDepth === 0) {
+            _scrollLockY = window.scrollY || window.pageYOffset || 0;
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${_scrollLockY}px`;
+            document.body.style.left = '0';
+            document.body.style.right = '0';
+            document.body.style.width = '100%';
+            document.body.style.overflow = 'hidden';
+        }
+        _scrollLockDepth++;
+    }
+    function unlockBodyScroll() {
+        _scrollLockDepth = Math.max(0, _scrollLockDepth - 1);
+        if (_scrollLockDepth === 0) {
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.left = '';
+            document.body.style.right = '';
+            document.body.style.width = '';
+            document.body.style.overflow = '';
+            window.scrollTo(0, _scrollLockY);   // 보던 위치로 정확히 복귀
+        }
+    }
+
     // 터치로 닫은 직후 지연 발생하는 클릭 1회를 캡처 단계에서 흡수 (기기별 편차 대비)
     function swallowNextClick() {
         const killer = (ev) => {
@@ -2948,7 +2984,10 @@
     }
 
     function closePhotoViewer() {
-        document.getElementById('photoViewer').classList.remove('active');
+        const el = document.getElementById('photoViewer');
+        if (!el.classList.contains('active')) return;   // 중복 호출 시 잠금이 어긋나지 않게
+        el.classList.remove('active');
+        unlockBodyScroll();
     }
     // 좌우 스와이프로 넘기기 / 그냥 탭하면 닫기
     (function initPhotoSwipe() {
@@ -4630,7 +4669,10 @@
     function closeTopOverlay() {
         const confirms = document.querySelectorAll('.confirm-overlay.active');
         if (confirms.length) {
-            confirms[confirms.length - 1].classList.remove('active');
+            const top = confirms[confirms.length - 1];
+            // 사진 뷰어는 스크롤 잠금을 쓰므로 반드시 전용 닫기 함수를 거쳐야 잠금이 풀린다
+            if (top.id === 'photoViewer') { closePhotoViewer(); return true; }
+            top.classList.remove('active');
             return true;
         }
         // 리뷰 상세보기(전체화면)는 confirm-overlay보다 아래 레이어이므로 그다음에 닫는다
