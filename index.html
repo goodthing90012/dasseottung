@@ -102,6 +102,12 @@
         .review-fs-photos img { width: 100px; height: 100px; object-fit: cover; border-radius: 10px; cursor: pointer; }
         .review-fs-footer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #eee; flex-shrink: 0; }
         .review-fs-btn { flex: 1; padding: 12px 0; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; background: #F1F3F5; color: #555; }
+        .memo-view-btn { flex:1; padding:7px 0; font-size:12px; font-weight:700; color:#888; background:#F1F3F5; border:1.5px solid transparent; border-radius:9px; cursor:pointer; }
+        .memo-view-btn.active { background:#FFF0F1; color:var(--primary); border-color:var(--primary); }
+        .rep-mode-btn { flex:1; padding:7px 0; font-size:12px; font-weight:700; color:#888; background:#F1F3F5; border:1.5px solid transparent; border-radius:8px; cursor:pointer; }
+        .rep-mode-btn.active { background:#FFF0F1; color:var(--primary); border-color:var(--primary); }
+        .dow-btn { flex:1; padding:7px 0; font-size:12px; font-weight:700; color:#999; background:#F8F9FA; border:1.5px solid #eee; border-radius:8px; cursor:pointer; }
+        .dow-btn.on { background:#FFF0F1; color:var(--primary); border-color:var(--primary); }
         .photo-thumb { position: relative; width: 64px; height: 64px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
         .photo-thumb img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
         .photo-thumb .del { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,0.6); color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -321,6 +327,38 @@
                 style="width:100%; border:1px solid #ddd; border-radius:8px; padding:7px 10px; font-size:12px; box-sizing:border-box; margin-bottom:6px; resize:none; font-family:inherit; overflow:hidden;"
                 oninput="this.style.height='auto'; this.style.height=this.scrollHeight+'px'; filterRoutineProductPicker('editRoutineProductPicker', 'editRoutineProductSearch', 'edit-routine-product-pick')"></textarea>
             <div id="editRoutineProductPicker" style="display:flex; flex-direction:column; margin-bottom:12px; max-height:180px; overflow-y:auto; border:1px solid #eee; border-radius:10px; padding:0 8px;"></div>
+                <div class="form-group">
+                    <label>반복 설정</label>
+                    <div style="display:flex; gap:6px; margin-bottom:8px;">
+                        <button type="button" class="rep-mode-btn active" data-mode="daily" onclick="setRepeatMode('editRoutine','daily')">매일</button>
+                        <button type="button" class="rep-mode-btn" data-mode="weekdays" onclick="setRepeatMode('editRoutine','weekdays')">특정 요일</button>
+                        <button type="button" class="rep-mode-btn" data-mode="cycle" onclick="setRepeatMode('editRoutine','cycle')">주기</button>
+                    </div>
+                    <div id="editRoutineWeekdaysBox" style="display:none;">
+                        <div style="display:flex; gap:4px;">
+                            <button type="button" class="dow-btn" data-dow="0" onclick="toggleDow('editRoutine',0)">일</button><button type="button" class="dow-btn" data-dow="1" onclick="toggleDow('editRoutine',1)">월</button><button type="button" class="dow-btn" data-dow="2" onclick="toggleDow('editRoutine',2)">화</button><button type="button" class="dow-btn" data-dow="3" onclick="toggleDow('editRoutine',3)">수</button><button type="button" class="dow-btn" data-dow="4" onclick="toggleDow('editRoutine',4)">목</button><button type="button" class="dow-btn" data-dow="5" onclick="toggleDow('editRoutine',5)">금</button><button type="button" class="dow-btn" data-dow="6" onclick="toggleDow('editRoutine',6)">토</button>
+                        </div>
+                        <div style="font-size:10px; color:#aaa; margin-top:5px;">선택한 요일에만 이 루틴이 떠요</div>
+                    </div>
+                    <div id="editRoutineCycleBox" style="display:none;">
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <select id="editRoutineCycleWeeks" onchange="syncCycleWeeksInput('editRoutine')" style="flex:1; border:1px solid #ddd; border-radius:8px; padding:7px; font-size:12px;">
+                                <option value="1">매주</option>
+                                <option value="2">격주</option>
+                                <option value="custom">직접 입력</option>
+                            </select>
+                            <select id="editRoutineCycleWeekday" style="flex:1; border:1px solid #ddd; border-radius:8px; padding:7px; font-size:12px;">
+                                <option value="0">일요일 마감</option><option value="1">월요일 마감</option><option value="2">화요일 마감</option><option value="3">수요일 마감</option><option value="4">목요일 마감</option><option value="5">금요일 마감</option><option value="6">토요일 마감</option>
+                            </select>
+                        </div>
+                        <div id="editRoutineCycleWeeksCustom" style="display:none; align-items:center; gap:6px; margin-top:6px;">
+                            <input type="number" id="editRoutineCycleWeeksInput" min="3" max="52" placeholder="3" inputmode="numeric"
+                                style="width:70px; border:1px solid #ddd; border-radius:8px; padding:7px; font-size:12px;">
+                            <span style="font-size:12px; color:#666;">주마다</span>
+                        </div>
+                        <div style="font-size:10px; color:#aaa; margin-top:5px;">주기 안에 한 번만 하면 돼요. 마감일 전엔 미완료로 잡히지 않아요 (예: 각질제거, 팩)</div>
+                    </div>
+                </div>
             <div style="display:flex; gap:8px;">
                 <button class="confirm-btn no" onclick="cancelEditRoutine()">취소</button>
                 <button class="confirm-btn yes" onclick="saveEditRoutine()">저장</button>
@@ -345,6 +383,25 @@
             </div>
         </div>
     </div>
+    <!-- 메모 모아보기 (전체화면) -->
+    <div class="review-fs" id="memoBoardFS">
+        <div class="review-fs-header">
+            <div class="review-fs-top">
+                <span class="review-fs-label">📝 메모 모아보기</span>
+                <button class="review-fs-close" onclick="closeMemoBoard()">✕</button>
+            </div>
+            <div class="review-fs-meta" id="memoBoardCount" style="margin-top:6px;"></div>
+            <div style="display:flex; gap:6px; margin-top:10px;">
+                <button type="button" class="memo-view-btn active" data-view="date" onclick="setMemoView('date')">🗓️ 날짜순</button>
+                <button type="button" class="memo-view-btn" data-view="product" onclick="setMemoView('product')">🧴 제품별</button>
+            </div>
+            <input type="text" id="memoBoardSearch" placeholder="메모·제품명 검색"
+                oninput="renderMemoBoard()"
+                style="width:100%; box-sizing:border-box; margin-top:8px; border:1px solid #ddd; border-radius:10px; padding:9px 11px; font-size:13px;">
+        </div>
+        <div class="review-fs-body" id="memoBoardList"></div>
+    </div>
+
     <!-- 리뷰 상세보기 (전체화면) -->
     <div class="review-fs" id="reviewDetailFS">
         <div class="review-fs-header">
@@ -690,6 +747,10 @@
                 oninput="this.style.height='auto'; this.style.height=this.scrollHeight+'px'; renderProducts();"></textarea>
         </div>
 
+        <!-- 메모 모아보기는 '목록을 보는 도구'라 필터 카드 아래에 두고 왼쪽 정렬한다.
+             제품 카드의 삭제 버튼이 오른쪽 위에 있어, 오른쪽 정렬하면 오탭 위험이 있다. -->
+        <button onclick="openMemoBoard()" style="display:inline-flex; align-items:center; gap:5px; background:#F8F9FA; border:1px solid #E9ECEF; border-radius:9px; color:#666; font-size:11px; font-weight:700; padding:7px 11px; cursor:pointer; white-space:nowrap; margin-bottom:14px;">📝 메모 모아보기</button>
+
         <div class="section-title">내 화장대 재고 현황 <span id="productCount" style="font-size:12px; color:#999; font-weight:normal;"></span></div>
         <div id="productList"></div>
     </div>
@@ -747,6 +808,38 @@
                         style="width:100%; border:1px solid var(--light-gray); border-radius:10px; padding:8px 10px; font-size:13px; box-sizing:border-box; margin-bottom:8px; resize:none; font-family:inherit; overflow:hidden;"
                         oninput="this.style.height='auto'; this.style.height=this.scrollHeight+'px'; filterRoutineProductPicker('routineProductPicker', 'routineProductSearch', 'routine-product-pick')"></textarea>
                     <div id="routineProductPicker" style="display:flex; flex-direction:column; max-height:180px; overflow-y:auto; border:1px solid #eee; border-radius:10px; padding:0 8px;"></div>
+                </div>
+                <div class="form-group">
+                    <label>반복 설정</label>
+                    <div style="display:flex; gap:6px; margin-bottom:8px;">
+                        <button type="button" class="rep-mode-btn active" data-mode="daily" onclick="setRepeatMode('newRoutine','daily')">매일</button>
+                        <button type="button" class="rep-mode-btn" data-mode="weekdays" onclick="setRepeatMode('newRoutine','weekdays')">특정 요일</button>
+                        <button type="button" class="rep-mode-btn" data-mode="cycle" onclick="setRepeatMode('newRoutine','cycle')">주기</button>
+                    </div>
+                    <div id="newRoutineWeekdaysBox" style="display:none;">
+                        <div style="display:flex; gap:4px;">
+                            <button type="button" class="dow-btn" data-dow="0" onclick="toggleDow('newRoutine',0)">일</button><button type="button" class="dow-btn" data-dow="1" onclick="toggleDow('newRoutine',1)">월</button><button type="button" class="dow-btn" data-dow="2" onclick="toggleDow('newRoutine',2)">화</button><button type="button" class="dow-btn" data-dow="3" onclick="toggleDow('newRoutine',3)">수</button><button type="button" class="dow-btn" data-dow="4" onclick="toggleDow('newRoutine',4)">목</button><button type="button" class="dow-btn" data-dow="5" onclick="toggleDow('newRoutine',5)">금</button><button type="button" class="dow-btn" data-dow="6" onclick="toggleDow('newRoutine',6)">토</button>
+                        </div>
+                        <div style="font-size:10px; color:#aaa; margin-top:5px;">선택한 요일에만 이 루틴이 떠요</div>
+                    </div>
+                    <div id="newRoutineCycleBox" style="display:none;">
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <select id="newRoutineCycleWeeks" onchange="syncCycleWeeksInput('newRoutine')" style="flex:1; border:1px solid #ddd; border-radius:8px; padding:7px; font-size:12px;">
+                                <option value="1">매주</option>
+                                <option value="2">격주</option>
+                                <option value="custom">직접 입력</option>
+                            </select>
+                            <select id="newRoutineCycleWeekday" style="flex:1; border:1px solid #ddd; border-radius:8px; padding:7px; font-size:12px;">
+                                <option value="0">일요일 마감</option><option value="1">월요일 마감</option><option value="2">화요일 마감</option><option value="3">수요일 마감</option><option value="4">목요일 마감</option><option value="5">금요일 마감</option><option value="6">토요일 마감</option>
+                            </select>
+                        </div>
+                        <div id="newRoutineCycleWeeksCustom" style="display:none; align-items:center; gap:6px; margin-top:6px;">
+                            <input type="number" id="newRoutineCycleWeeksInput" min="3" max="52" placeholder="3" inputmode="numeric"
+                                style="width:70px; border:1px solid #ddd; border-radius:8px; padding:7px; font-size:12px;">
+                            <span style="font-size:12px; color:#666;">주마다</span>
+                        </div>
+                        <div style="font-size:10px; color:#aaa; margin-top:5px;">주기 안에 한 번만 하면 돼요. 마감일 전엔 미완료로 잡히지 않아요 (예: 각질제거, 팩)</div>
+                    </div>
                 </div>
                 <button class="btn-save" onclick="addRoutine()">루틴 저장</button>
             </div>
@@ -1464,6 +1557,19 @@
         totalTungCount = products.reduce((sum, p) => sum + (p.tungHistory || []).length, 0);
     }
 
+    // [마이그레이션] 메모에 고유 id 부여.
+    // 기존엔 배열 순번(index)으로 삭제해서, 메모를 날짜순으로 모아 보여주면
+    // 순번이 어긋나 엉뚱한 메모가 지워졌다. id 기준으로 바꾸기 위한 사전 작업.
+    function migrateMemoIds() {
+        let seq = 0;
+        (products || []).forEach(p => {
+            (p.memos || []).forEach(m => {
+                if (!m.id) m.id = 'm' + Date.now() + '_' + (seq++);
+            });
+        });
+    }
+    migrateMemoIds();
+
     // [마이그레이션] 과거 루틴 기록에 '그날 루틴 구성' 스냅샷(requiredIds)이 없으면
     // 그날 체크한 목록으로 채워둠 → 이후 루틴 구성을 바꿔도 과거 판정·표시가 안 흔들림
     function migrateRoutineSnapshots() {
@@ -1638,6 +1744,28 @@
 
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
+        {
+            version: 'v2.9.0',
+            date: '2026.07',
+            title: '메모 모아보기',
+            items: [
+                '📝 내 화장대에서 제품에 남긴 메모를 한 화면에 모아볼 수 있어요',
+                '🗓️ 날짜순 / 제품별 묶음 중 원하는 방식으로 볼 수 있어요',
+                '🔍 메모 내용과 제품명으로 검색할 수 있어요 (예: \'재구매\')',
+                '🛠️ 메모 삭제가 더 정확해졌어요'
+            ]
+        },
+        {
+            version: 'v2.8.0',
+            date: '2026.07',
+            title: '루틴 반복 설정',
+            items: [
+                '🔄 주기 루틴 추가 — 각질제거·팩처럼 주 1회 쓰는 제품은 주기 안에 한 번만 하면 돼요',
+                '📅 요일 루틴 추가 — 선크림은 평일만, 팩은 주말만처럼 요일을 정할 수 있어요',
+                '⭐ 주기 루틴은 마감일 전까지 미완료로 잡히지 않아서 올클리어가 억울하게 깨지지 않아요',
+                '🔒 반복 설정은 정한 날부터 적용돼요 — 지난 달력 기록은 그대로예요'
+            ]
+        },
         {
             version: 'v2.7.0',
             date: '2026.07',
@@ -2186,11 +2314,11 @@
                         <button class="btn-qty" onclick="adjustStock(${p.id}, 1)">+</button>
                     </div>
                     <div style="margin-top:8px; border-top:1px dashed #F0F0F0; padding-top:7px;">
-                        ${(p.memos && p.memos.length > 0) ? p.memos.map((m, idx) => `
+                        ${(p.memos && p.memos.length > 0) ? p.memos.map((m) => `
                             <div style="display:flex; align-items:flex-start; gap:4px; margin-bottom:4px;">
                                 <span style="font-size:11px; color:#888; white-space:nowrap; flex-shrink:0;">${m.date ? '📅 ' + m.date : '📝'}</span>
                                 <span style="font-size:11px; color:#555; flex:1; word-break:break-all;">${m.text}</span>
-                                <button onclick="deleteMemo(${p.id}, ${idx})" style="background:none; border:none; color:#CCC; font-size:11px; cursor:pointer; padding:0; flex-shrink:0;">✕</button>
+                                <button onclick="deleteMemo(${p.id}, '${m.id}')" style="background:none; border:none; color:#CCC; font-size:11px; cursor:pointer; padding:0; flex-shrink:0;">✕</button>
                             </div>
                         `).join('') : ''}
                         <button onclick="openMemoModal(${p.id})" style="background:none; border:1px dashed #DDD; border-radius:8px; color:#AAA; font-size:11px; padding:3px 10px; cursor:pointer; margin-top:${(p.memos && p.memos.length > 0) ? '2' : '0'}px;">+ 메모 추가</button>
@@ -3271,15 +3399,120 @@
         const p = products.find(prod => prod.id === memoTargetId);
         if (!p) return;
         if (!p.memos) p.memos = [];
-        p.memos.push({ date, text });
+        p.memos.push({ id: 'm' + Date.now(), date, text });
         closeMemoModal();
         saveToStorage();
         syncAllAndRender();
         showToast('📝 메모가 추가됐어요');
     }
+    // ══════════ 메모 모아보기 ══════════
+    // 제품에 흩어진 메모를 날짜순으로 한데 모아 본다. 각 메모에 제품명 배지를 붙인다.
+    function collectMemos() {
+        const out = [];
+        (products || []).forEach(p => {
+            (p.memos || []).forEach(m => {
+                out.push({
+                    id: m.id, text: m.text, date: m.date || '',
+                    productId: p.id, productName: p.name, archived: !!p.archived
+                });
+            });
+        });
+        // 날짜 있는 것 먼저 최신순, 날짜 없는 것은 뒤로
+        return out.sort((a, b) => {
+            if (!a.date && !b.date) return 0;
+            if (!a.date) return 1;
+            if (!b.date) return -1;
+            return b.date.localeCompare(a.date);
+        });
+    }
+    let memoBoardView = 'date';   // 'date' = 날짜순, 'product' = 제품별 묶음
+    function setMemoView(v) {
+        memoBoardView = v;
+        document.querySelectorAll('.memo-view-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.view === v));
+        renderMemoBoard();
+    }
+    function openMemoBoard() {
+        const s = document.getElementById('memoBoardSearch');
+        if (s) s.value = '';
+        setMemoView(memoBoardView);   // 버튼 상태를 현재 보기와 맞춤
+        renderMemoBoard();
+        document.getElementById('memoBoardFS').classList.add('active');
+        lockBodyScroll();
+    }
+    function closeMemoBoard() {
+        const el = document.getElementById('memoBoardFS');
+        if (!el.classList.contains('active')) return;
+        el.classList.remove('active');
+        unlockBodyScroll();
+    }
+    function renderMemoBoard() {
+        const listEl = document.getElementById('memoBoardList');
+        const cntEl = document.getElementById('memoBoardCount');
+        if (!listEl) return;
+        const q = (document.getElementById('memoBoardSearch')?.value || '').trim().toLowerCase();
+        const all = collectMemos();
+        const rows = q
+            ? all.filter(m => m.text.toLowerCase().includes(q) || m.productName.toLowerCase().includes(q))
+            : all;
+
+        if (cntEl) cntEl.textContent = all.length === 0 ? '' :
+            (q ? `${rows.length}개 찾음 (전체 ${all.length}개)` : `전체 ${all.length}개`);
+
+        if (rows.length === 0) {
+            listEl.innerHTML = all.length === 0
+                ? `<div style="text-align:center; color:#BBB; font-size:13px; padding:40px 0; line-height:1.7;">아직 메모가 없어요<br><span style="font-size:11px;">내 화장대에서 제품 카드의 \'+ 메모 추가\'를 눌러보세요</span></div>`
+                : `<div style="text-align:center; color:#BBB; font-size:13px; padding:40px 0;">검색 결과가 없어요</div>`;
+            return;
+        }
+        // showBadge: 제품별 보기에선 그룹 헤더에 제품명이 있으므로 배지를 생략
+        const card = (m, showBadge) => `
+            <div style="background:#fff; border:1px solid #F1F3F5; border-radius:12px; padding:12px 13px; margin-bottom:9px;">
+                <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+                    ${showBadge ? `<span style="font-size:10px; font-weight:800; color:var(--primary); background:#FFF0F2; padding:3px 8px; border-radius:7px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.productName}${m.archived ? ' (보관)' : ''}</span>` : ''}
+                    ${m.date ? `<span style="font-size:10px; color:#AAA;">📅 ${m.date}</span>` : `<span style="font-size:10px; color:#CCC;">날짜 없음</span>`}
+                    <button onclick="deleteMemoFromBoard(${m.productId}, '${m.id}')"
+                        style="margin-left:auto; background:none; border:none; color:#CCC; font-size:12px; cursor:pointer; padding:0 2px;">✕</button>
+                </div>
+                <div style="font-size:13px; color:#333; line-height:1.6; word-break:break-word; white-space:pre-wrap;">${m.text}</div>
+            </div>`;
+
+        if (memoBoardView === 'product') {
+            // 제품별 묶음: 최근 메모가 있는 제품이 위로 (활동 중인 제품이 먼저 보이게)
+            const groups = new Map();
+            rows.forEach(m => {
+                if (!groups.has(m.productId)) groups.set(m.productId, { name: m.productName, archived: m.archived, items: [] });
+                groups.get(m.productId).items.push(m);
+            });
+            const ordered = [...groups.entries()].sort((a, b) => {
+                const la = a[1].items[0]?.date || '';
+                const lb = b[1].items[0]?.date || '';
+                if (!la && !lb) return 0;
+                if (!la) return 1;
+                if (!lb) return -1;
+                return lb.localeCompare(la);
+            });
+            listEl.innerHTML = ordered.map(([pid, g]) => `
+                <div style="margin-bottom:16px;">
+                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:7px;">
+                        <span style="font-size:13px; font-weight:800; color:#333;">${g.name}${g.archived ? ' <span style="font-size:10px; color:#AAA; font-weight:600;">(보관)</span>' : ''}</span>
+                        <span style="font-size:10px; color:#BBB; font-weight:700;">${g.items.length}개</span>
+                    </div>
+                    ${g.items.map(m => card(m, false)).join('')}
+                </div>`).join('');
+        } else {
+            listEl.innerHTML = rows.map(m => card(m, true)).join('');
+        }
+    }
+    // 보드에서 삭제해도 목록이 바로 갱신되도록 (id 기준이라 정렬과 무관하게 정확)
+    function deleteMemoFromBoard(productId, memoId) {
+        deleteMemo(productId, memoId);
+    }
+
     let pendingDeleteMemo = null;
-    function deleteMemo(productId, idx) {
-        pendingDeleteMemo = { productId, idx };
+    // memoId 기준 삭제 (정렬 순서와 무관하게 항상 정확한 메모를 지움)
+    function deleteMemo(productId, memoId) {
+        pendingDeleteMemo = { productId, memoId };
         document.getElementById('deleteMemoOverlay').classList.add('active');
     }
     function cancelDeleteMemo() {
@@ -3288,13 +3521,15 @@
     }
     function proceedDeleteMemo() {
         if (!pendingDeleteMemo) return;
-        const { productId, idx } = pendingDeleteMemo;
+        const { productId, memoId } = pendingDeleteMemo;
         const p = products.find(prod => prod.id === productId);
-        if (p && p.memos) p.memos.splice(idx, 1);
+        if (p && p.memos) p.memos = p.memos.filter(m => m.id !== memoId);
         pendingDeleteMemo = null;
         document.getElementById('deleteMemoOverlay').classList.remove('active');
         saveToStorage();
         syncAllAndRender();
+        // 메모 보드가 열려 있으면 목록도 즉시 갱신
+        if (document.getElementById('memoBoardFS')?.classList.contains('active')) renderMemoBoard();
         showToast('🗑️ 메모가 삭제됐어요');
     }
 
@@ -3364,6 +3599,120 @@
     }
 
     // [V1 정책] 해당 날짜에 루틴을 1개 이상 체크했으면 완료로 인정
+    // ══════════ 루틴 반복 규칙 (매일 / 특정 요일 / 주기) ══════════
+    // repeat: 'daily'(기본) | 'weekdays'(activeDays) | 'cycle'(cycleWeekday+cycleWeeks)
+    // scheduleFrom: 규칙이 적용되기 시작한 날. 이 날 이전은 예전처럼 '매일 필수'로 판정한다.
+    //   → 루틴 설정을 바꿔도 과거 달력이 소급해서 바뀌지 않게 하기 위함 (v2.0.0 원칙과 동일).
+    const DOW_LABELS = ['일','월','화','수','목','금','토'];
+
+    function dateStrToDate(dateStr) {
+        const [y, m, d] = dateStr.split('-').map(Number);
+        return new Date(y, m - 1, d);
+    }
+    function addDaysStr(dateStr, n) {
+        const d = dateStrToDate(dateStr);
+        d.setDate(d.getDate() + n);
+        return formatDateString(d.getTime());
+    }
+    function dowOf(dateStr) { return dateStrToDate(dateStr).getDay(); }
+
+    function routineRepeatMode(r) {
+        if (!r) return 'daily';
+        if (r.repeat === 'cycle' && typeof r.cycleWeekday === 'number') return 'cycle';
+        if (r.repeat === 'weekdays' && Array.isArray(r.activeDays)) return 'weekdays';
+        return 'daily';
+    }
+    // 규칙이 이 날짜에 효력이 있는가 (설정 이전 과거는 건드리지 않는다)
+    function routineRuleApplies(r, dateStr) {
+        if (routineRepeatMode(r) === 'daily') return false;
+        if (!r.scheduleFrom) return false;
+        return dateStr >= r.scheduleFrom;
+    }
+    function routineCycleWeeks(r) {
+        const n = parseInt(r && r.cycleWeeks, 10);
+        return (n && n > 0) ? n : 1;
+    }
+    // dateStr이 속한 주기 창 {start, end}
+    // cycleWeekday는 '마감 요일' = 창의 마지막 날. scheduleFrom을 기준점으로 창이 밀리지 않게 고정한다.
+    function cycleWindow(r, dateStr) {
+        const span = routineCycleWeeks(r) * 7;
+        const from = r.scheduleFrom;
+        // scheduleFrom 이후(당일 포함) 첫 마감 요일 = 첫 창의 끝
+        let firstEnd = from;
+        for (let i = 0; i < 7; i++) {
+            if (dowOf(firstEnd) === r.cycleWeekday) break;
+            firstEnd = addDaysStr(firstEnd, 1);
+        }
+        let end;
+        if (dateStr <= firstEnd) {
+            end = firstEnd;
+        } else {
+            const diff = Math.round((dateStrToDate(dateStr) - dateStrToDate(firstEnd)) / 86400000);
+            end = addDaysStr(firstEnd, Math.ceil(diff / span) * span);
+        }
+        let start = addDaysStr(end, -(span - 1));
+        if (start < from) start = from;   // 첫 창은 설정일부터 시작
+        return { start, end };
+    }
+    function cycleWindowStart(r, dateStr) { return cycleWindow(r, dateStr).start; }
+    function cycleWindowEnd(r, dateStr) { return cycleWindow(r, dateStr).end; }
+
+    // 그 루틴이 특정 날짜에 '완전히 체크됐는지' (그날 구성 스냅샷 기준)
+    function routineFullyCheckedOn(r, dateStr) {
+        const rec = (r.checkHistory || []).find(h => h.date === dateStr);
+        if (!rec) return false;
+        const reqSource = Array.isArray(rec.requiredIds) ? rec.requiredIds : r.productIds;
+        const req = reqSource.filter(pid => !isArchivedId(pid));
+        if (req.length === 0) return false;
+        return req.every(pid => rec.checkedProductIds.includes(pid));
+    }
+    // 현재 주기 창 안에서 이미 완료했는가
+    function routineCycleDone(r, dateStr) {
+        const start = cycleWindowStart(r, dateStr);
+        const end = cycleWindowEnd(r, dateStr);
+        return (r.checkHistory || []).some(h =>
+            h.date >= start && h.date <= end && routineFullyCheckedOn(r, h.date));
+    }
+    // 주기 창의 마지막 날인가 (이 날에만 '미완료'로 잡힌다)
+    function routineCycleDue(r, dateStr) {
+        return dateStr === cycleWindowEnd(r, dateStr);
+    }
+    // 이 날짜에 이 루틴이 대상인가 (체크리스트 노출 + 올클리어 판정 공용)
+    function routineActiveOn(r, dateStr) {
+        if (!routineRuleApplies(r, dateStr)) return true;      // 규칙 적용 전이면 예전대로 매일
+        const mode = routineRepeatMode(r);
+        if (mode === 'weekdays') return r.activeDays[dowOf(dateStr)] !== false;
+        return true;                                            // 주기 루틴은 매일 보이되 판정만 다름
+    }
+    // 올클리어 판정에서 이 루틴이 '미완료'로 발목을 잡는가
+    function routineBlocksAllClear(r, dateStr) {
+        if (!routineActiveOn(r, dateStr)) return false;         // 그날 대상 아님
+        if (routineRuleApplies(r, dateStr) && routineRepeatMode(r) === 'cycle') {
+            if (routineCycleDone(r, dateStr)) return false;      // 이번 주기 이미 완료
+            return routineCycleDue(r, dateStr);                 // 마감일에만 발목
+        }
+        const rec = (r.checkHistory || []).find(h => h.date === dateStr);
+        const reqSource = (rec && Array.isArray(rec.requiredIds)) ? rec.requiredIds : r.productIds;
+        const req = reqSource.filter(pid => !isArchivedId(pid));
+        if (req.length === 0) return false;
+        return !(rec && req.every(pid => rec.checkedProductIds.includes(pid)));
+    }
+    function routineRepeatLabel(r) {
+        const mode = routineRepeatMode(r);
+        if (mode === 'weekdays') {
+            const days = (r.activeDays || []).map((on, i) => on !== false ? DOW_LABELS[i] : null).filter(Boolean);
+            if (days.length === 7) return '매일';
+            if (days.length === 0) return '요일 미지정';
+            return days.join('·');
+        }
+        if (mode === 'cycle') {
+            const wk = routineCycleWeeks(r);
+            const pre = wk === 1 ? '매주' : wk === 2 ? '격주' : `${wk}주마다`;
+            return `${pre} ${DOW_LABELS[r.cycleWeekday]}요일 마감`;
+        }
+        return '매일';
+    }
+
     function isRoutineDayDone(dateStr) {
         return routines.some(r => {
             const rec = r.checkHistory.find(h => h.date === dateStr);
@@ -3396,14 +3745,14 @@
     // 해당 날짜에 등록된 모든 루틴 100% 완료(올클리어) 여부
     function isRoutineDayAllClear(dateStr) {
         if (routines.length === 0) return false;
-        return routines.every(r => {
-            const rec = r.checkHistory.find(h => h.date === dateStr);
-            // 그날 구성 스냅샷이 있으면 그걸 기준으로 (루틴을 나중에 바꿔도 과거는 고정)
-            const reqSource = (rec && Array.isArray(rec.requiredIds)) ? rec.requiredIds : r.productIds;
-            const req = reqSource.filter(pid => !isArchivedId(pid));
-            if (req.length === 0) return true;
-            return rec && req.every(pid => rec.checkedProductIds.includes(pid));
-        });
+        // 그날 대상인 루틴이 하나도 없으면 올클리어로 치지 않는다 (빈 날에 별이 뜨는 것 방지)
+        const targets = routines.filter(r => routineActiveOn(r, dateStr));
+        if (targets.length === 0) return false;
+        // 주기 루틴만 있고 아직 마감 전이면, 실제로 한 게 없는데 별이 뜰 수 있으므로
+        // 최소 하나는 '오늘 실제로 완료'돼야 올클리어로 인정한다.
+        const anyDoneToday = targets.some(r => routineFullyCheckedOn(r, dateStr));
+        if (!anyDoneToday) return false;
+        return targets.every(r => !routineBlocksAllClear(r, dateStr));
     }
 
     // 루틴 탭에서 선택된 날짜 (기본: 오늘). 어제까지만 이동 가능
@@ -3432,15 +3781,119 @@
         if (checked) newRoutineSelectedIds.add(id);
         else newRoutineSelectedIds.delete(id);
     }
+    // ── 반복 설정 UI 상태 (추가 폼 / 수정 모달 각각) ──
+    let repeatState = {
+        newRoutine:  { mode: 'daily', days: [true,true,true,true,true,true,true] },
+        editRoutine: { mode: 'daily', days: [true,true,true,true,true,true,true] }
+    };
+    // 주기 '직접 입력' 선택 시에만 숫자 입력칸을 보여준다
+    function syncCycleWeeksInput(prefix) {
+        const sel = document.getElementById(prefix + 'CycleWeeks');
+        const box = document.getElementById(prefix + 'CycleWeeksCustom');
+        if (!sel || !box) return;
+        box.style.display = (sel.value === 'custom') ? 'flex' : 'none';
+    }
+    // 셀렉트 + 직접 입력에서 최종 주기(주 단위)를 읽는다
+    function readCycleWeeks(prefix) {
+        const sel = document.getElementById(prefix + 'CycleWeeks');
+        if (!sel) return 1;
+        if (sel.value === 'custom') {
+            const n = parseInt(document.getElementById(prefix + 'CycleWeeksInput').value, 10);
+            return (n && n >= 3 && n <= 52) ? n : null;   // 유효하지 않으면 null → 저장 막음
+        }
+        return parseInt(sel.value, 10) || 1;
+    }
+
+    function setRepeatMode(prefix, mode) {
+        repeatState[prefix].mode = mode;
+        syncRepeatUI(prefix);
+    }
+    function toggleDow(prefix, i) {
+        const d = repeatState[prefix].days;
+        d[i] = !d[i];
+        syncRepeatUI(prefix);
+    }
+    function syncRepeatUI(prefix) {
+        const st = repeatState[prefix];
+        const scope = document.getElementById(prefix + 'WeekdaysBox')?.closest('.form-group');
+        if (!scope) return;
+        scope.querySelectorAll('.rep-mode-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.mode === st.mode));
+        document.getElementById(prefix + 'WeekdaysBox').style.display = st.mode === 'weekdays' ? 'block' : 'none';
+        document.getElementById(prefix + 'CycleBox').style.display = st.mode === 'cycle' ? 'block' : 'none';
+        scope.querySelectorAll('.dow-btn').forEach(b =>
+            b.classList.toggle('on', st.days[parseInt(b.dataset.dow, 10)] !== false));
+    }
+    // 폼 입력 → 루틴 객체에 저장할 반복 필드
+    function readRepeatFields(prefix) {
+        const st = repeatState[prefix];
+        const today = formatDateString(getTodayTimeline());
+        if (st.mode === 'weekdays') {
+            if (st.days.every(d => d === false)) {
+                showToast('요일을 하나 이상 선택해주세요');
+                return null;
+            }
+            return { repeat: 'weekdays', activeDays: st.days.slice(), cycleWeekday: null, cycleWeeks: null, scheduleFrom: today };
+        }
+        if (st.mode === 'cycle') {
+            const wk = readCycleWeeks(prefix);
+            if (wk === null) {
+                showToast('주기를 3 이상 52 이하로 입력해주세요');
+                return null;
+            }
+            return {
+                repeat: 'cycle',
+                activeDays: null,
+                cycleWeekday: parseInt(document.getElementById(prefix + 'CycleWeekday').value, 10),
+                cycleWeeks: wk,
+                scheduleFrom: today
+            };
+        }
+        return { repeat: 'daily', activeDays: null, cycleWeekday: null, cycleWeeks: null, scheduleFrom: null };
+    }
+    // 루틴 객체 → 수정 모달 폼 상태
+    function loadRepeatFields(prefix, r) {
+        const mode = routineRepeatMode(r);
+        repeatState[prefix].mode = mode;
+        repeatState[prefix].days = Array.isArray(r.activeDays) ? r.activeDays.slice() : [true,true,true,true,true,true,true];
+        const wdEl = document.getElementById(prefix + 'CycleWeekday');
+        const wkEl = document.getElementById(prefix + 'CycleWeeks');
+        if (wdEl) wdEl.value = String(typeof r.cycleWeekday === 'number' ? r.cycleWeekday : 0);
+        if (wkEl) {
+            const wk = routineCycleWeeks(r);
+            if (wk <= 2) {
+                wkEl.value = String(wk);
+            } else {
+                wkEl.value = 'custom';
+                const inp = document.getElementById(prefix + 'CycleWeeksInput');
+                if (inp) inp.value = String(wk);
+            }
+        }
+        syncCycleWeeksInput(prefix);
+        syncRepeatUI(prefix);
+    }
+    function resetRepeatUI(prefix) {
+        repeatState[prefix] = { mode: 'daily', days: [true,true,true,true,true,true,true] };
+        const sel = document.getElementById(prefix + 'CycleWeeks');
+        const inp = document.getElementById(prefix + 'CycleWeeksInput');
+        if (sel) sel.value = '1';
+        if (inp) inp.value = '';
+        syncCycleWeeksInput(prefix);
+        syncRepeatUI(prefix);
+    }
+
     function addRoutine() {
         const emoji = document.getElementById('newRoutineEmoji').value.trim() || '✅';
         const name = document.getElementById('newRoutineName').value.trim();
         if (!name) { showToast('루틴 이름을 입력해주세요'); return; }
         const selectedIds = [...newRoutineSelectedIds];
-        routines.push({ id: Date.now(), name, emoji, productIds: selectedIds, checkHistory: [] });
+        const rep = readRepeatFields('newRoutine');
+        if (!rep) return;
+        routines.push({ id: Date.now(), name, emoji, productIds: selectedIds, checkHistory: [], ...rep });
         document.getElementById('newRoutineEmoji').value = '';
         document.getElementById('newRoutineName').value = '';
         newRoutineSelectedIds = new Set();
+        resetRepeatUI('newRoutine');
         const searchEl = document.getElementById('routineProductSearch');
         if (searchEl) { searchEl.value = ''; searchEl.style.height = 'auto'; }
         saveToStorage();
@@ -3475,6 +3928,7 @@
                     <input type="checkbox" class="edit-routine-product-pick" value="${p.id}" ${editRoutineSelectedIds.has(p.id) ? 'checked' : ''} onchange="toggleEditRoutinePick(this.value, this.checked)" style="flex-shrink:0; width:16px; height:16px; accent-color:var(--primary);">
                     <span>${p.name}</span>
                 </label>`).join('');
+        loadRepeatFields('editRoutine', r);
         document.getElementById('editRoutineOverlay').classList.add('active');
     }
     function cancelEditRoutine() {
@@ -3488,7 +3942,18 @@
         // DOM 체크박스가 아니라 JS 선택 상태에서 읽음 (검색/필터 영향 없음)
         const selectedIds = [...editRoutineSelectedIds];
         const r = routines.find(rt => rt.id === editingRoutineId);
-        if (r) { r.emoji = emoji; r.name = name; r.productIds = selectedIds; }
+        const rep = readRepeatFields('editRoutine');
+        if (!rep) return;
+        if (r) {
+            r.emoji = emoji; r.name = name; r.productIds = selectedIds;
+            // 규칙이 그대로면 scheduleFrom을 갱신하지 않는다 (기존 주기 창이 밀리지 않게)
+            const sameRule = r.repeat === rep.repeat
+                && JSON.stringify(r.activeDays || null) === JSON.stringify(rep.activeDays)
+                && (r.cycleWeekday ?? null) === rep.cycleWeekday
+                && (r.cycleWeeks ?? null) === rep.cycleWeeks;
+            const keepFrom = sameRule ? r.scheduleFrom : rep.scheduleFrom;
+            Object.assign(r, rep, { scheduleFrom: keepFrom });
+        }
         cancelEditRoutine();
         saveToStorage();
         syncAllAndRender();
@@ -4184,7 +4649,11 @@
             const todayStr = selectedStr;
             const editable = isRoutineDateEditable();
             const noticeHtml = editable ? '' : `<div style="display:flex; align-items:center; gap:6px; background:#F3F4F6; color:#888; font-size:11px; font-weight:600; padding:8px 12px; border-radius:10px; margin-bottom:12px;">🔒 지난 기록은 보기 전용이에요. 체크는 오늘·어제만 할 수 있어요.</div>`;
-            listEl.innerHTML = noticeHtml + routines.map(r => {
+            // 그날 대상인 루틴만 노출 (요일 지정 루틴은 해당 요일에만)
+            const dayRoutines = routines.filter(r => routineActiveOn(r, todayStr));
+            listEl.innerHTML = dayRoutines.length === 0
+              ? noticeHtml + `<div style="text-align:center; color:#BBB; font-size:13px; padding:30px 0;">오늘은 예정된 루틴이 없어요 🌙</div>`
+              : noticeHtml + dayRoutines.map(r => {
                 const todayRecord = r.checkHistory.find(h => h.date === todayStr);
                 const checkedIds = todayRecord ? todayRecord.checkedProductIds : [];
                 // 오늘만 현재 구성(추가/삭제 즉시 반영), 어제 이하 지난 날은 '그날 구성 스냅샷'으로 고정
@@ -4243,11 +4712,30 @@
                             padding:6px 12px; border-radius:10px; white-space:nowrap;
                         ">전체체크 ✨</button>`;
 
+                // 주기 루틴이면 '이번 주기' 상태를 보여준다 (매일 미완료로 보이는 문제 해결)
+                let cycleBadge = '';
+                if (routineRuleApplies(r, todayStr) && routineRepeatMode(r) === 'cycle') {
+                    const done = routineCycleDone(r, todayStr);
+                    const due = routineCycleDue(r, todayStr);
+                    const endStr = cycleWindowEnd(r, todayStr);
+                    const daysLeft = Math.round((dateStrToDate(endStr) - dateStrToDate(todayStr)) / 86400000);
+                    const txt = done ? '✓ 이번 주기 완료'
+                              : due ? '⏰ 오늘이 마감이에요'
+                              : `이번 주기 안에 한 번 · ${daysLeft}일 남음`;
+                    const col = done ? '#1EA94A' : due ? '#E8590C' : '#888';
+                    const bgc = done ? '#EBFBEE' : due ? '#FFF4E6' : '#F5F5F5';
+                    cycleBadge = `<div style="font-size:11px; font-weight:700; color:${col}; background:${bgc}; padding:5px 9px; border-radius:8px; margin-bottom:9px; display:inline-block;">🔄 ${txt}</div>`;
+                }
+                const repeatTag = (routineRuleApplies(r, todayStr) && routineRepeatMode(r) === 'weekdays')
+                    ? `<span style="font-size:10px; color:#888; font-weight:600; background:#F1F3F5; padding:2px 6px; border-radius:6px; margin-left:5px;">${routineRepeatLabel(r)}</span>`
+                    : '';
+
                 return `<div style="background:white; border-radius:14px; padding:14px; margin-bottom:12px; box-shadow:0 1px 6px rgba(0,0,0,0.06); ${allDone ? 'border:1.5px solid #1EA94A;' : ''}">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <span style="font-size:15px; font-weight:bold;">${r.emoji} ${r.name} <span style="font-size:12px; color:#aaa; font-weight:normal;">${activeIds.length}개</span></span>
+                        <span style="font-size:15px; font-weight:bold;">${r.emoji} ${r.name} <span style="font-size:12px; color:#aaa; font-weight:normal;">${activeIds.length}개</span>${repeatTag}</span>
                         ${allCheckBtn}
                     </div>
+                    ${cycleBadge}
                     ${productsHtml}
                 </div>`;
             }).join('');
@@ -4299,9 +4787,12 @@
                 const p = products.find(prod => prod.id === pid);
                 return (p && !p.archived) ? p.name : '';
             }).filter(Boolean).join(', ') || '연결된 제품 없음';
+            const mode = routineRepeatMode(r);
+            const repTag = mode === 'daily' ? ''
+                : `<span style="font-size:10px; font-weight:700; color:${mode === 'cycle' ? '#E8590C' : '#666'}; background:${mode === 'cycle' ? '#FFF4E6' : '#F1F3F5'}; padding:2px 6px; border-radius:6px; margin-left:5px;">${mode === 'cycle' ? '🔄 ' : '📅 '}${routineRepeatLabel(r)}</span>`;
             return `<div class="list-item-card" style="padding:10px 14px;">
                 <div style="flex:1;">
-                    <strong>${r.emoji} ${r.name}</strong>
+                    <strong>${r.emoji} ${r.name}</strong>${repTag}
                     <div style="font-size:11px; color:#AAA; margin-top:2px;">${productNames}</div>
                 </div>
                 <div style="display:flex; gap:6px;">
@@ -4767,6 +5258,11 @@
             closeReviewDetail();
             return true;
         }
+        const memoFS = document.getElementById('memoBoardFS');
+        if (memoFS && memoFS.classList.contains('active')) {
+            closeMemoBoard();
+            return true;
+        }
         const popups = ['dashProductPopup', 'appIntroPopup', 'updateHistoryPopup'];
         for (let i = 0; i < popups.length; i++) {
             const el = document.getElementById(popups[i]);
@@ -4780,6 +5276,7 @@
     function isAnyOverlayOpen() {
         if (document.querySelector('.confirm-overlay.active')) return true;
         if (document.getElementById('reviewDetailFS')?.classList.contains('active')) return true;
+        if (document.getElementById('memoBoardFS')?.classList.contains('active')) return true;
         const popups = ['dashProductPopup', 'appIntroPopup', 'updateHistoryPopup'];
         return popups.some(id => {
             const el = document.getElementById(id);
