@@ -336,7 +336,7 @@
                     </div>
                     <div id="editRoutineWeekdaysBox" style="display:none;">
                         <div style="display:flex; gap:4px;">
-                            <button type="button" class="dow-btn" data-dow="0" onclick="toggleDow('editRoutine',0)">일</button><button type="button" class="dow-btn" data-dow="1" onclick="toggleDow('editRoutine',1)">월</button><button type="button" class="dow-btn" data-dow="2" onclick="toggleDow('editRoutine',2)">화</button><button type="button" class="dow-btn" data-dow="3" onclick="toggleDow('editRoutine',3)">수</button><button type="button" class="dow-btn" data-dow="4" onclick="toggleDow('editRoutine',4)">목</button><button type="button" class="dow-btn" data-dow="5" onclick="toggleDow('editRoutine',5)">금</button><button type="button" class="dow-btn" data-dow="6" onclick="toggleDow('editRoutine',6)">토</button>
+                            <button type="button" class="dow-btn" data-dow="1" onclick="toggleDow('editRoutine',1)">월</button><button type="button" class="dow-btn" data-dow="2" onclick="toggleDow('editRoutine',2)">화</button><button type="button" class="dow-btn" data-dow="3" onclick="toggleDow('editRoutine',3)">수</button><button type="button" class="dow-btn" data-dow="4" onclick="toggleDow('editRoutine',4)">목</button><button type="button" class="dow-btn" data-dow="5" onclick="toggleDow('editRoutine',5)">금</button><button type="button" class="dow-btn" data-dow="6" onclick="toggleDow('editRoutine',6)">토</button><button type="button" class="dow-btn" data-dow="0" onclick="toggleDow('editRoutine',0)">일</button>
                         </div>
                         <div style="font-size:10px; color:#aaa; margin-top:5px;">선택한 요일에만 이 루틴이 떠요</div>
                     </div>
@@ -348,7 +348,7 @@
                                 <option value="custom">직접 입력</option>
                             </select>
                             <select id="editRoutineCycleWeekday" style="flex:1; border:1px solid #ddd; border-radius:8px; padding:7px; font-size:12px;">
-                                <option value="0">일요일 마감</option><option value="1">월요일 마감</option><option value="2">화요일 마감</option><option value="3">수요일 마감</option><option value="4">목요일 마감</option><option value="5">금요일 마감</option><option value="6">토요일 마감</option>
+                                <option value="1">월요일 마감</option><option value="2">화요일 마감</option><option value="3">수요일 마감</option><option value="4">목요일 마감</option><option value="5">금요일 마감</option><option value="6">토요일 마감</option><option value="0">일요일 마감</option>
                             </select>
                         </div>
                         <div id="editRoutineCycleWeeksCustom" style="display:none; align-items:center; gap:6px; margin-top:6px;">
@@ -818,7 +818,7 @@
                     </div>
                     <div id="newRoutineWeekdaysBox" style="display:none;">
                         <div style="display:flex; gap:4px;">
-                            <button type="button" class="dow-btn" data-dow="0" onclick="toggleDow('newRoutine',0)">일</button><button type="button" class="dow-btn" data-dow="1" onclick="toggleDow('newRoutine',1)">월</button><button type="button" class="dow-btn" data-dow="2" onclick="toggleDow('newRoutine',2)">화</button><button type="button" class="dow-btn" data-dow="3" onclick="toggleDow('newRoutine',3)">수</button><button type="button" class="dow-btn" data-dow="4" onclick="toggleDow('newRoutine',4)">목</button><button type="button" class="dow-btn" data-dow="5" onclick="toggleDow('newRoutine',5)">금</button><button type="button" class="dow-btn" data-dow="6" onclick="toggleDow('newRoutine',6)">토</button>
+                            <button type="button" class="dow-btn" data-dow="1" onclick="toggleDow('newRoutine',1)">월</button><button type="button" class="dow-btn" data-dow="2" onclick="toggleDow('newRoutine',2)">화</button><button type="button" class="dow-btn" data-dow="3" onclick="toggleDow('newRoutine',3)">수</button><button type="button" class="dow-btn" data-dow="4" onclick="toggleDow('newRoutine',4)">목</button><button type="button" class="dow-btn" data-dow="5" onclick="toggleDow('newRoutine',5)">금</button><button type="button" class="dow-btn" data-dow="6" onclick="toggleDow('newRoutine',6)">토</button><button type="button" class="dow-btn" data-dow="0" onclick="toggleDow('newRoutine',0)">일</button>
                         </div>
                         <div style="font-size:10px; color:#aaa; margin-top:5px;">선택한 요일에만 이 루틴이 떠요</div>
                     </div>
@@ -830,7 +830,7 @@
                                 <option value="custom">직접 입력</option>
                             </select>
                             <select id="newRoutineCycleWeekday" style="flex:1; border:1px solid #ddd; border-radius:8px; padding:7px; font-size:12px;">
-                                <option value="0">일요일 마감</option><option value="1">월요일 마감</option><option value="2">화요일 마감</option><option value="3">수요일 마감</option><option value="4">목요일 마감</option><option value="5">금요일 마감</option><option value="6">토요일 마감</option>
+                                <option value="1">월요일 마감</option><option value="2">화요일 마감</option><option value="3">수요일 마감</option><option value="4">목요일 마감</option><option value="5">금요일 마감</option><option value="6">토요일 마감</option><option value="0">일요일 마감</option>
                             </select>
                         </div>
                         <div id="newRoutineCycleWeeksCustom" style="display:none; align-items:center; gap:6px; margin-top:6px;">
@@ -3603,7 +3603,8 @@
     // repeat: 'daily'(기본) | 'weekdays'(activeDays) | 'cycle'(cycleWeekday+cycleWeeks)
     // scheduleFrom: 규칙이 적용되기 시작한 날. 이 날 이전은 예전처럼 '매일 필수'로 판정한다.
     //   → 루틴 설정을 바꿔도 과거 달력이 소급해서 바뀌지 않게 하기 위함 (v2.0.0 원칙과 동일).
-    const DOW_LABELS = ['일','월','화','수','목','금','토'];
+    const DOW_LABELS = ['일','월','화','수','목','금','토'];   // 인덱스 = JS getDay() (0=일)
+    const DOW_DISPLAY_ORDER = [1,2,3,4,5,6,0];               // 화면 표시는 월요일부터
 
     function dateStrToDate(dateStr) {
         const [y, m, d] = dateStr.split('-').map(Number);
@@ -3700,7 +3701,10 @@
     function routineRepeatLabel(r) {
         const mode = routineRepeatMode(r);
         if (mode === 'weekdays') {
-            const days = (r.activeDays || []).map((on, i) => on !== false ? DOW_LABELS[i] : null).filter(Boolean);
+            // 표시는 월요일부터 (데이터 인덱스는 0=일 그대로 유지)
+            const days = DOW_DISPLAY_ORDER
+                .filter(i => (r.activeDays || [])[i] !== false)
+                .map(i => DOW_LABELS[i]);
             if (days.length === 7) return '매일';
             if (days.length === 0) return '요일 미지정';
             return days.join('·');
