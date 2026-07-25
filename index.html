@@ -525,7 +525,7 @@
             </div>
         </div>
     </div>
-    <div class="confirm-overlay" id="deleteMemoOverlay">
+    <div class="confirm-overlay" id="deleteMemoOverlay" style="z-index:1200;">
         <div class="confirm-box">
             <p>메모를 삭제할까요?</p>
             <div class="confirm-btn-row">
@@ -3537,15 +3537,16 @@
             return;
         }
         // showBadge: 제품별 보기에선 그룹 헤더에 제품명이 있으므로 배지를 생략
+        // 카드(X 버튼 제외 영역)를 누르면 해당 제품으로 이동. X는 stopPropagation으로 삭제만.
         const card = (m, showBadge) => `
-            <div style="background:#fff; border:1px solid #F1F3F5; border-radius:12px; padding:12px 13px; margin-bottom:9px;">
+            <div onclick="goToProductFromDash(${m.productId})" style="background:#fff; border:1px solid #F1F3F5; border-radius:12px; padding:12px 13px; margin-bottom:9px; cursor:pointer; -webkit-tap-highlight-color:transparent;">
                 <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
                     ${showBadge ? `<span style="font-size:10px; font-weight:800; color:var(--primary); background:#FFF0F2; padding:3px 8px; border-radius:7px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.productName}${m.archived ? ' (보관)' : ''}</span>` : ''}
                     ${m.date ? `<span style="font-size:10px; color:#AAA;">📅 ${m.date}</span>` : `<span style="font-size:10px; color:#CCC;">날짜 없음</span>`}
-                    <button onclick="deleteMemoFromBoard(${m.productId}, '${m.id}')"
-                        style="margin-left:auto; background:none; border:none; color:#CCC; font-size:12px; cursor:pointer; padding:0 2px;">✕</button>
+                    <button onclick="event.stopPropagation(); deleteMemoFromBoard(${m.productId}, '${m.id}')"
+                        style="margin-left:auto; background:none; border:none; color:#CCC; font-size:14px; cursor:pointer; padding:2px 6px;">✕</button>
                 </div>
-                <div style="font-size:13px; color:#333; line-height:1.6; word-break:break-word; white-space:pre-wrap;">${m.text}</div>
+                <div style="font-size:13px; color:#333; line-height:1.6; word-break:break-word; white-space:pre-wrap;">${m.text} <span style="color:#DDD; font-size:11px;">›</span></div>
             </div>`;
 
         if (memoBoardView === 'product') {
@@ -4552,6 +4553,8 @@
     // 대시보드 팝업의 제품을 눌러 내 화장대의 그 제품 카드로 이동 + 강조
     function goToProductFromDash(productId) {
         closeDashProductPopup();
+        // 메모 보드에서 호출된 경우 그것도 닫는다 (스크롤 잠금까지 해제)
+        if (document.getElementById('memoBoardFS')?.classList.contains('active')) closeMemoBoard();
         // 필터가 걸려 있으면 그 제품이 목록에서 빠질 수 있으므로 초기화
         const cat = document.getElementById('filterCategory');
         const sched = document.getElementById('filterSchedule');
@@ -4567,7 +4570,12 @@
         // 렌더가 끝난 뒤 카드로 스크롤 + 잠깐 강조
         setTimeout(() => {
             const card = document.getElementById(`product-card-${productId}`);
-            if (!card) return;
+            if (!card) {
+                // 보관된 제품 등 목록에 없으면 안내 (스크롤 대상이 없음)
+                const p = products.find(x => x.id === productId);
+                if (p && p.archived) showToast('📦 보관함에 있는 제품이에요');
+                return;
+            }
             card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             card.classList.add('card-flash');
             setTimeout(() => card.classList.remove('card-flash'), 1600);
