@@ -1329,29 +1329,12 @@
 
     // 소리끼리 겹쳐 뭉개지는 것 방지: 직전 재생 후 60ms 내 재호출은 무시
     let _lastSoundAt = 0;
-    function playTung() {
-        const s = getSoundSetting();
-        if (!s.on) return;
-        const now = performance.now();
-        if (now - _lastSoundAt < 60) return;     // 연타/중복 이벤트 가드
-        _lastSoundAt = now;
+    // 목탁 '텅' 한 번을 지정 시각(at)에 스케줄. pitchMul로 음정을 살짝 올릴 수 있어 연쇄가 단조롭지 않다.
+    function _scheduleTung(ctx, hp, at, gainScale, pitchMul) {
+        gainScale = gainScale == null ? 1 : gainScale;
+        pitchMul = pitchMul == null ? 1 : pitchMul;
 
-        const ctx = _getCtx();
-        if (!ctx) return;
-        const t0 = ctx.currentTime;
-
-        const master = ctx.createGain();
-        master.gain.value = SOUND_GAIN[s.level] || SOUND_GAIN.medium;
-        master.connect(ctx.destination);
-
-        // 저역 정리(고역통과)로 붕 뜨는 소리 제거 + 과한 고역 억제
-        const hp = ctx.createBiquadFilter();
-        hp.type = 'highpass'; hp.frequency.value = 300;   // 저역 컷 = 청아함의 핵심
-        const lp = ctx.createBiquadFilter();
-        lp.type = 'lowpass'; lp.frequency.value = 7000;
-        hp.connect(lp); lp.connect(master);
-
-        // 1) 나무 타격 '딱' — 짧고 단단한 노이즈
+        // 1) 나무 타격 '딱'
         const clen = Math.floor(ctx.sampleRate * 0.015);
         const cbuf = ctx.createBuffer(1, clen, ctx.sampleRate);
         const cdata = cbuf.getChannelData(0);
@@ -1360,11 +1343,11 @@
             cdata[j] = (Math.random() * 2 - 1) * Math.exp(-tt * 1400);
         }
         const csrc = ctx.createBufferSource(); csrc.buffer = cbuf;
-        const cg = ctx.createGain(); cg.gain.value = 0.45;
+        const cg = ctx.createGain(); cg.gain.value = 0.45 * gainScale;
         csrc.connect(cg); cg.connect(hp);
-        csrc.start(t0); csrc.stop(t0 + 0.03);
+        csrc.start(at); csrc.stop(at + 0.03);
 
-        // 2) 나무통 공명 — 비화성 배음 + 매우 빠른 감쇠 = 청아하게 딱 끊기는 목탁 음색
+        // 2) 나무통 공명
         const partials = [
             { f: 520,  a: 1.00, d: 26 },
             { f: 880,  a: 0.42, d: 34 },
@@ -1375,13 +1358,56 @@
         partials.forEach(p => {
             const osc = ctx.createOscillator();
             osc.type = 'sine';
-            osc.frequency.value = p.f;
+            osc.frequency.value = p.f * pitchMul;
             const g = ctx.createGain();
-            g.gain.setValueAtTime(p.a * 0.9, t0);
-            g.gain.exponentialRampToValueAtTime(0.0008, t0 + 3 / p.d);
+            g.gain.setValueAtTime(p.a * 0.9 * gainScale, at);
+            g.gain.exponentialRampToValueAtTime(0.0008, at + 3 / p.d);
             osc.connect(g); g.connect(hp);
-            osc.start(t0); osc.stop(t0 + 0.4);
+            osc.start(at); osc.stop(at + 0.4);
         });
+    }
+
+    // 공통 준비: 컨텍스트 + 필터 체인 (master gain에 볼륨 반영)
+    function _tungChain(ctx, gainMul) {
+        const s = getSoundSetting();
+        const master = ctx.createGain();
+        master.gain.value = (SOUND_GAIN[s.level] || SOUND_GAIN.medium) * (gainMul || 1);
+        master.connect(ctx.destination);
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass'; hp.frequency.value = 300;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.value = 7000;
+        hp.connect(lp); lp.connect(master);
+        return hp;
+    }
+
+    function playTung() {
+        const s = getSoundSetting();
+        if (!s.on) return;
+        const now = performance.now();
+        if (now - _lastSoundAt < 60) return;     // 연타/중복 이벤트 가드
+        _lastSoundAt = now;
+        const ctx = _getCtx();
+        if (!ctx) return;
+        const hp = _tungChain(ctx);
+        _scheduleTung(ctx, hp, ctx.currentTime, 1, 1);
+    }
+
+    // 여러 번 '텅텅텅…' 연쇄 (전체 완료용). count만큼 짧은 간격으로 스케줄.
+    function playTungBurst(count) {
+        const s = getSoundSetting();
+        if (!s.on) return;
+        const n = Math.max(1, Math.min(count || 1, 12));   // 안전 상한 12
+        _lastSoundAt = performance.now();                  // 이후 개별 연타 가드와 충돌 방지
+        const ctx = _getCtx();
+        if (!ctx) return;
+        // 연쇄는 살짝 크게(1.15배) — 성취의 순간이므로. 각 텅은 간격 90ms, 음정을 조금씩 올림.
+        const hp = _tungChain(ctx, 1.15);
+        const gap = 0.09;
+        for (let i = 0; i < n; i++) {
+            const pitch = 1 + i * 0.03;                    // 올라가는 느낌 = 상승감
+            _scheduleTung(ctx, hp, ctx.currentTime + i * gap, 1, pitch);
+        }
     }
 
     // 텅·루틴에서 한 번에 호출: 소리 + 진동을 함께 (각자 설정에 따라 독립 동작)
@@ -4181,9 +4207,16 @@
         const composition = isToday
             ? [...r.productIds]
             : (Array.isArray(todayRecord.requiredIds) ? [...todayRecord.requiredIds] : [...r.productIds]);
+        // 이번에 새로 체크되는 제품 수 = '텅' 연쇄 횟수 (이미 체크된 건 제외)
+        const newlyChecked = composition.filter(pid => !todayRecord.checkedProductIds.includes(pid)).length;
         todayRecord.requiredIds = composition;
         todayRecord.checkedProductIds = [...composition];
         saveToStorage();
+        // 전체 완료 피드백: 제품 수만큼 '텅텅텅…' 연쇄 + 진동 한 번
+        if (newlyChecked > 0) {
+            playTungBurst(newlyChecked);
+            triggerVibe();
+        }
         const allClearMsg = () => isRoutineDayAllClear(todayStr) ? `⭐ 오늘 루틴 올클리어!` : `💚 오늘의 루틴 기록 완료`;
         // 바운스 애니메이션
         const bottle = el.querySelector('.tung-bottle-wrapper');
