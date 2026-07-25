@@ -4959,6 +4959,18 @@
         renderRoutineTab();
     }
 
+    // 루틴끼리 순서 변경 (제품 순서 변경과 동일한 버튼 방식)
+    // 이 순서가 루틴 탭의 표시 순서에도 그대로 반영된다.
+    function moveRoutineOrder(routineId, direction) {
+        const idx = routines.findIndex(r => r.id === routineId);
+        const newIdx = idx + direction;
+        if (idx === -1 || newIdx < 0 || newIdx >= routines.length) return;
+        [routines[idx], routines[newIdx]] = [routines[newIdx], routines[idx]];
+        saveToStorage();
+        renderRoutineMgmt();
+        renderRoutineTab();   // 루틴 탭 순서도 함께 갱신
+    }
+
     // 마이페이지 루틴 관리 렌더
     function renderRoutineMgmt() {
         // 제품 선택 피커
@@ -4981,7 +4993,10 @@
             listEl.innerHTML = '<div style="text-align:center; color:#BBB; font-size:12px; padding:20px 0;">등록된 루틴이 없어요</div>';
             return;
         }
-        listEl.innerHTML = [...routines].reverse().map(r => {
+        // 표시 순서 = 배열 순서 (reverse 제거). 순서 변경 버튼이 곧 이 순서를 바꾼다.
+        listEl.innerHTML = routines.map((r, rIdx) => {
+            const isFirst = rIdx === 0;
+            const isLast = rIdx === routines.length - 1;
             const productNames = r.productIds.map(pid => {
                 const p = products.find(prod => prod.id === pid);
                 return (p && !p.archived) ? p.name : '';
@@ -4993,6 +5008,10 @@
             const repTag = mode === 'daily' ? ''
                 : `<span style="font-size:10px; font-weight:700; color:${repColor}; background:${repBg}; padding:2px 6px; border-radius:6px; margin-left:5px;">${repIcon}${routineRepeatLabel(r)}</span>`;
             return `<div class="list-item-card" style="padding:10px 14px;">
+                <div class="order-btn-group">
+                    <button class="order-btn" ${isFirst ? 'disabled' : ''} ${isFirst ? '' : `onclick="moveRoutineOrder(${r.id}, -1)"`}>▲</button>
+                    <button class="order-btn" ${isLast ? 'disabled' : ''} ${isLast ? '' : `onclick="moveRoutineOrder(${r.id}, 1)"`}>▼</button>
+                </div>
                 <div style="flex:1;">
                     <strong>${r.emoji} ${r.name}</strong>${repTag}
                     <div style="font-size:11px; color:#AAA; margin-top:2px;">${productNames}</div>
