@@ -3744,28 +3744,32 @@
     }
     // 이 날짜에 이 루틴이 대상인가 (체크리스트 노출 + 올클리어 판정 공용)
     function routineActiveOn(r, dateStr) {
-        if (!routineRuleApplies(r, dateStr)) return true;      // 규칙 적용 전이면 예전대로 매일
         const mode = routineRepeatMode(r);
+        // 요일 계열(특정요일·요일중한번)은 '적용 전' 개념 없이 항상 지정 요일에만 뜬다.
+        // (scheduleFrom 이전이라도 매일 떠선 안 됨 — 그게 지정 요일의 의미)
         if (mode === 'weekdays') return r.activeDays[dowOf(dateStr)] !== false;
         if (mode === 'weekdaysOnce') {
-            // 이미 이번 주에 완료했으면 남은 후보 요일엔 더 안 띄운다 (다 한 걸 또 보여줄 필요 없음)
-            if (weekdaysOnceDone(r, dateStr)) return false;
-            return r.activeDays[dowOf(dateStr)] !== false;      // 후보 요일에만 노출
+            if (r.activeDays[dowOf(dateStr)] === false) return false;   // 후보 요일 아니면 안 뜸
+            if (weekdaysOnceDone(r, dateStr)) return false;             // 이번 주 이미 완료면 안 뜸
+            return true;
         }
-        return true;                                            // 주기 루틴은 매일 보이되 판정만 다름
+        // 주기 루틴은 매일 보이되 판정만 다름. 단 '적용 전(과거)'은 예전처럼 매일로 둔다(소급 방지).
+        return true;
     }
     // 올클리어 판정에서 이 루틴이 '미완료'로 발목을 잡는가
     function routineBlocksAllClear(r, dateStr) {
         if (!routineActiveOn(r, dateStr)) return false;         // 그날 대상 아님
         const rmode = routineRepeatMode(r);
+        // 주기: 과거 소급 방지 게이트 유지
         if (routineRuleApplies(r, dateStr) && rmode === 'cycle') {
             if (routineCycleDone(r, dateStr)) return false;      // 이번 주기 이미 완료
             return routineCycleDue(r, dateStr);                 // 마감일에만 발목
         }
-        if (routineRuleApplies(r, dateStr) && rmode === 'weekdaysOnce') {
-            if (weekdaysOnceDone(r, dateStr)) return false;      // 이번 주 이미 완료
+        // 요일중한번: 게이트 없이 항상 '주 1회' 규칙으로 판정 (마지막 후보 요일에만 발목)
+        if (rmode === 'weekdaysOnce') {
+            if (weekdaysOnceDone(r, dateStr)) return false;
             const last = weekdaysOnceLastCandidate(r, dateStr);
-            return dateStr === last;                             // 마지막 후보 요일에만 발목
+            return dateStr === last;
         }
         const rec = (r.checkHistory || []).find(h => h.date === dateStr);
         const reqSource = (rec && Array.isArray(rec.requiredIds)) ? rec.requiredIds : r.productIds;
