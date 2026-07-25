@@ -329,9 +329,10 @@
             <div id="editRoutineProductPicker" style="display:flex; flex-direction:column; margin-bottom:12px; max-height:180px; overflow-y:auto; border:1px solid #eee; border-radius:10px; padding:0 8px;"></div>
                 <div class="form-group">
                     <label>반복 설정</label>
-                    <div style="display:flex; gap:6px; margin-bottom:8px;">
+                    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
                         <button type="button" class="rep-mode-btn active" data-mode="daily" onclick="setRepeatMode('editRoutine','daily')">매일</button>
                         <button type="button" class="rep-mode-btn" data-mode="weekdays" onclick="setRepeatMode('editRoutine','weekdays')">특정 요일</button>
+                        <button type="button" class="rep-mode-btn" data-mode="weekdaysOnce" onclick="setRepeatMode('editRoutine','weekdaysOnce')">요일 중 한 번</button>
                         <button type="button" class="rep-mode-btn" data-mode="cycle" onclick="setRepeatMode('editRoutine','cycle')">주기</button>
                     </div>
                     <div id="editRoutineWeekdaysBox" style="display:none;">
@@ -339,6 +340,12 @@
                             <button type="button" class="dow-btn" data-dow="1" onclick="toggleDow('editRoutine',1)">월</button><button type="button" class="dow-btn" data-dow="2" onclick="toggleDow('editRoutine',2)">화</button><button type="button" class="dow-btn" data-dow="3" onclick="toggleDow('editRoutine',3)">수</button><button type="button" class="dow-btn" data-dow="4" onclick="toggleDow('editRoutine',4)">목</button><button type="button" class="dow-btn" data-dow="5" onclick="toggleDow('editRoutine',5)">금</button><button type="button" class="dow-btn" data-dow="6" onclick="toggleDow('editRoutine',6)">토</button><button type="button" class="dow-btn" data-dow="0" onclick="toggleDow('editRoutine',0)">일</button>
                         </div>
                         <div style="font-size:10px; color:#aaa; margin-top:5px;">선택한 요일에만 이 루틴이 떠요</div>
+                    </div>
+                    <div id="editRoutineWeekdaysOnceBox" style="display:none;">
+                        <div style="display:flex; gap:4px;">
+                            <button type="button" class="dow-btn" data-donce="1" onclick="toggleDowOnce('editRoutine',1)">월</button><button type="button" class="dow-btn" data-donce="2" onclick="toggleDowOnce('editRoutine',2)">화</button><button type="button" class="dow-btn" data-donce="3" onclick="toggleDowOnce('editRoutine',3)">수</button><button type="button" class="dow-btn" data-donce="4" onclick="toggleDowOnce('editRoutine',4)">목</button><button type="button" class="dow-btn" data-donce="5" onclick="toggleDowOnce('editRoutine',5)">금</button><button type="button" class="dow-btn" data-donce="6" onclick="toggleDowOnce('editRoutine',6)">토</button><button type="button" class="dow-btn" data-donce="0" onclick="toggleDowOnce('editRoutine',0)">일</button>
+                        </div>
+                        <div style="font-size:10px; color:#aaa; margin-top:5px;">선택한 요일 중 <b>주 1회</b>만 하면 완료돼요 (예: 토·일 중 아무 날). 한 주는 월~일 기준이에요.</div>
                     </div>
                     <div id="editRoutineCycleBox" style="display:none;">
                         <div style="display:flex; gap:6px; align-items:center;">
@@ -811,9 +818,10 @@
                 </div>
                 <div class="form-group">
                     <label>반복 설정</label>
-                    <div style="display:flex; gap:6px; margin-bottom:8px;">
+                    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
                         <button type="button" class="rep-mode-btn active" data-mode="daily" onclick="setRepeatMode('newRoutine','daily')">매일</button>
                         <button type="button" class="rep-mode-btn" data-mode="weekdays" onclick="setRepeatMode('newRoutine','weekdays')">특정 요일</button>
+                        <button type="button" class="rep-mode-btn" data-mode="weekdaysOnce" onclick="setRepeatMode('newRoutine','weekdaysOnce')">요일 중 한 번</button>
                         <button type="button" class="rep-mode-btn" data-mode="cycle" onclick="setRepeatMode('newRoutine','cycle')">주기</button>
                     </div>
                     <div id="newRoutineWeekdaysBox" style="display:none;">
@@ -821,6 +829,12 @@
                             <button type="button" class="dow-btn" data-dow="1" onclick="toggleDow('newRoutine',1)">월</button><button type="button" class="dow-btn" data-dow="2" onclick="toggleDow('newRoutine',2)">화</button><button type="button" class="dow-btn" data-dow="3" onclick="toggleDow('newRoutine',3)">수</button><button type="button" class="dow-btn" data-dow="4" onclick="toggleDow('newRoutine',4)">목</button><button type="button" class="dow-btn" data-dow="5" onclick="toggleDow('newRoutine',5)">금</button><button type="button" class="dow-btn" data-dow="6" onclick="toggleDow('newRoutine',6)">토</button><button type="button" class="dow-btn" data-dow="0" onclick="toggleDow('newRoutine',0)">일</button>
                         </div>
                         <div style="font-size:10px; color:#aaa; margin-top:5px;">선택한 요일에만 이 루틴이 떠요</div>
+                    </div>
+                    <div id="newRoutineWeekdaysOnceBox" style="display:none;">
+                        <div style="display:flex; gap:4px;">
+                            <button type="button" class="dow-btn" data-donce="1" onclick="toggleDowOnce('newRoutine',1)">월</button><button type="button" class="dow-btn" data-donce="2" onclick="toggleDowOnce('newRoutine',2)">화</button><button type="button" class="dow-btn" data-donce="3" onclick="toggleDowOnce('newRoutine',3)">수</button><button type="button" class="dow-btn" data-donce="4" onclick="toggleDowOnce('newRoutine',4)">목</button><button type="button" class="dow-btn" data-donce="5" onclick="toggleDowOnce('newRoutine',5)">금</button><button type="button" class="dow-btn" data-donce="6" onclick="toggleDowOnce('newRoutine',6)">토</button><button type="button" class="dow-btn" data-donce="0" onclick="toggleDowOnce('newRoutine',0)">일</button>
+                        </div>
+                        <div style="font-size:10px; color:#aaa; margin-top:5px;">선택한 요일 중 <b>주 1회</b>만 하면 완료돼요 (예: 토·일 중 아무 날). 한 주는 월~일 기준이에요.</div>
                     </div>
                     <div id="newRoutineCycleBox" style="display:none;">
                         <div style="display:flex; gap:6px; align-items:center;">
@@ -1744,6 +1758,18 @@
 
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
+        {
+            version: 'v3.0.0',
+            date: '2026.07',
+            title: '\'요일 중 한 번\' 루틴',
+            items: [
+                '🗓️ 새 반복 모드 — 고른 요일 중 주 1회만 하면 완료돼요',
+                '🧴 예: 토·일 중 아무 날에나 선크림 한 번 (둘 다 안 해도 되는 게 아니라, 둘 중 하루)',
+                '✅ 후보 요일에만 루틴이 뜨고, 한 번 하면 그 주는 완료 처리돼요',
+                '⏰ 그 주의 마지막 후보 요일까지 안 하면 그날 미완료로 표시돼요',
+                '📊 달성률에도 주 1회 단위로 정확히 반영돼요 (매일 루틴과 섞여도 정확)'
+            ]
+        },
         {
             version: 'v2.9.1',
             date: '2026.07',
@@ -3631,8 +3657,35 @@
     function routineRepeatMode(r) {
         if (!r) return 'daily';
         if (r.repeat === 'cycle' && typeof r.cycleWeekday === 'number') return 'cycle';
+        if (r.repeat === 'weekdaysOnce' && Array.isArray(r.activeDays)) return 'weekdaysOnce';
         if (r.repeat === 'weekdays' && Array.isArray(r.activeDays)) return 'weekdays';
         return 'daily';
+    }
+    // 이번 '주'(월~일)의 시작 월요일과 끝 일요일
+    function weekWindow(dateStr) {
+        const dow = dowOf(dateStr);              // 0=일 … 6=토
+        const backToMon = (dow === 0) ? 6 : dow - 1;   // 월요일까지 되돌릴 일수
+        const start = addDaysStr(dateStr, -backToMon);
+        const end = addDaysStr(start, 6);
+        return { start, end };
+    }
+    // '요일 중 한 번' 루틴: 이번 주에 후보 요일 중 하루라도 완료했는가
+    function weekdaysOnceDone(r, dateStr) {
+        const { start, end } = weekWindow(dateStr);
+        return (r.checkHistory || []).some(h =>
+            h.date >= start && h.date <= end
+            && (r.activeDays[dowOf(h.date)] !== false)   // 후보 요일에 한 완료만 인정
+            && routineFullyCheckedOn(r, h.date));
+    }
+    // 그 주의 '마지막 후보 요일' (이 날 지나도록 안 하면 미완료 확정)
+    function weekdaysOnceLastCandidate(r, dateStr) {
+        const { start } = weekWindow(dateStr);
+        let last = null;
+        for (let i = 0; i < 7; i++) {
+            const d = addDaysStr(start, i);
+            if (r.activeDays[dowOf(d)] !== false) last = d;
+        }
+        return last;   // 후보 요일이 하나도 없으면 null
     }
     // 규칙이 이 날짜에 효력이 있는가 (설정 이전 과거는 건드리지 않는다)
     function routineRuleApplies(r, dateStr) {
@@ -3694,14 +3747,25 @@
         if (!routineRuleApplies(r, dateStr)) return true;      // 규칙 적용 전이면 예전대로 매일
         const mode = routineRepeatMode(r);
         if (mode === 'weekdays') return r.activeDays[dowOf(dateStr)] !== false;
+        if (mode === 'weekdaysOnce') {
+            // 이미 이번 주에 완료했으면 남은 후보 요일엔 더 안 띄운다 (다 한 걸 또 보여줄 필요 없음)
+            if (weekdaysOnceDone(r, dateStr)) return false;
+            return r.activeDays[dowOf(dateStr)] !== false;      // 후보 요일에만 노출
+        }
         return true;                                            // 주기 루틴은 매일 보이되 판정만 다름
     }
     // 올클리어 판정에서 이 루틴이 '미완료'로 발목을 잡는가
     function routineBlocksAllClear(r, dateStr) {
         if (!routineActiveOn(r, dateStr)) return false;         // 그날 대상 아님
-        if (routineRuleApplies(r, dateStr) && routineRepeatMode(r) === 'cycle') {
+        const rmode = routineRepeatMode(r);
+        if (routineRuleApplies(r, dateStr) && rmode === 'cycle') {
             if (routineCycleDone(r, dateStr)) return false;      // 이번 주기 이미 완료
             return routineCycleDue(r, dateStr);                 // 마감일에만 발목
+        }
+        if (routineRuleApplies(r, dateStr) && rmode === 'weekdaysOnce') {
+            if (weekdaysOnceDone(r, dateStr)) return false;      // 이번 주 이미 완료
+            const last = weekdaysOnceLastCandidate(r, dateStr);
+            return dateStr === last;                             // 마지막 후보 요일에만 발목
         }
         const rec = (r.checkHistory || []).find(h => h.date === dateStr);
         const reqSource = (rec && Array.isArray(rec.requiredIds)) ? rec.requiredIds : r.productIds;
@@ -3720,6 +3784,13 @@
             if (days.length === 0) return '요일 미지정';
             return days.join('·');
         }
+        if (mode === 'weekdaysOnce') {
+            const days = DOW_DISPLAY_ORDER
+                .filter(i => (r.activeDays || [])[i] !== false)
+                .map(i => DOW_LABELS[i]);
+            const dtxt = days.length === 0 ? '요일 미지정' : days.join('·');
+            return `${dtxt} 중 주 1회`;
+        }
         if (mode === 'cycle') {
             const wk = routineCycleWeeks(r);
             const pre = wk === 1 ? '매주' : wk === 2 ? '격주' : `${wk}주마다`;
@@ -3728,18 +3799,22 @@
         return '매일';
     }
 
+    // 일일 루틴(매일/특정요일)만 대상 — 주간형(요일중한번/주기)은 창 단위로 따로 집계하므로 여기서 제외
+    function dailyRoutines() {
+        return routines.filter(r => !isWeeklyMode(routineRepeatMode(r)));
+    }
     function isRoutineDayDone(dateStr) {
-        return routines.some(r => {
+        return dailyRoutines().some(r => {
+            if (!routineActiveOn(r, dateStr)) return false;
             const rec = r.checkHistory.find(h => h.date === dateStr);
             return rec && rec.checkedProductIds && rec.checkedProductIds.length > 0;
         });
     }
-    // 그날 '예정된' 루틴이 하나라도 있는가.
-    // 요일 루틴(예: 평일만)을 쓰면 토·일엔 예정이 없다. 그런 날은 실패가 아니라 '해당 없음'이므로
-    // 달성률 분모에서 빼고, 연속 기록도 끊지 않아야 한다.
+    // 그날 '예정된' 일일 루틴이 하나라도 있는가.
     function isRoutineScheduledDay(dateStr) {
-        if (routines.length === 0) return false;
-        return routines.some(r => routineActiveOn(r, dateStr));
+        const ds = dailyRoutines();
+        if (ds.length === 0) return false;
+        return ds.some(r => routineActiveOn(r, dateStr));
     }
     // 루틴 기록이 시작된 가장 이른 날짜
     function getFirstRoutineDate() {
@@ -3766,6 +3841,50 @@
         }
         return maxStreak;
     }
+    // ══════════ 주간형 루틴(요일중한번·주기)의 '창' 단위 집계 ══════════
+    // 달성률·꾸준함은 원래 '하루' 단위인데, 주간형 루틴은 하루가 아니라 '주기 창'이 1칸이다.
+    // 그래서 일일 루틴(매일/특정요일)과 단위가 섞이지 않도록, 주간형은 창 단위로 따로 센 뒤 합산한다.
+    function isWeeklyMode(mode) { return mode === 'weekdaysOnce' || mode === 'cycle'; }
+
+    // 한 주간형 루틴이 [from~today]에서 지나온 창들을 {end, done} 목록으로 반환.
+    // end = 그 창의 마감일(대표일). done = 그 창을 완료했는지. 아직 안 끝난 미래 창은 제외.
+    function weeklyWindowsOf(r, todayStr) {
+        const mode = routineRepeatMode(r);
+        if (!isWeeklyMode(mode)) return [];
+        const from = r.scheduleFrom;
+        if (!from || todayStr < from) return [];
+        const seen = new Set();
+        const out = [];
+        for (let d = from; d <= todayStr; d = addDaysStr(d, 1)) {
+            let end, done;
+            if (mode === 'cycle') {
+                end = cycleWindowEnd(r, d);
+                done = routineCycleDone(r, d);
+            } else {
+                // weekdaysOnce: 그 주의 마지막 후보 요일이 대표일
+                end = weekdaysOnceLastCandidate(r, d);
+                if (!end) continue;                 // 후보 요일이 없는 주는 건너뜀
+                done = weekdaysOnceDone(r, d);
+            }
+            if (!end || seen.has(end)) continue;
+            seen.add(end);
+            // 아직 마감이 안 지난 '진행 중' 창은, 이미 완료한 경우에만 집계에 넣는다
+            // (마감 전 미완료는 아직 실패가 아니므로 분모에서 제외 → 억울한 감점 방지)
+            if (end > todayStr) continue;
+            if (end === todayStr || end < todayStr) {
+                out.push({ end, done });
+            }
+        }
+        // 진행 중(오늘이 마감 전)인데 이미 완료한 창도 인정
+        let cur, curDone;
+        if (mode === 'cycle') { cur = cycleWindowEnd(r, todayStr); curDone = routineCycleDone(r, todayStr); }
+        else { cur = weekdaysOnceLastCandidate(r, todayStr); curDone = weekdaysOnceDone(r, todayStr); }
+        if (cur && cur > todayStr && curDone && !seen.has(cur)) {
+            out.push({ end: cur, done: true });
+        }
+        return out;
+    }
+
     // 보관(archive)된 제품 id인지 — 완료 판정에서 '필요 항목' 제외용
     function isArchivedId(pid) {
         const p = products.find(prod => prod.id === pid);
@@ -3812,8 +3931,8 @@
     }
     // ── 반복 설정 UI 상태 (추가 폼 / 수정 모달 각각) ──
     let repeatState = {
-        newRoutine:  { mode: 'daily', days: [true,true,true,true,true,true,true] },
-        editRoutine: { mode: 'daily', days: [true,true,true,true,true,true,true] }
+        newRoutine:  { mode: 'daily', days: [true,true,true,true,true,true,true], onceDays: [false,false,false,false,false,false,false] },
+        editRoutine: { mode: 'daily', days: [true,true,true,true,true,true,true], onceDays: [false,false,false,false,false,false,false] }
     };
     // 주기 '직접 입력' 선택 시에만 숫자 입력칸을 보여준다
     function syncCycleWeeksInput(prefix) {
@@ -3842,6 +3961,11 @@
         d[i] = !d[i];
         syncRepeatUI(prefix);
     }
+    function toggleDowOnce(prefix, i) {
+        const d = repeatState[prefix].onceDays;
+        d[i] = !d[i];
+        syncRepeatUI(prefix);
+    }
     function syncRepeatUI(prefix) {
         const st = repeatState[prefix];
         const scope = document.getElementById(prefix + 'WeekdaysBox')?.closest('.form-group');
@@ -3849,9 +3973,12 @@
         scope.querySelectorAll('.rep-mode-btn').forEach(b =>
             b.classList.toggle('active', b.dataset.mode === st.mode));
         document.getElementById(prefix + 'WeekdaysBox').style.display = st.mode === 'weekdays' ? 'block' : 'none';
+        document.getElementById(prefix + 'WeekdaysOnceBox').style.display = st.mode === 'weekdaysOnce' ? 'block' : 'none';
         document.getElementById(prefix + 'CycleBox').style.display = st.mode === 'cycle' ? 'block' : 'none';
-        scope.querySelectorAll('.dow-btn').forEach(b =>
+        scope.querySelectorAll('.dow-btn[data-dow]').forEach(b =>
             b.classList.toggle('on', st.days[parseInt(b.dataset.dow, 10)] !== false));
+        scope.querySelectorAll('.dow-btn[data-donce]').forEach(b =>
+            b.classList.toggle('on', st.onceDays[parseInt(b.dataset.donce, 10)] === true));
     }
     // 폼 입력 → 루틴 객체에 저장할 반복 필드
     function readRepeatFields(prefix) {
@@ -3863,6 +3990,13 @@
                 return null;
             }
             return { repeat: 'weekdays', activeDays: st.days.slice(), cycleWeekday: null, cycleWeeks: null, scheduleFrom: today };
+        }
+        if (st.mode === 'weekdaysOnce') {
+            if (st.onceDays.every(d => d !== true)) {
+                showToast('후보 요일을 하나 이상 선택해주세요');
+                return null;
+            }
+            return { repeat: 'weekdaysOnce', activeDays: st.onceDays.slice(), cycleWeekday: null, cycleWeeks: null, scheduleFrom: today };
         }
         if (st.mode === 'cycle') {
             const wk = readCycleWeeks(prefix);
@@ -3884,7 +4018,13 @@
     function loadRepeatFields(prefix, r) {
         const mode = routineRepeatMode(r);
         repeatState[prefix].mode = mode;
-        repeatState[prefix].days = Array.isArray(r.activeDays) ? r.activeDays.slice() : [true,true,true,true,true,true,true];
+        if (mode === 'weekdaysOnce') {
+            repeatState[prefix].onceDays = Array.isArray(r.activeDays) ? r.activeDays.slice() : [false,false,false,false,false,false,false];
+            repeatState[prefix].days = [true,true,true,true,true,true,true];
+        } else {
+            repeatState[prefix].days = Array.isArray(r.activeDays) ? r.activeDays.slice() : [true,true,true,true,true,true,true];
+            repeatState[prefix].onceDays = [false,false,false,false,false,false,false];
+        }
         const wdEl = document.getElementById(prefix + 'CycleWeekday');
         const wkEl = document.getElementById(prefix + 'CycleWeeks');
         if (wdEl) wdEl.value = String(typeof r.cycleWeekday === 'number' ? r.cycleWeekday : 0);
@@ -3902,7 +4042,7 @@
         syncRepeatUI(prefix);
     }
     function resetRepeatUI(prefix) {
-        repeatState[prefix] = { mode: 'daily', days: [true,true,true,true,true,true,true] };
+        repeatState[prefix] = { mode: 'daily', days: [true,true,true,true,true,true,true], onceDays: [false,false,false,false,false,false,false] };
         const sel = document.getElementById(prefix + 'CycleWeeks');
         const inp = document.getElementById(prefix + 'CycleWeeksInput');
         if (sel) sel.value = '1';
@@ -4054,15 +4194,26 @@
         const today = now.getDate();
         let doneDays = 0;
 
-        // 달성률 분모는 '루틴이 예정된 날'만 센다.
-        // 평일 루틴만 쓰는 사람은 토·일이 분모에 깔려 아무리 잘해도 75%가 천장이 되기 때문.
+        // 달성률 = 일일 루틴(날 단위) + 주간형 루틴(창 단위)을 함께 센다.
+        // 단위가 섞이지 않도록, 주간형은 '이번 달에 마감이 걸린 창'을 1칸씩 분모에 더한다.
         let scheduledDays = 0;
+        const monthStartStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
+        const todayStr = `${year}-${String(month+1).padStart(2,'0')}-${String(today).padStart(2,'0')}`;
         for (let d = 1; d <= today; d++) {
             const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             if (!isRoutineScheduledDay(dateStr)) continue;
             scheduledDays++;
             if (isRoutineDayDone(dateStr)) doneDays++;
         }
+        // 주간형 루틴의 창을 이번 달 범위에서 합산
+        routines.forEach(r => {
+            if (!isWeeklyMode(routineRepeatMode(r))) return;
+            weeklyWindowsOf(r, todayStr).forEach(w => {
+                if (w.end < monthStartStr || w.end > todayStr) return;   // 이번 달 마감분만
+                scheduledDays++;
+                if (w.done) doneDays++;
+            });
+        });
 
         const pct = scheduledDays > 0 ? Math.round((doneDays / scheduledDays) * 100) : 0;
 
@@ -4742,6 +4893,18 @@
                     const bgc = done ? '#EBFBEE' : due ? '#FFF4E6' : '#F5F5F5';
                     cycleBadge = `<div style="font-size:11px; font-weight:700; color:${col}; background:${bgc}; padding:5px 9px; border-radius:8px; margin-bottom:9px; display:inline-block;">🔄 ${txt}</div>`;
                 }
+                // '요일 중 한 번' 상태 배지
+                if (routineRuleApplies(r, todayStr) && routineRepeatMode(r) === 'weekdaysOnce') {
+                    const done = weekdaysOnceDone(r, todayStr);
+                    const last = weekdaysOnceLastCandidate(r, todayStr);
+                    const isLast = todayStr === last;
+                    const txt = done ? '✓ 이번 주 완료'
+                              : isLast ? '⏰ 오늘이 이번 주 마지막 기회예요'
+                              : `${routineRepeatLabel(r)}`;
+                    const col = done ? '#1EA94A' : isLast ? '#E8590C' : '#888';
+                    const bgc = done ? '#EBFBEE' : isLast ? '#FFF4E6' : '#F5F5F5';
+                    cycleBadge = `<div style="font-size:11px; font-weight:700; color:${col}; background:${bgc}; padding:5px 9px; border-radius:8px; margin-bottom:9px; display:inline-block;">🗓️ ${txt}</div>`;
+                }
                 const repeatTag = (routineRuleApplies(r, todayStr) && routineRepeatMode(r) === 'weekdays')
                     ? `<span style="font-size:10px; color:#888; font-weight:600; background:#F1F3F5; padding:2px 6px; border-radius:6px; margin-left:5px;">${routineRepeatLabel(r)}</span>`
                     : '';
@@ -4804,8 +4967,11 @@
                 return (p && !p.archived) ? p.name : '';
             }).filter(Boolean).join(', ') || '연결된 제품 없음';
             const mode = routineRepeatMode(r);
+            const repIcon = mode === 'cycle' ? '🔄 ' : mode === 'weekdaysOnce' ? '🗓️ ' : '📅 ';
+            const repColor = (mode === 'cycle' || mode === 'weekdaysOnce') ? '#E8590C' : '#666';
+            const repBg = (mode === 'cycle' || mode === 'weekdaysOnce') ? '#FFF4E6' : '#F1F3F5';
             const repTag = mode === 'daily' ? ''
-                : `<span style="font-size:10px; font-weight:700; color:${mode === 'cycle' ? '#E8590C' : '#666'}; background:${mode === 'cycle' ? '#FFF4E6' : '#F1F3F5'}; padding:2px 6px; border-radius:6px; margin-left:5px;">${mode === 'cycle' ? '🔄 ' : '📅 '}${routineRepeatLabel(r)}</span>`;
+                : `<span style="font-size:10px; font-weight:700; color:${repColor}; background:${repBg}; padding:2px 6px; border-radius:6px; margin-left:5px;">${repIcon}${routineRepeatLabel(r)}</span>`;
             return `<div class="list-item-card" style="padding:10px 14px;">
                 <div style="flex:1;">
                     <strong>${r.emoji} ${r.name}</strong>${repTag}
