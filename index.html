@@ -147,6 +147,12 @@
         .btn-qty { background: #F0F0F0; border: none; width: 26px; height: 26px; border-radius: 8px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         
         .product-card, .list-item-card { position: relative; }
+        @keyframes cardFlash {
+            0% { box-shadow: 0 0 0 0 rgba(255,90,95,0); }
+            25% { box-shadow: 0 0 0 3px rgba(255,90,95,0.55); background: #FFF3F3; }
+            100% { box-shadow: 0 0 0 0 rgba(255,90,95,0); }
+        }
+        .card-flash { animation: cardFlash 1.6s ease-out; }
         .right-actions { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 95px; gap: 4px; }
         .btn-del-action { background: none; border: none; color: #FF3B30; font-size: 11px; cursor: pointer; padding: 2px; font-weight: bold; }
         .btn-del-corner { position: absolute; top: 8px; right: 8px; background: #FFEBEB; border: none; color: #FF3B30; font-size: 11px; cursor: pointer; padding: 4px 8px; border-radius: 8px; font-weight: bold; z-index: 2; }
@@ -2317,6 +2323,7 @@
 
             const card = document.createElement('div');
             card.className = 'product-card';
+            card.id = `product-card-${p.id}`;   // 대시보드에서 이 제품으로 이동할 때 앵커
             card.innerHTML = `
                 <button class="btn-del-corner" onclick="confirmDeleteProduct(${p.id})">삭제 🗑️</button>
                 <div class="prod-info" style="padding-right:42px;">
@@ -4528,9 +4535,9 @@
             list.innerHTML = items.map(p => {
                 const cat = categories.find(c => Number(c.id) === Number(p.categoryId));
                 const catName = cat ? cat.name : (Number(p.categoryId) === 0 ? '🫙 일단 쓰고 봄' : '미지정');
-                return `<div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f5f5f5;">
+                return `<div onclick="goToProductFromDash(${p.id})" style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f5f5f5; cursor:pointer; -webkit-tap-highlight-color:transparent;">
                     <div>
-                        <div style="font-size:13px; font-weight:700; color:#333;">${p.name}</div>
+                        <div style="font-size:13px; font-weight:700; color:#333;">${p.name} <span style="color:#CCC; font-weight:400;">›</span></div>
                         <div style="font-size:11px; color:#aaa; margin-top:2px;">${catName}</div>
                     </div>
                     <div style="font-size:13px; font-weight:900; color:${type==='refill'?'#FF5A5F':(type==='risk'?'#E03131':'#E67E22')};">
@@ -4540,6 +4547,31 @@
             }).join('');
         }
         popup.style.display = 'block';
+    }
+
+    // 대시보드 팝업의 제품을 눌러 내 화장대의 그 제품 카드로 이동 + 강조
+    function goToProductFromDash(productId) {
+        closeDashProductPopup();
+        // 필터가 걸려 있으면 그 제품이 목록에서 빠질 수 있으므로 초기화
+        const cat = document.getElementById('filterCategory');
+        const sched = document.getElementById('filterSchedule');
+        const status = document.getElementById('filterStatus');
+        const search = document.getElementById('filterSearch');
+        if (cat) cat.value = 'all';
+        if (sched) sched.value = 'all';
+        if (status) status.value = 'all';
+        if (search) search.value = '';
+
+        switchTab('home');   // 내 화장대 탭으로 (renderProducts 포함해 다시 그림)
+
+        // 렌더가 끝난 뒤 카드로 스크롤 + 잠깐 강조
+        setTimeout(() => {
+            const card = document.getElementById(`product-card-${productId}`);
+            if (!card) return;
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.classList.add('card-flash');
+            setTimeout(() => card.classList.remove('card-flash'), 1600);
+        }, 120);
     }
 
     function closeDashProductPopup() {
