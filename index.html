@@ -783,6 +783,7 @@
                 <button onclick="changeRoutineDate(-1)" id="routineDatePrev" style="background:none; border:none; font-size:18px; cursor:pointer; color:#555;">‹</button>
                 <span id="routineDateLabel" style="font-size:12px; font-weight:bold; min-width:80px; text-align:center;"></span>
                 <button onclick="changeRoutineDate(1)" id="routineDateNext" style="background:none; border:none; font-size:18px; cursor:pointer; color:#555;">›</button>
+                <button onclick="goToRoutineToday()" id="routineTodayBtn" style="display:none; background:var(--primary); border:none; color:#fff; font-size:11px; font-weight:700; padding:4px 10px; border-radius:8px; cursor:pointer; margin-left:2px;">오늘</button>
             </div>
         </div>
         <div id="todayRoutineList"></div>
@@ -3932,6 +3933,11 @@
         routineDateOffset = next;
         renderRoutineTab();
     }
+    function goToRoutineToday() {
+        if (routineDateOffset === 0) return;
+        routineDateOffset = 0;
+        renderRoutineTab();
+    }
 
     // 루틴 추가
     let newRoutineSelectedIds = new Set();
@@ -4814,6 +4820,9 @@
         }
         // 오늘이면 다음(미래) 버튼 비활성화
         if (nextBtn) nextBtn.style.opacity = routineDateOffset === 0 ? '0.25' : '1';
+        // '오늘' 바로가기 버튼: 오늘이 아닐 때만 노출
+        const todayBtn = document.getElementById('routineTodayBtn');
+        if (todayBtn) todayBtn.style.display = routineDateOffset === 0 ? 'none' : 'inline-block';
         const prevBtn = document.getElementById('routineDatePrev');
         if (prevBtn) prevBtn.style.opacity = routineDateOffset <= ROUTINE_VIEW_MIN_OFFSET ? '0.25' : '1';
 
