@@ -3743,17 +3743,24 @@
         return dateStr === cycleWindowEnd(r, dateStr);
     }
     // 이 날짜에 이 루틴이 대상인가 (체크리스트 노출 + 올클리어 판정 공용)
+    // 그날 실제로 완료 기록이 있는가 (규칙과 무관하게 '기록의 사실')
+    function routineHasCheckOn(r, dateStr) {
+        const rec = (r.checkHistory || []).find(h => h.date === dateStr);
+        return !!(rec && rec.checkedProductIds && rec.checkedProductIds.length > 0);
+    }
+    // 이 날짜에 이 루틴이 '대상'인가.
+    // 핵심: 규칙을 나중에 바꿔도 과거 완료 기록은 소급해서 무효화되면 안 된다.
+    //   → 이미 완료 기록이 있는 날은 규칙과 무관하게 항상 대상으로 인정한다.
+    //   → 규칙(요일 지정 등)은 '앞으로 어느 날 뜰지'에만 적용한다.
     function routineActiveOn(r, dateStr) {
+        if (routineHasCheckOn(r, dateStr)) return true;   // 과거 기록 보존 (소급 무효화 방지)
         const mode = routineRepeatMode(r);
-        // 요일 계열(특정요일·요일중한번)은 '적용 전' 개념 없이 항상 지정 요일에만 뜬다.
-        // (scheduleFrom 이전이라도 매일 떠선 안 됨 — 그게 지정 요일의 의미)
         if (mode === 'weekdays') return r.activeDays[dowOf(dateStr)] !== false;
         if (mode === 'weekdaysOnce') {
             if (r.activeDays[dowOf(dateStr)] === false) return false;   // 후보 요일 아니면 안 뜸
             if (weekdaysOnceDone(r, dateStr)) return false;             // 이번 주 이미 완료면 안 뜸
             return true;
         }
-        // 주기 루틴은 매일 보이되 판정만 다름. 단 '적용 전(과거)'은 예전처럼 매일로 둔다(소급 방지).
         return true;
     }
     // 올클리어 판정에서 이 루틴이 '미완료'로 발목을 잡는가
