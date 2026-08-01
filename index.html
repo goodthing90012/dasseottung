@@ -102,6 +102,8 @@
         .review-fs-photos img { width: 100px; height: 100px; object-fit: cover; border-radius: 10px; cursor: pointer; }
         .review-fs-footer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #eee; flex-shrink: 0; }
         .review-fs-btn { flex: 1; padding: 12px 0; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; background: #F1F3F5; color: #555; }
+        .exclude-chip { display:inline-flex; align-items:center; gap:5px; background:#FFF4E6; color:#E8590C; border:1px solid #FFD8A8; border-radius:8px; padding:5px 8px 5px 10px; font-size:12px; font-weight:700; }
+        .exclude-chip .x { cursor:pointer; color:#E8590C; font-size:12px; opacity:0.75; padding:0 2px; }
         .memo-view-btn { flex:1; padding:7px 0; font-size:12px; font-weight:700; color:#888; background:#F1F3F5; border:1.5px solid transparent; border-radius:9px; cursor:pointer; }
         .memo-view-btn.active { background:#FFF0F1; color:var(--primary); border-color:var(--primary); }
         .rep-mode-btn { flex:1; padding:7px 0; font-size:12px; font-weight:700; color:#888; background:#F1F3F5; border:1.5px solid transparent; border-radius:8px; cursor:pointer; }
@@ -372,6 +374,16 @@
                         <div style="font-size:10px; color:#aaa; margin-top:5px;">주기 안에 한 번만 하면 돼요. 마감일 전엔 미완료로 잡히지 않아요 (예: 각질제거, 팩)</div>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label>제외 날짜 (연차·휴일 등)</label>
+                    <div style="font-size:11px; color:#aaa; margin-bottom:6px;">이 날짜엔 체크리스트에 그대로 뜨지만, 안 해도 달성률·꾸준함에 실패로 안 잡혀요.</div>
+                    <div id="editRoutineExcludeChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+                    <div style="display:flex; gap:6px;">
+                        <input type="date" id="editRoutineExcludeInput" style="flex:1; border:1px solid #ddd; border-radius:8px; padding:7px; font-size:12px;">
+                        <button type="button" onclick="addExcludeDate('editRoutine')" style="background:#F1F3F5; border:none; border-radius:8px; padding:0 14px; font-size:12px; font-weight:700; color:#555; cursor:pointer;">추가</button>
+                    </div>
+                </div>
+
             <div style="display:flex; gap:8px;">
                 <button class="confirm-btn no" onclick="cancelEditRoutine()">취소</button>
                 <button class="confirm-btn yes" onclick="saveEditRoutine()">저장</button>
@@ -862,6 +874,16 @@
                         <div style="font-size:10px; color:#aaa; margin-top:5px;">주기 안에 한 번만 하면 돼요. 마감일 전엔 미완료로 잡히지 않아요 (예: 각질제거, 팩)</div>
                     </div>
                 </div>
+                <div class="form-group">
+                    <label>제외 날짜 (연차·휴일 등)</label>
+                    <div style="font-size:11px; color:#aaa; margin-bottom:6px;">이 날짜엔 체크리스트에 그대로 뜨지만, 안 해도 달성률·꾸준함에 실패로 안 잡혀요.</div>
+                    <div id="newRoutineExcludeChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+                    <div style="display:flex; gap:6px;">
+                        <input type="date" id="newRoutineExcludeInput" style="flex:1; border:1px solid #ddd; border-radius:8px; padding:7px; font-size:12px;">
+                        <button type="button" onclick="addExcludeDate('newRoutine')" style="background:#F1F3F5; border:none; border-radius:8px; padding:0 14px; font-size:12px; font-weight:700; color:#555; cursor:pointer;">추가</button>
+                    </div>
+                </div>
+
                 <button class="btn-save" onclick="addRoutine()">루틴 저장</button>
             </div>
             <div class="section-title">등록된 루틴</div>
@@ -1791,6 +1813,17 @@
 
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
+        {
+            version: 'v3.1.0',
+            date: '2026.07',
+            title: '루틴 제외 날짜',
+            items: [
+                '🌴 루틴마다 연차·휴일 같은 제외 날짜를 지정할 수 있어요',
+                '✅ 제외일에도 체크리스트엔 그대로 뜨지만, 안 해도 달성률·꾸준함에 실패로 안 잡혀요',
+                '🎯 제외일에 실제로 체크하면 그건 그대로 완료로 인정돼요',
+                '📅 이미 지난 날짜도 소급해서 제외 처리할 수 있어요'
+            ]
+        },
         {
             version: 'v3.0.0',
             date: '2026.07',
@@ -3783,6 +3816,17 @@
         const rec = (r.checkHistory || []).find(h => h.date === dateStr);
         return !!(rec && rec.checkedProductIds && rec.checkedProductIds.length > 0);
     }
+    // 그 날짜가 이 루틴의 제외일(연차·휴일 등)인가.
+    // 단, 제외로 지정했어도 실제로 체크했다면 '한 것'이므로 제외 취급하지 않는다 (보너스로 인정).
+    function routineExcludedOn(r, dateStr) {
+        if (routineHasCheckOn(r, dateStr)) return false;
+        return (r.excludeDates || []).includes(dateStr);
+    }
+    // 그 날짜에 이 루틴이 '실제로 해내야 하는' 대상인가 (달성률·꾸준함 분모용).
+    // 노출(routineActiveOn)과는 다르다 — 제외일에도 체크리스트엔 뜨지만, 여기선 빠진다.
+    function routineScheduledOn(r, dateStr) {
+        return routineActiveOn(r, dateStr) && !routineExcludedOn(r, dateStr);
+    }
     // 이 날짜에 이 루틴이 '대상'인가.
     // 핵심: 규칙을 나중에 바꿔도 과거 완료 기록은 소급해서 무효화되면 안 된다.
     //   → 이미 완료 기록이 있는 날은 규칙과 무관하게 항상 대상으로 인정한다.
@@ -3801,6 +3845,7 @@
     // 올클리어 판정에서 이 루틴이 '미완료'로 발목을 잡는가
     function routineBlocksAllClear(r, dateStr) {
         if (!routineActiveOn(r, dateStr)) return false;         // 그날 대상 아님
+        if (routineExcludedOn(r, dateStr)) return false;        // 제외일(연차 등) — 미완료여도 발목 안 잡음
         const rmode = routineRepeatMode(r);
         // 주기: 과거 소급 방지 게이트 유지
         if (routineRuleApplies(r, dateStr) && rmode === 'cycle') {
@@ -3860,7 +3905,7 @@
     function isRoutineScheduledDay(dateStr) {
         const ds = dailyRoutines();
         if (ds.length === 0) return false;
-        return ds.some(r => routineActiveOn(r, dateStr));
+        return ds.some(r => routineScheduledOn(r, dateStr));
     }
     // 루틴 기록이 시작된 가장 이른 날짜
     function getFirstRoutineDate() {
@@ -3917,6 +3962,8 @@
             // 아직 마감이 안 지난 '진행 중' 창은, 이미 완료한 경우에만 집계에 넣는다
             // (마감 전 미완료는 아직 실패가 아니므로 분모에서 제외 → 억울한 감점 방지)
             if (end > todayStr) continue;
+            // 마감일이 제외일(연차 등)이고 완료도 안 했으면, 이번 창은 집계 자체에서 뺀다
+            if (!done && (r.excludeDates || []).includes(end)) continue;
             if (end === todayStr || end < todayStr) {
                 out.push({ end, done });
             }
@@ -4092,6 +4139,37 @@
         syncCycleWeeksInput(prefix);
         syncRepeatUI(prefix);
     }
+    // ── 루틴 제외 날짜 (연차·휴일 등) ──
+    let excludeDatesState = { newRoutine: [], editRoutine: [] };
+    function addExcludeDate(prefix) {
+        const inp = document.getElementById(prefix + 'ExcludeInput');
+        const val = inp.value;
+        if (!val) return;
+        if (!excludeDatesState[prefix].includes(val)) {
+            excludeDatesState[prefix].push(val);
+            excludeDatesState[prefix].sort();
+        }
+        inp.value = '';
+        renderExcludeChips(prefix);
+    }
+    function removeExcludeDate(prefix, dateStr) {
+        excludeDatesState[prefix] = excludeDatesState[prefix].filter(d => d !== dateStr);
+        renderExcludeChips(prefix);
+    }
+    function renderExcludeChips(prefix) {
+        const box = document.getElementById(prefix + 'ExcludeChips');
+        if (!box) return;
+        const list = excludeDatesState[prefix];
+        if (list.length === 0) {
+            box.innerHTML = `<div style="font-size:11px; color:#CCC;">예정된 제외 날짜가 없어요</div>`;
+            return;
+        }
+        box.innerHTML = list.map(d => {
+            const label = d.slice(5).replace('-', '/');   // YYYY-MM-DD -> MM/DD
+            return `<span class="exclude-chip">${label} <span class="x" onclick="removeExcludeDate('${prefix}','${d}')">✕</span></span>`;
+        }).join('');
+    }
+
     function resetRepeatUI(prefix) {
         repeatState[prefix] = { mode: 'daily', days: [true,true,true,true,true,true,true], onceDays: [false,false,false,false,false,false,false] };
         const sel = document.getElementById(prefix + 'CycleWeeks');
@@ -4100,6 +4178,8 @@
         if (inp) inp.value = '';
         syncCycleWeeksInput(prefix);
         syncRepeatUI(prefix);
+        excludeDatesState[prefix] = [];
+        renderExcludeChips(prefix);
     }
 
     function addRoutine() {
@@ -4109,7 +4189,7 @@
         const selectedIds = [...newRoutineSelectedIds];
         const rep = readRepeatFields('newRoutine');
         if (!rep) return;
-        routines.push({ id: Date.now(), name, emoji, productIds: selectedIds, checkHistory: [], ...rep });
+        routines.push({ id: Date.now(), name, emoji, productIds: selectedIds, checkHistory: [], excludeDates: excludeDatesState.newRoutine.slice(), ...rep });
         document.getElementById('newRoutineEmoji').value = '';
         document.getElementById('newRoutineName').value = '';
         newRoutineSelectedIds = new Set();
@@ -4149,6 +4229,8 @@
                     <span>${p.name}</span>
                 </label>`).join('');
         loadRepeatFields('editRoutine', r);
+        excludeDatesState.editRoutine = (r.excludeDates || []).slice();
+        renderExcludeChips('editRoutine');
         document.getElementById('editRoutineOverlay').classList.add('active');
     }
     function cancelEditRoutine() {
@@ -4166,6 +4248,7 @@
         if (!rep) return;
         if (r) {
             r.emoji = emoji; r.name = name; r.productIds = selectedIds;
+            r.excludeDates = excludeDatesState.editRoutine.slice();
             // 규칙이 그대로면 scheduleFrom을 갱신하지 않는다 (기존 주기 창이 밀리지 않게)
             const sameRule = r.repeat === rep.repeat
                 && JSON.stringify(r.activeDays || null) === JSON.stringify(rep.activeDays)
@@ -5001,6 +5084,10 @@
                 const repeatTag = (routineRuleApplies(r, todayStr) && routineRepeatMode(r) === 'weekdays')
                     ? `<span style="font-size:10px; color:#888; font-weight:600; background:#F1F3F5; padding:2px 6px; border-radius:6px; margin-left:5px;">${routineRepeatLabel(r)}</span>`
                     : '';
+                // 오늘이 이 루틴의 제외일(연차 등)이면 안내 배지 — 안 해도 실패로 안 잡힌다는 걸 눈에 보이게
+                const excludeBadge = routineExcludedOn(r, todayStr)
+                    ? `<div style="font-size:11px; font-weight:700; color:#868E96; background:#F1F3F5; padding:5px 9px; border-radius:8px; margin-bottom:9px; display:inline-block;">🌴 오늘은 제외일이에요 — 안 해도 괜찮아요</div>`
+                    : '';
 
                 return `<div style="background:white; border-radius:14px; padding:14px; margin-bottom:12px; box-shadow:0 1px 6px rgba(0,0,0,0.06); ${allDone ? 'border:1.5px solid #1EA94A;' : ''}">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -5008,6 +5095,7 @@
                         ${allCheckBtn}
                     </div>
                     ${cycleBadge}
+                    ${excludeBadge}
                     ${productsHtml}
                 </div>`;
             }).join('');
@@ -5046,6 +5134,8 @@
 
     // 마이페이지 루틴 관리 렌더
     function renderRoutineMgmt() {
+        // 새 루틴 폼의 제외 날짜 칩 (상태는 유지된 채 매번 다시 그림)
+        renderExcludeChips('newRoutine');
         // 제품 선택 피커
         const picker = document.getElementById('routineProductPicker');
         if (picker) {
@@ -5080,13 +5170,17 @@
             const repBg = (mode === 'cycle' || mode === 'weekdaysOnce') ? '#FFF4E6' : '#F1F3F5';
             const repTag = mode === 'daily' ? ''
                 : `<span style="font-size:10px; font-weight:700; color:${repColor}; background:${repBg}; padding:2px 6px; border-radius:6px; margin-left:5px;">${repIcon}${routineRepeatLabel(r)}</span>`;
+            const excludeCount = (r.excludeDates || []).length;
+            const excludeTag = excludeCount > 0
+                ? `<span style="font-size:10px; font-weight:700; color:#E8590C; background:#FFF4E6; padding:2px 6px; border-radius:6px; margin-left:5px;">🗓️ 제외 ${excludeCount}일</span>`
+                : '';
             return `<div class="list-item-card" style="padding:10px 14px;">
                 <div class="order-btn-group">
                     <button class="order-btn" ${isFirst ? 'disabled' : ''} ${isFirst ? '' : `onclick="moveRoutineOrder(${r.id}, -1)"`}>▲</button>
                     <button class="order-btn" ${isLast ? 'disabled' : ''} ${isLast ? '' : `onclick="moveRoutineOrder(${r.id}, 1)"`}>▼</button>
                 </div>
                 <div style="flex:1;">
-                    <strong>${r.emoji} ${r.name}</strong>${repTag}
+                    <strong>${r.emoji} ${r.name}</strong>${repTag}${excludeTag}
                     <div style="font-size:11px; color:#AAA; margin-top:2px;">${productNames}</div>
                 </div>
                 <div style="display:flex; gap:6px;">
