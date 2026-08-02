@@ -105,7 +105,7 @@
         .excal-day { aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:9px; font-size:13px; font-weight:700; color:#333; cursor:pointer; -webkit-tap-highlight-color:transparent; user-select:none; }
         .excal-day.dim { color:#ddd; cursor:default; }
         .excal-day.today { border:1.5px solid #1EA94A; color:#1EA94A; }
-        .excal-day.picked { background:#FF922B; color:#fff; }
+        .excal-day.picked { background:var(--primary); color:#fff; }
         .exclude-chip { display:inline-flex; align-items:center; gap:5px; background:#FFF4E6; color:#E8590C; border:1px solid #FFD8A8; border-radius:8px; padding:5px 8px 5px 10px; font-size:12px; font-weight:700; }
         .exclude-chip .x { cursor:pointer; color:#E8590C; font-size:12px; opacity:0.75; padding:0 2px; }
         .memo-view-btn { flex:1; padding:7px 0; font-size:12px; font-weight:700; color:#888; background:#F1F3F5; border:1.5px solid transparent; border-radius:9px; cursor:pointer; }
@@ -1833,6 +1833,16 @@
 
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
+        {
+            version: 'v3.1.1',
+            date: '2026.07',
+            title: '요일중한번 루틴 달력 표시 버그 수정',
+            items: [
+                '🐛 \'요일 중 한 번\' 루틴만 완료한 날, 달력에 아무 캐릭터도 안 뜨던 문제 수정',
+                '📊 대시보드 루틴 달성률이 루틴 탭 숫자와 다르게 나오던 문제도 함께 수정',
+                '🎨 제외 날짜 선택 캘린더의 선택 색상을 앱 기본 색상으로 변경'
+            ]
+        },
         {
             version: 'v3.1.0',
             date: '2026.07',
@@ -3921,6 +3931,17 @@
             return rec && rec.checkedProductIds && rec.checkedProductIds.length > 0;
         });
     }
+    // isRoutineDayDone과 달리 '모든' 루틴(요일중한번·주기 포함)을 본다.
+    // 달성률·스트릭은 일 단위 집계라 주간형을 일부러 뺐지만(dailyRoutines()),
+    // 달력 마커·대시보드처럼 '오늘 뭐라도 했는지'를 표시할 땐 주간형도 포함해야 한다.
+    // (안 그러면 요일중한번/주기 루틴만 완료한 날에 달력에 아무 캐릭터도 안 뜨는 문제가 생긴다)
+    function isRoutineDayDoneAny(dateStr) {
+        return routines.some(r => {
+            if (!routineActiveOn(r, dateStr)) return false;
+            const rec = r.checkHistory.find(h => h.date === dateStr);
+            return rec && rec.checkedProductIds && rec.checkedProductIds.length > 0;
+        });
+    }
     // 그날 '예정된' 일일 루틴이 하나라도 있는가.
     function isRoutineScheduledDay(dateStr) {
         const ds = dailyRoutines();
@@ -4004,6 +4025,31 @@
         return p ? !!p.archived : false;
     }
     // 해당 날짜에 등록된 모든 루틴 100% 완료(올클리어) 여부
+    // 달성률 계산을 한 곳에만 둔다 — 예전에 루틴탭 위젯과 대시보드 위젯이 각자
+    // 따로 계산하다가, 한쪽만 고치고 한쪽은 못 고쳐서 서로 다른 숫자가 나온 적이 있었다.
+    // year, month: 0-indexed month. uptoDay: 그 달의 며칠까지 셀지.
+    function computeRoutineAchievement(year, month, uptoDay) {
+        let doneDays = 0, scheduledDays = 0;
+        const monthStartStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
+        const todayStr = `${year}-${String(month+1).padStart(2,'0')}-${String(uptoDay).padStart(2,'0')}`;
+        for (let d = 1; d <= uptoDay; d++) {
+            const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            if (!isRoutineScheduledDay(dateStr)) continue;
+            scheduledDays++;
+            if (isRoutineDayDone(dateStr)) doneDays++;
+        }
+        routines.forEach(r => {
+            if (!isWeeklyMode(routineRepeatMode(r))) return;
+            weeklyWindowsOf(r, todayStr).forEach(w => {
+                if (w.end < monthStartStr || w.end > todayStr) return;
+                scheduledDays++;
+                if (w.done) doneDays++;
+            });
+        });
+        const pct = scheduledDays > 0 ? Math.round((doneDays / scheduledDays) * 100) : 0;
+        return { doneDays, scheduledDays, pct };
+    }
+
     function isRoutineDayAllClear(dateStr) {
         if (routines.length === 0) return false;
         // 그날 대상인 루틴이 하나도 없으면 올클리어로 치지 않는다 (빈 날에 별이 뜨는 것 방지)
@@ -4405,30 +4451,8 @@
         const month = now.getMonth();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const today = now.getDate();
-        let doneDays = 0;
-
-        // 달성률 = 일일 루틴(날 단위) + 주간형 루틴(창 단위)을 함께 센다.
-        // 단위가 섞이지 않도록, 주간형은 '이번 달에 마감이 걸린 창'을 1칸씩 분모에 더한다.
-        let scheduledDays = 0;
-        const monthStartStr = `${year}-${String(month+1).padStart(2,'0')}-01`;
-        const todayStr = `${year}-${String(month+1).padStart(2,'0')}-${String(today).padStart(2,'0')}`;
-        for (let d = 1; d <= today; d++) {
-            const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-            if (!isRoutineScheduledDay(dateStr)) continue;
-            scheduledDays++;
-            if (isRoutineDayDone(dateStr)) doneDays++;
-        }
-        // 주간형 루틴의 창을 이번 달 범위에서 합산
-        routines.forEach(r => {
-            if (!isWeeklyMode(routineRepeatMode(r))) return;
-            weeklyWindowsOf(r, todayStr).forEach(w => {
-                if (w.end < monthStartStr || w.end > todayStr) return;   // 이번 달 마감분만
-                scheduledDays++;
-                if (w.done) doneDays++;
-            });
-        });
-
-        const pct = scheduledDays > 0 ? Math.round((doneDays / scheduledDays) * 100) : 0;
+        const rateResult = computeRoutineAchievement(year, month, today);
+        const doneDays = rateResult.doneDays, scheduledDays = rateResult.scheduledDays, pct = rateResult.pct;
 
         // 최고 꾸준함 — 계산이 한 군데(getMaxRoutineStreak)에만 있도록 공용 함수를 쓴다
         const maxStreak = getMaxRoutineStreak();
@@ -4607,15 +4631,10 @@
         const dc = id => document.getElementById(id);
         if (dc('dash-tung-count')) dc('dash-tung-count').textContent = tungCount;
 
-        // 루틴 달성률 — 이번 달, '오늘까지 지난 일수' 기준 (아직 안 온 날은 분모에서 제외)
-        const dayOfMonth = new Date(today).getDate();
-        let doneDays = 0;
-        for (let d = 1; d <= dayOfMonth; d++) {
-            const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-            if (isRoutineDayDone(dateStr)) doneDays++;
-        }
-        const pct = dayOfMonth > 0 ? Math.round(doneDays / dayOfMonth * 100) : 0;
-        if (dc('dash-routine-pct')) dc('dash-routine-pct').textContent = pct + '%';
+        // 루틴 달성률 — 루틴 탭 위젯과 동일한 계산식(computeRoutineAchievement)을 그대로 쓴다.
+        // (예전엔 여기만 따로 계산해서, 요일 지정 루틴을 쓰는 사람은 대시보드 숫자가 루틴 탭과 달랐다)
+        const dashRate = computeRoutineAchievement(new Date(today).getFullYear(), new Date(today).getMonth(), new Date(today).getDate());
+        if (dc('dash-routine-pct')) dc('dash-routine-pct').textContent = dashRate.pct + '%';
         if (dc('dash-routine-streak')) dc('dash-routine-streak').textContent = getMaxRoutineStreak();
 
         // 리필 예정 (재고 1개 이하)
@@ -4898,8 +4917,10 @@
             const dateStr = `${calendarYear}-${String(calendarMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const isToday = dateStr === todayStr;
 
-            // 루틴 완료 여부
-            const routineDone = isRoutineDayDone(dateStr);
+            // 루틴 완료 여부 — 달력 마커는 요일중한번·주기 루틴도 포함해서 봐야 한다.
+            // (isRoutineDayDone은 달성률·스트릭 전용으로 일일 루틴만 보므로, 요일중한번만
+            //  완료한 날엔 아무 캐릭터도 안 뜨는 문제가 있었다)
+            const routineDone = isRoutineDayDoneAny(dateStr);
 
             // 텅 여부 (formatDateString으로 로컬 날짜 비교)
             const tungDone = products.some(p =>
