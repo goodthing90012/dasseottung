@@ -108,6 +108,11 @@
         .excal-day.picked { background:var(--primary); color:#fff; }
         .exclude-chip { display:inline-flex; align-items:center; gap:5px; background:#FFF4E6; color:#E8590C; border:1px solid #FFD8A8; border-radius:8px; padding:5px 8px 5px 10px; font-size:12px; font-weight:700; }
         .exclude-chip .x { cursor:pointer; color:#E8590C; font-size:12px; opacity:0.75; padding:0 2px; }
+        .star-pick { color:#E0E0E0; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:color 0.1s; }
+        .star-pick.on { color:#FFB400; }
+        .repurchase-btn { flex:1; padding:9px 0; font-size:13px; font-weight:700; color:#888; background:#F1F3F5; border:1.5px solid transparent; border-radius:9px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+        .repurchase-btn.on[data-v="yes"] { background:#EBFBEE; color:#2F9E44; border-color:#B2F2BB; }
+        .repurchase-btn.on[data-v="no"] { background:#FFF0F0; color:#E03131; border-color:#FFC9C9; }
         .memo-view-btn { flex:1; padding:7px 0; font-size:12px; font-weight:700; color:#888; background:#F1F3F5; border:1.5px solid transparent; border-radius:9px; cursor:pointer; }
         .memo-view-btn.active { background:#FFF0F1; color:var(--primary); border-color:var(--primary); }
         .rep-mode-btn { flex:1; padding:7px 0; font-size:12px; font-weight:700; color:#888; background:#F1F3F5; border:1.5px solid transparent; border-radius:8px; cursor:pointer; }
@@ -292,6 +297,17 @@
             <p id="editReviewModalTitle" style="margin-bottom:10px;">상품평 수정</p>
             <textarea id="editReviewTextInput" maxlength="200" placeholder="수정할 내용을 입력하세요"
                 style="width:100%; height:80px; border-radius:8px; border:1px solid #ddd; padding:8px; font-size:13px; resize:none; box-sizing:border-box;"></textarea>
+            <div style="margin:0 0 10px; text-align:left;">
+                <div style="font-size:11px; font-weight:bold; color:#888; margin-bottom:4px;">별점 (선택)</div>
+                <div id="editReviewStars" style="font-size:26px; line-height:1; letter-spacing:2px;"><span class="star-pick" data-n="1" onclick="setReviewRating('editReview',1)">★</span><span class="star-pick" data-n="2" onclick="setReviewRating('editReview',2)">★</span><span class="star-pick" data-n="3" onclick="setReviewRating('editReview',3)">★</span><span class="star-pick" data-n="4" onclick="setReviewRating('editReview',4)">★</span><span class="star-pick" data-n="5" onclick="setReviewRating('editReview',5)">★</span></div>
+            </div>
+            <div style="margin:0 0 12px; text-align:left;">
+                <div style="font-size:11px; font-weight:bold; color:#888; margin-bottom:4px;">재구매 의사 (선택)</div>
+                <div style="display:flex; gap:6px;">
+                    <button type="button" class="repurchase-btn" data-v="yes" onclick="setReviewRepurchase('editReview','yes')">👍 있음</button>
+                    <button type="button" class="repurchase-btn" data-v="no" onclick="setReviewRepurchase('editReview','no')">👎 없음</button>
+                </div>
+            </div>
             <div id="editReviewPhotoArea" style="margin:10px 0; text-align:left;">
                 <div style="font-size:11px; font-weight:bold; color:#888; margin-bottom:4px;">사진 (최대 3장)</div>
                 <div id="editReviewPhotoList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
@@ -311,6 +327,17 @@
             <p id="reviewModalTitle" style="margin-bottom:10px;">상품평을 남겨볼까요?</p>
             <textarea id="reviewTextInput" maxlength="200" placeholder="이 제품, 어떻게 쓰셨나요? (예: 흡수는 좋았지만 향이 좀 강했어요)" 
                 style="width:100%; box-sizing:border-box; height:80px; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:13px; resize:none; margin-bottom:14px; font-family:inherit;"></textarea>
+            <div style="margin:0 0 10px; text-align:left;">
+                <div style="font-size:11px; font-weight:bold; color:#888; margin-bottom:4px;">별점 (선택)</div>
+                <div id="reviewStars" style="font-size:26px; line-height:1; letter-spacing:2px;"><span class="star-pick" data-n="1" onclick="setReviewRating('review',1)">★</span><span class="star-pick" data-n="2" onclick="setReviewRating('review',2)">★</span><span class="star-pick" data-n="3" onclick="setReviewRating('review',3)">★</span><span class="star-pick" data-n="4" onclick="setReviewRating('review',4)">★</span><span class="star-pick" data-n="5" onclick="setReviewRating('review',5)">★</span></div>
+            </div>
+            <div style="margin:0 0 12px; text-align:left;">
+                <div style="font-size:11px; font-weight:bold; color:#888; margin-bottom:4px;">재구매 의사 (선택)</div>
+                <div style="display:flex; gap:6px;">
+                    <button type="button" class="repurchase-btn" data-v="yes" onclick="setReviewRepurchase('review','yes')">👍 있음</button>
+                    <button type="button" class="repurchase-btn" data-v="no" onclick="setReviewRepurchase('review','no')">👎 없음</button>
+                </div>
+            </div>
             <div id="reviewPhotoArea" style="margin:0 0 12px; text-align:left;">
                 <div style="font-size:11px; font-weight:bold; color:#888; margin-bottom:4px;">사진 (최대 3장)</div>
                 <div id="reviewPhotoList" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
@@ -461,12 +488,14 @@
             <div class="review-fs-meta" id="reviewDetailMeta"></div>
         </div>
         <div class="review-fs-body">
+            <div id="reviewDetailBadges" style="margin-bottom:10px;"></div>
             <div class="review-fs-text" id="reviewDetailText"></div>
             <div class="review-fs-photos" id="reviewDetailPhotos"></div>
         </div>
         <div class="review-fs-footer">
             <button class="review-fs-btn" onclick="deleteReviewFromDetail()">삭제</button>
-            <button class="review-fs-btn" onclick="shareReviewFromDetail()">공유</button>
+            <button class="review-fs-btn" onclick="shareReviewFromDetail()">텍스트</button>
+            <button class="review-fs-btn" onclick="shareReviewImageFromDetail()">🖼️ 이미지</button>
             <button class="review-fs-btn" style="background:var(--primary,#FF5A5F); color:#fff;" onclick="editReviewFromDetail()">수정</button>
         </div>
     </div>
@@ -1834,6 +1863,27 @@
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
         {
+            version: 'v3.2.0',
+            date: '2026.07',
+            title: '리뷰 별점·재구매 의사 + 이미지로 공유',
+            items: [
+                '⭐ 상품평에 별점(1~5개)을 남길 수 있어요',
+                '👍 재구매 의사 있음/없음도 표시할 수 있어요 (둘 다 선택사항)',
+                '🖼️ 상품평 상세보기에서 \'이미지\' 버튼으로 예쁜 카드 이미지를 만들어 공유할 수 있어요',
+                '📤 기존 텍스트 공유(클립보드 복사)는 \'텍스트\' 버튼으로 이름만 정리했어요'
+            ]
+        },
+        {
+            version: 'v3.1.2',
+            date: '2026.07',
+            title: '주기 계산 안내 정확도 개선',
+            items: [
+                '🔍 \'시작일 모르는 통\'은 첫 텅이 평균 계산에서 빠져서 3번째 텅부터 평균이 나와요 (정상 동작이에요)',
+                '📝 안내 문구를 \'2번 누르면\'에서 실제 남은 횟수로 정확하게 바꿨어요',
+                '🫙 첫 텅(추정 시작일)도 평균엔 안 들어가지만, 며칠 썼는지 숫자는 토스트와 카드에 그대로 보여드려요'
+            ]
+        },
+        {
             version: 'v3.1.1',
             date: '2026.07',
             title: '요일중한번 루틴 달력 표시 버그 수정',
@@ -2298,10 +2348,10 @@
                     if (!matchedSched) {
                         // 세일/구매 일정이 연동 안 된 경우 — 기존처럼 분석 단계 안내만
                         if (history.length === 0) {
-                            const hasProvisional = (p.tungHistory || []).some(h => h.provisional);
+                            const provEntry = (p.tungHistory || []).find(h => h.provisional);
                             statusBadge = '<span class="badge neutral">🫙 분석 대기 중</span>';
-                            alertText = hasProvisional
-                                ? '앱 쓰기 전부터 쓰던 통이라 첫 소진은 평균에서 빼요 · 다음 텅부터 정확해져요'
+                            alertText = provEntry
+                                ? `이전 통은 ${provEntry.days}일 썼어요 · 시작일을 몰라서 평균엔 안 넣었어요 (다음 텅부터 정확해져요)`
                                 : '텅을 누를수록 소진 패턴이 자동으로 분석돼요';
                         } else if (history.length === 1) {
                             statusBadge = '<span class="badge neutral">📊 데이터 1개 수집됨</span>';
@@ -2356,7 +2406,14 @@
                         const remainHint = remainCount > 0 ? `, ${remainCount}번 더 쌓이면 완전히 맞춰져요` : ', 내 패턴으로 완전히 맞춰졌어요';
                         usedText = `현재 통 사용 ${daysUsed}일째 · 예상 소진 주기: ${effectiveCategoryDays}일 (처음 설정 ${myCategory.days}일 → 내 실제 사용 기록 반영해서 조정 중${remainHint})`;
                     } else {
-                        usedText = `현재 통 사용 ${daysUsed}일째 (기준 ${myCategory.days}일 주기 · 텅 2번 누르면 실제 데이터 반영 시작)`;
+                        // '2번 누르면'을 고정 문구로 쓰면, 첫 텅이 추정치(provisional)라 평균에서 빠지는
+                        // 경우엔 실제로 3번째 텅에야 반영되는데도 안내가 틀려서 헷갈리게 만든다.
+                        // 그래서 실제 남은 필요 횟수(needMoreReal)를 계산해서 넣는다.
+                        const needMoreReal = Math.max(2 - realHistory.length, 1);
+                        const provEntry = (p.tungHistory || []).find(h => h.provisional);
+                        // 추정 시작일 기반 첫 텅은 평균엔 안 들어가지만, 실제로 며칠 썼는지는 숫자로 보여준다
+                        const provisionalNote = provEntry ? ` · 이전 통은 ${provEntry.days}일 썼어요 (시작일을 몰라서 평균엔 안 넣었어요)` : '';
+                        usedText = `현재 통 사용 ${daysUsed}일째 (기준 ${myCategory.days}일 주기 · 텅 ${needMoreReal}번 더 누르면 실제 데이터 반영 시작${provisionalNote})`;
                     }
                 }
             }
@@ -2793,9 +2850,17 @@
             const realHist = (p.tungHistory || []).filter(h => !h.provisional);
             const cnt = realHist.length;
             const avg = cnt >= 2 ? Math.round(realHist.reduce((s,h)=>s+h.days,0)/cnt) : null;
-            toastMsg = avg !== null
-                ? `📊 ${getTungOrdinalLabel(p.tungCount)}! 평균 ${avg}일 소진 패턴이에요`
-                : `🫙 ${getTungOrdinalLabel(p.tungCount)}!`;
+            const justTunged = p.tungHistory[p.tungHistory.length - 1];   // 방금 기록된 항목
+            if (avg !== null) {
+                toastMsg = `📊 ${getTungOrdinalLabel(p.tungCount)}! 평균 ${avg}일 소진 패턴이에요`;
+            } else if (justTunged && justTunged.provisional) {
+                // 추정 시작일 기반이라 평균엔 안 들어가지만, 실제로 며칠 썼는지는 보여준다
+                toastMsg = `🫙 ${getTungOrdinalLabel(p.tungCount)}! 이번 통은 ${justTunged.days}일 썼어요 (추정 시작일이라 평균엔 안 넣어요)`;
+            } else if (justTunged) {
+                toastMsg = `🫙 ${getTungOrdinalLabel(p.tungCount)}! ${justTunged.days}일 썼어요`;
+            } else {
+                toastMsg = `🫙 ${getTungOrdinalLabel(p.tungCount)}!`;
+            }
         }
         showToast(toastMsg);
 
@@ -3075,6 +3140,22 @@
 
     // ── 리뷰 상세보기 (전체화면) ──
     let viewingReviewId = null;
+    // 별점·재구매를 별점 문자열 + 배지로 렌더 (리뷰 목록 / 상세보기 공용)
+    function renderReviewRatingHtml(r) {
+        const parts = [];
+        if (r.rating) {
+            const stars = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+            parts.push(`<span style="color:#FFB400; font-size:14px; letter-spacing:1px;">${stars}</span>`);
+        }
+        if (r.repurchase === 'yes') {
+            parts.push(`<span style="font-size:11px; font-weight:700; color:#2F9E44; background:#EBFBEE; padding:2px 7px; border-radius:6px;">👍 재구매 의사 있음</span>`);
+        } else if (r.repurchase === 'no') {
+            parts.push(`<span style="font-size:11px; font-weight:700; color:#E03131; background:#FFF0F0; padding:2px 7px; border-radius:6px;">👎 재구매 의사 없음</span>`);
+        }
+        if (parts.length === 0) return '';
+        return `<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">${parts.join('')}</div>`;
+    }
+
     function openReviewDetail(reviewId) {
         const r = reviews.find(rv => rv.id === reviewId);
         if (!r) return;
@@ -3086,6 +3167,7 @@
             `${getTungOrdinalLabel(r.tungNo || 1)} 리뷰 · ${formatDateString(r.date)}`
             + `${cat ? ' · ' + cat.name : ''}${sched ? ' · ' + sched.name : ''}`
             + `${r.editedAt ? ' · 수정됨' : ''}`;
+        document.getElementById('reviewDetailBadges').innerHTML = renderReviewRatingHtml(r);
         document.getElementById('reviewDetailText').textContent = r.text;
         const dPhotos = (r.photos || []);
         const dList = dPhotos.join(',');
@@ -3373,6 +3455,46 @@
         });
     })();
 
+    // ── 리뷰 별점·재구매 (작성/수정 공용) ──
+    let reviewRatingState = { review: 0, editReview: 0 };
+    let reviewRepurchaseState = { review: null, editReview: null };
+    // 같은 모달(confirm-box) 안에서만 버튼을 찾아야 새 폼/수정 폼이 서로 안 섞인다
+    function _reviewFormScope(prefix) {
+        const anchor = document.getElementById(prefix + 'Stars');
+        return anchor ? anchor.closest('.confirm-box') : null;
+    }
+    function setReviewRating(prefix, n) {
+        // 같은 별을 다시 누르면 선택 해제 (별점은 선택사항이라 취소 가능해야 함)
+        reviewRatingState[prefix] = (reviewRatingState[prefix] === n) ? 0 : n;
+        renderReviewRating(prefix);
+    }
+    function renderReviewRating(prefix) {
+        const scope = _reviewFormScope(prefix);
+        if (!scope) return;
+        const n = reviewRatingState[prefix];
+        scope.querySelectorAll('.star-pick').forEach(s => {
+            s.classList.toggle('on', parseInt(s.dataset.n, 10) <= n);
+        });
+    }
+    function setReviewRepurchase(prefix, v) {
+        reviewRepurchaseState[prefix] = (reviewRepurchaseState[prefix] === v) ? null : v;
+        renderReviewRepurchase(prefix);
+    }
+    function renderReviewRepurchase(prefix) {
+        const scope = _reviewFormScope(prefix);
+        if (!scope) return;
+        const v = reviewRepurchaseState[prefix];
+        scope.querySelectorAll('.repurchase-btn').forEach(b => {
+            b.classList.toggle('on', b.dataset.v === v);
+        });
+    }
+    function resetReviewRatingUI(prefix) {
+        reviewRatingState[prefix] = 0;
+        reviewRepurchaseState[prefix] = null;
+        renderReviewRating(prefix);
+        renderReviewRepurchase(prefix);
+    }
+
     // ── 상품평 (텅 비운 직후 입력) ──
     let pendingReviewProductId = null;
     let pendingReviewTungNo = 1;
@@ -3386,6 +3508,7 @@
         document.getElementById('reviewTextInput').value = '';
         reviewWorkingPhotos = [];
         renderReviewPhotos('new');
+        resetReviewRatingUI('review');
         document.getElementById('reviewOverlay').classList.add('active');
         setTimeout(() => document.getElementById('reviewTextInput').focus(), 50);
     }
@@ -3411,7 +3534,9 @@
             text: text,
             date: pendingReviewDate != null ? pendingReviewDate : getTodayTimeline(),
             tungNo: pendingReviewTungNo,
-            photos: reviewWorkingPhotos.slice()
+            photos: reviewWorkingPhotos.slice(),
+            rating: reviewRatingState.review || null,
+            repurchase: reviewRepurchaseState.review
         });
         reviewWorkingPhotos = [];
         showToast('📝 상품평이 저장됐어요');
@@ -3474,6 +3599,10 @@
         editReviewWorkingPhotos = (r.photos || []).slice();
         editReviewOriginalPhotos = (r.photos || []).slice();
         renderReviewPhotos('edit');
+        reviewRatingState.editReview = r.rating || 0;
+        reviewRepurchaseState.editReview = r.repurchase || null;
+        renderReviewRating('editReview');
+        renderReviewRepurchase('editReview');
         document.getElementById('editReviewOverlay').classList.add('active');
         setTimeout(() => document.getElementById('editReviewTextInput').focus(), 50);
     }
@@ -3499,6 +3628,8 @@
                 .filter(pid => !editReviewWorkingPhotos.includes(pid))
                 .forEach(pid => photoDelete(pid));
             r.photos = editReviewWorkingPhotos.slice();
+            r.rating = reviewRatingState.editReview || null;
+            r.repurchase = reviewRepurchaseState.editReview;
         }
         editReviewWorkingPhotos = [];
         editReviewOriginalPhotos = [];
@@ -5335,6 +5466,214 @@
         renderReviewList();
     }
 
+    // ══════════ 리뷰 이미지로 공유 (다뺐텅의 리포트 공유 방식 참고) ══════════
+    // canvas에 그려서 PNG로 만든 뒤, Web Share API(파일 공유) 지원 기기는 공유 시트로,
+    // 아니면 다운로드로 대체한다.
+    function wrapCanvasText(ctx, text, maxWidth) {
+        // 한글은 띄어쓰기 기준 word-wrap이 잘 안 맞아서 글자 단위로 채워 넣는다.
+        const paragraphs = String(text || '').split('\n');
+        const lines = [];
+        paragraphs.forEach(p => {
+            if (p.length === 0) { lines.push(''); return; }
+            let line = '';
+            for (const ch of p) {
+                const test = line + ch;
+                if (ctx.measureText(test).width > maxWidth && line.length > 0) {
+                    lines.push(line);
+                    line = ch;
+                } else {
+                    line = test;
+                }
+            }
+            if (line) lines.push(line);
+        });
+        return lines;
+    }
+
+    function shareReviewAsImage(reviewId) {
+        const r = reviews.find(rv => rv.id === reviewId);
+        if (!r) return;
+        showToast('🖼️ 이미지를 만드는 중...');
+
+        const W = 720, dpr = 2;
+        const PAD = 44, contentW = W - PAD * 2;
+
+        // 실제 그리기 전에 임시 컨텍스트로 텍스트 줄 수를 먼저 재서 전체 높이를 계산한다
+        // (canvas는 높이를 만들 때 미리 정해야 하므로)
+        const measureCanvas = document.createElement('canvas');
+        const mctx = measureCanvas.getContext('2d');
+        mctx.font = '400 20px sans-serif';
+        const textLines = wrapCanvasText(mctx, r.text, contentW - 8);
+        const lineH = 30;
+
+        const hasPhoto = r.photos && r.photos.length > 0 && photoCache[r.photos[0]];
+        const photoH = hasPhoto ? 320 : 0;
+
+        const headerH = 210;   // 로고+텅이 캐릭터
+        const metaH = 70;      // 제품명+텅번호+날짜
+        const badgeH = (r.rating || r.repurchase) ? 44 : 0;
+        const textAreaH = textLines.length * lineH + 20;
+        const footerH = 70;
+        const H = headerH + metaH + badgeH + textAreaH + photoH + footerH + PAD * 2;
+
+        const cv = document.createElement('canvas');
+        cv.width = W * dpr; cv.height = H * dpr;
+        const g = cv.getContext('2d');
+        g.scale(dpr, dpr);
+
+        function rr(x, y, w, h, rad) {
+            g.beginPath();
+            g.moveTo(x + rad, y);
+            g.arcTo(x + w, y, x + w, y + h, rad);
+            g.arcTo(x + w, y + h, x, y + h, rad);
+            g.arcTo(x, y + h, x, y, rad);
+            g.arcTo(x, y, x + w, y, rad);
+            g.closePath();
+        }
+
+        function drawAll(photoImg) {
+            // 배경 그라데이션 (앱 메인 컬러 톤)
+            const bg = g.createLinearGradient(0, 0, 0, H);
+            bg.addColorStop(0, '#FFF3F3');
+            bg.addColorStop(1, '#FFE3E5');
+            g.fillStyle = bg;
+            g.fillRect(0, 0, W, H);
+
+            // 카드
+            g.fillStyle = '#ffffff';
+            rr(24, 24, W - 48, H - 48, 26);
+            g.fill();
+
+            const cx = W / 2;
+            let y = 24 + 40;
+
+            // 로고 텍스트 (다썼텅)
+            g.textAlign = 'center';
+            g.fillStyle = '#FF5A5F';
+            g.font = '800 26px sans-serif';
+            g.fillText('다썼텅', cx, y);
+            y += 30;
+            g.fillStyle = '#BBB';
+            g.font = '600 13px sans-serif';
+            g.fillText('내가 쓴 상품평', cx, y);
+            y += 26;
+
+            const drawRest = () => {
+                // 텅이 캐릭터
+                if (drawRest._charImg) {
+                    const im = drawRest._charImg;
+                    const maxH = 84, ratio = im.width / im.height, dw = maxH * ratio;
+                    g.drawImage(im, cx - dw / 2, y, dw, maxH);
+                }
+                y += 100;
+
+                // 제품명
+                g.textAlign = 'center';
+                g.fillStyle = '#222';
+                g.font = '800 24px sans-serif';
+                g.fillText(r.productName, cx, y);
+                y += 30;
+
+                // 텅 번호 + 날짜
+                g.fillStyle = '#999';
+                g.font = '500 15px sans-serif';
+                const ordinal = getTungOrdinalLabel(r.tungNo || 1);
+                g.fillText(`${ordinal} · ${formatDateString(r.date)}`, cx, y);
+                y += 34;
+
+                // 별점 + 재구매 배지
+                if (r.rating || r.repurchase) {
+                    if (r.rating) {
+                        g.font = '700 22px sans-serif';
+                        g.fillStyle = '#FFB400';
+                        g.fillText('★'.repeat(r.rating) + '☆'.repeat(5 - r.rating), cx, y);
+                    }
+                    if (r.repurchase) {
+                        const label = r.repurchase === 'yes' ? '👍 재구매 의사 있음' : '👎 재구매 의사 없음';
+                        g.font = '700 14px sans-serif';
+                        g.fillStyle = r.repurchase === 'yes' ? '#2F9E44' : '#E03131';
+                        g.fillText(label, cx, y + (r.rating ? 26 : 0));
+                    }
+                    y += badgeH;
+                }
+                y += 14;
+
+                // 본문 (좌측 정렬, 카드 안쪽 배경)
+                const boxY = y;
+                const boxH = textAreaH;
+                g.fillStyle = '#FFF8F8';
+                rr(PAD, boxY, contentW, boxH, 16);
+                g.fill();
+                g.textAlign = 'left';
+                g.fillStyle = '#333';
+                g.font = '400 20px sans-serif';
+                let ty = boxY + 34;
+                textLines.forEach(line => {
+                    g.fillText(line, PAD + 20, ty);
+                    ty += lineH;
+                });
+                y += boxH + 20;
+
+                // 사진 (있으면 첫 장만, 중앙 정렬 정사각 크롭)
+                if (photoImg) {
+                    const size = photoH - 20;
+                    const sx = (photoImg.width - Math.min(photoImg.width, photoImg.height)) / 2;
+                    const sy = (photoImg.height - Math.min(photoImg.width, photoImg.height)) / 2;
+                    const s = Math.min(photoImg.width, photoImg.height);
+                    g.save();
+                    rr(cx - size / 2, y, size, size, 16);
+                    g.clip();
+                    g.drawImage(photoImg, sx, sy, s, s, cx - size / 2, y, size, size);
+                    g.restore();
+                    y += photoH;
+                }
+
+                // 하단 태그라인
+                g.textAlign = 'center';
+                g.fillStyle = '#CCC';
+                g.font = '500 12px sans-serif';
+                g.fillText('다썼텅에서 기록한 리뷰예요 🫙', cx, H - 40);
+
+                finishShare();
+            };
+
+            const charImg = new Image();
+            charImg.onload = () => { drawRest._charImg = charImg; drawRest(); };
+            charImg.onerror = () => { drawRest(); };
+            charImg.src = CHAR_TUNG;
+        }
+
+        function finishShare() {
+            cv.toBlob(blob => {
+                if (!blob) { showToast('⚠️ 이미지 생성에 실패했어요'); return; }
+                const safeName = (r.productName || '리뷰').replace(/[\\/:*?"<>|]/g, '');
+                const filename = `다썼텅_리뷰_${safeName}_${formatDateString(r.date)}.png`;
+                const file = new File([blob], filename, { type: 'image/png' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    navigator.share({ files: [file], title: `${r.productName} 상품평` }).catch(() => {});
+                } else {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = filename; a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    showToast('🖼️ 이미지를 저장했어요');
+                }
+            }, 'image/png');
+        }
+
+        if (hasPhoto) {
+            const pImg = new Image();
+            pImg.onload = () => drawAll(pImg);
+            pImg.onerror = () => drawAll(null);
+            pImg.src = photoCache[r.photos[0]];
+        } else {
+            drawAll(null);
+        }
+    }
+    function shareReviewImageFromDetail() {
+        if (viewingReviewId != null) shareReviewAsImage(viewingReviewId);
+    }
+
     function shareReview(reviewId) {
         const r = reviews.find(rv => rv.id === reviewId);
         if (!r) return;
@@ -5435,6 +5774,7 @@
                     <!-- 본문 영역만 상세보기로 연결 (버튼은 위에서 stopPropagation) -->
                     <div onclick="openReviewDetail(${r.id})" style="cursor:pointer;">
                     <div class="review-meta">${cat ? cat.name : '카테고리 없음'} ${sched ? '· ' + sched.name : ''} · ${formatDateString(r.date)}${editedMark}</div>
+                    ${renderReviewRatingHtml(r)}
                     <div class="review-text">${r.text}</div>
                     ${(r.photos && r.photos.length) ? `<div class="review-photos">${r.photos.map(pid => `<img src="${photoCache[pid] || ''}" onclick="event.stopPropagation(); openPhotoViewer('${pid}','${r.photos.join(',')}')">`).join('')}</div>` : ''}
                     </div>
