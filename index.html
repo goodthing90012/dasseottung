@@ -2310,6 +2310,18 @@
                 effectiveCategoryDays = Math.round(myCategory.days * (1 - blendWeight) + realAvgDays * blendWeight);
             }
 
+            // [신규] 카드에 항상 띄우는 '실측 기록 요약' — 첫 통 기간 → 2회부터 실측 평균
+            // (예측 주기와 별개로, 실제로 며칠 썼는지를 정직하게 앞세운다)
+            const provFirst = (p.tungHistory || []).find(h => h.provisional);
+            const measuredSummary =
+                realHistory.length >= 2
+                    ? `실측 평균 ${realAvgDays}일 (${realHistory.length}회 기록)`
+                    : realHistory.length === 1
+                        ? `첫 통 ${realHistory[0].days}일 사용`
+                        : provFirst
+                            ? `이전 통 ${provFirst.days}일 사용 · 추정 시작일이라 평균 제외`
+                            : null;
+
             // [변경점] 소진일 계산: 현재 통은 (평균일 - 며칠 썼는지)만큼만 남은 걸로 계산
             // 나머지 미개봉 재고(stock - 1개)는 그대로 평균일씩 더함
             let totalRemainingDays = 0;
@@ -2369,7 +2381,7 @@
                                 : '텅을 누를수록 소진 패턴이 자동으로 분석돼요';
                         } else if (history.length === 1) {
                             statusBadge = '<span class="badge neutral">📊 데이터 1개 수집됨</span>';
-                            alertText = `첫 소진: ${history[0].days}일 걸렸어요 · 1번 더 누르면 평균 계산!`;
+                            alertText = `1번 더 텅하면 평균이 잡혀요`;
                         } else {
                             statusBadge = '<span class="badge enough">📊 평균 ' + avgDays + '일 소진</span>';
                             alertText = `${history.length}회 분석 기준 · 평균 ${avgDays}일마다 한 통 소진`;
@@ -2391,7 +2403,8 @@
                         }
                     }
 
-                    usedText = `현재 통 사용 ${daysUsed}일째` + (avgDays !== null ? ` (평균 ${avgDays}일 주기)` : ' (패턴 분석 중)');
+                    // [변경] 세일 연동 여부와 무관하게 실측 기록(첫 통 기간 → 실측 평균)을 항상 보여준다
+                    usedText = `현재 통 사용 ${daysUsed}일째` + (measuredSummary ? ` · ${measuredSummary}` : ' · 패턴 분석 중');
                 }
             } else {
                 if (p.stock === 0) {
@@ -2421,20 +2434,21 @@
                     alertText = `소진 ${totalRemainingDays}일 후 (세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`;
                 }
                 if (p.stock > 0) {
+                    // [변경] 실측 기록(첫 통 기간 → 실측 평균)을 앞세우고, 예측 주기는 실측과 다를 때만 보조로
+                    let usageLine = `현재 통 사용 ${daysUsed}일째`;
+                    if (measuredSummary) usageLine += ` · ${measuredSummary}`;
                     if (realAvgDays !== null) {
-                        const remainCount = Math.max(5 - realHistory.length, 0);
-                        const remainHint = remainCount > 0 ? `, ${remainCount}번 더 쌓이면 완전히 맞춰져요` : ', 내 패턴으로 완전히 맞춰졌어요';
-                        usedText = `현재 통 사용 ${daysUsed}일째 · 예상 소진 주기: ${effectiveCategoryDays}일 (처음 설정 ${myCategory.days}일 → 내 실제 사용 기록 반영해서 조정 중${remainHint})`;
+                        // 실측 평균이 있는데도 예측(가중블렌딩)이 아직 실측과 차이나면 그 사실만 짧게 알림
+                        if (Math.abs(effectiveCategoryDays - realAvgDays) >= 3) {
+                            usageLine += ` · 예상 주기 ${effectiveCategoryDays}일 (기준값 반영 중)`;
+                        }
+                        // 차이가 거의 없으면 예측이 실측에 수렴한 것 → 굳이 두 숫자 안 보여줌
                     } else {
-                        // '2번 누르면'을 고정 문구로 쓰면, 첫 텅이 추정치(provisional)라 평균에서 빠지는
-                        // 경우엔 실제로 3번째 텅에야 반영되는데도 안내가 틀려서 헷갈리게 만든다.
-                        // 그래서 실제 남은 필요 횟수(needMoreReal)를 계산해서 넣는다.
+                        // 아직 실측 평균 없음 → 기준 주기로 예측 중임을 안내 (남은 필요 횟수 계산)
                         const needMoreReal = Math.max(2 - realHistory.length, 1);
-                        const provEntry = (p.tungHistory || []).find(h => h.provisional);
-                        // 추정 시작일 기반 첫 텅은 평균엔 안 들어가지만, 실제로 며칠 썼는지는 숫자로 보여준다
-                        const provisionalNote = provEntry ? ` · 이전 통은 ${provEntry.days}일 썼어요 (시작일을 몰라서 평균엔 안 넣었어요)` : '';
-                        usedText = `현재 통 사용 ${daysUsed}일째 (기준 ${myCategory.days}일 주기 · 텅 ${needMoreReal}번 더 누르면 실제 데이터 반영 시작${provisionalNote})`;
+                        usageLine += ` · 예상 주기 ${myCategory.days}일 기준 (텅 ${needMoreReal}번 더면 실측 평균)`;
                     }
+                    usedText = usageLine;
                 }
             }
 
