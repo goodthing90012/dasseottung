@@ -1863,6 +1863,15 @@
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
         {
+            version: 'v3.2.1',
+            date: '2026.07',
+            title: '첫 사용기간 노출 누락 수정',
+            items: [
+                '🐛 재고가 1개뿐인 제품은 첫 텅(추정치) 누르자마자 재고 0이 되는데, 이 경우 며칠 썼는지가 안 보이던 문제 수정',
+                '📊 이제 재고 0이어도 \'이전 통은 며칠 썼어요\'가 카드에 그대로 나와요'
+            ]
+        },
+        {
             version: 'v3.2.0',
             date: '2026.07',
             title: '리뷰 별점·재구매 의사 + 이미지로 공유',
@@ -2334,7 +2343,12 @@
                         alertText = '즉시 구매 필요';
                         usedText = `첫 소진 ${history[0].days}일 기록됨 · 다음 통부터 평균 계산`;
                     } else {
-                        alertText = '즉시 구매 필요';
+                        // 재고가 1개뿐이던 제품은 첫 텅(추정치)만으로 바로 재고 0이 된다.
+                        // 이 경우도 며칠 썼는지는 보여줘야 한다 (누락돼 있던 경로).
+                        const provEntry0 = (p.tungHistory || []).find(h => h.provisional);
+                        alertText = provEntry0
+                            ? `즉시 구매 필요 · 이전 통은 ${provEntry0.days}일 썼어요 (시작일을 몰라서 평균엔 안 넣었어요)`
+                            : '즉시 구매 필요';
                     }
                 } else {
                     // [변경점] 평균값이 있으면(0일 수도 있음) openedDate 기준으로 totalRemainingDays도 계산
@@ -2386,8 +2400,14 @@
                     if (realAvgDays !== null) {
                         alertText = `즉시 구매 필요 · 평균 ${effectiveCategoryDays}일마다 소진했어요 (내 기록 ${realHistory.length}회 반영)`;
                         usedText = `지금까지 텅 ${realHistory.length}회 · 평균 ${effectiveCategoryDays}일 주기`;
+                    } else if (realHistory.length === 1) {
+                        alertText = `즉시 구매 필요 · 첫 소진 ${realHistory[0].days}일 기록됨`;
                     } else {
-                        alertText = '즉시 구매 필요';
+                        // 재고가 1개뿐이던 제품은 첫 텅(추정치)만으로 바로 재고 0이 된다.
+                        const provEntry0 = (p.tungHistory || []).find(h => h.provisional);
+                        alertText = provEntry0
+                            ? `즉시 구매 필요 · 이전 통은 ${provEntry0.days}일 썼어요 (시작일을 몰라서 평균엔 안 넣었어요)`
+                            : '즉시 구매 필요';
                     }
                 } else if (!matchedSched) {
                     statusBadge = '<span class="badge neutral">일단 씀</span>'; alertText = `소진까지 약 ${totalRemainingDays}일 남음`;
