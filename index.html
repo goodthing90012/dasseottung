@@ -5884,13 +5884,14 @@
             let y = routineShareDrawHeader(g, char, cx, BRAND);
             g.textAlign = 'center'; g.fillStyle = '#222'; g.font = '800 25px sans-serif';
             g.fillText(day.dateLabel, cx, y); y += 40;
+            // 게이지·연속일수는 루틴 탭 상단 대시보드와 동일한 지표(이번 달 달성률 / 최고 꾸준함)를 그대로 쓴다
             const R = 60, rcy = y + R + 4;
-            routineShareDrawRing(g, cx, rcy, R, 15, total ? done / total : 0, RING, TRACK);
+            routineShareDrawRing(g, cx, rcy, R, 15, (day.achievedPct || 0) / 100, RING, TRACK);
             y = rcy + R + 40;
             g.textAlign = 'center'; g.fillStyle = BRAND; g.font = '800 30px sans-serif';
             g.fillText(day.streakDays + ' Days', cx, y); y += 26;
             g.fillStyle = '#9AAF82'; g.font = '600 14px sans-serif';
-            g.fillText(`오늘 ${done}/${total} 완료`, cx, y); y += 26;
+            g.fillText(`${day.achievedLabel} ${day.achievedDays}/${day.scheduledDays}일 (${day.achievedPct}%)`, cx, y); y += 26;
             g.fillStyle = BOX; routineShareRR(g, PAD, y, contentW, listH, 18); g.fill();
             let iy = y + boxPadT;
             dayRoutines.forEach((r, idx) => {
@@ -5981,9 +5982,20 @@
 
         const [yy, mm, dd] = dateStr.split('-');
         const dow = ['일', '월', '화', '수', '목', '금', '토'][dowOf(dateStr)];
+        // 달성률은 '그 날짜가 속한 달' 기준 — 지금 이번 달이면 오늘까지, 지난 달이면 그 달 전체
+        const viewedYear = parseInt(yy, 10), viewedMonthIdx = parseInt(mm, 10) - 1;
+        const now = new Date();
+        const isCurrentMonth = viewedYear === now.getFullYear() && viewedMonthIdx === now.getMonth();
+        const uptoDay = isCurrentMonth ? now.getDate() : new Date(viewedYear, viewedMonthIdx + 1, 0).getDate();
+        const rateResult = computeRoutineAchievement(viewedYear, viewedMonthIdx, uptoDay);
+        // 최고 꾸준함은 항상 전체 기록 기준 그대로
         const dayData = {
             dateLabel: `${parseInt(mm, 10)}월 ${parseInt(dd, 10)}일 ${dow}요일`,
-            streakDays: getRoutineStreak(),
+            streakDays: getMaxRoutineStreak(),
+            achievedLabel: isCurrentMonth ? '이번 달' : `${parseInt(mm, 10)}월`,
+            achievedDays: rateResult.doneDays,
+            scheduledDays: rateResult.scheduledDays,
+            achievedPct: rateResult.pct,
             routines: routinesData,
         };
 
