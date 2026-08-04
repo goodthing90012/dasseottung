@@ -5754,7 +5754,7 @@
         g.arcTo(x, y, x + w, y, rad);
         g.closePath();
     }
-    function routineShareDrawRing(g, cx, cy, R, lw, frac, RING, TRACK) {
+    function routineShareDrawRing(g, cx, cy, R, lw, frac, RING, TRACK, centerLabel, centerValue) {
         g.lineCap = 'round';
         g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2);
         g.lineWidth = lw; g.strokeStyle = TRACK; g.stroke();
@@ -5763,8 +5763,18 @@
             g.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(frac, 1));
             g.lineWidth = lw; g.strokeStyle = RING; g.stroke();
         }
-        g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.font = '46px sans-serif'; g.fillText('🔥', cx, cy + 2);
+        g.textAlign = 'center';
+        if (centerValue) {
+            // 달성률 게이지: 라벨 + 퍼센트를 링 안에 직접 표시
+            g.textBaseline = 'alphabetic';
+            g.fillStyle = '#8FAE6E'; g.font = '600 12px sans-serif';
+            g.fillText(centerLabel || '', cx, cy - 6);
+            g.fillStyle = '#3E6B12'; g.font = '800 27px sans-serif';
+            g.fillText(centerValue, cx, cy + 21);
+        } else {
+            g.textBaseline = 'middle';
+            g.font = '46px sans-serif'; g.fillText('🔥', cx, cy + 2);
+        }
         g.textBaseline = 'alphabetic';
     }
     function routineShareDrawCheckItem(g, x, ty, it, BRAND) {
@@ -5884,14 +5894,14 @@
             let y = routineShareDrawHeader(g, char, cx, BRAND);
             g.textAlign = 'center'; g.fillStyle = '#222'; g.font = '800 25px sans-serif';
             g.fillText(day.dateLabel, cx, y); y += 40;
-            // 게이지·연속일수는 루틴 탭 상단 대시보드와 동일한 지표(이번 달 달성률 / 최고 꾸준함)를 그대로 쓴다
+            // 게이지·연속일수는 루틴 탭 상단 대시보드와 동일한 지표(달성률 / 최고 꾸준함)를 그대로 쓴다
             const R = 60, rcy = y + R + 4;
-            routineShareDrawRing(g, cx, rcy, R, 15, (day.achievedPct || 0) / 100, RING, TRACK);
+            routineShareDrawRing(g, cx, rcy, R, 15, (day.achievedPct || 0) / 100, RING, TRACK, '달성률', (day.achievedPct || 0) + '%');
             y = rcy + R + 40;
             g.textAlign = 'center'; g.fillStyle = BRAND; g.font = '800 30px sans-serif';
             g.fillText(day.streakDays + ' Days', cx, y); y += 26;
             g.fillStyle = '#9AAF82'; g.font = '600 14px sans-serif';
-            g.fillText(`${day.achievedLabel} ${day.achievedDays}/${day.scheduledDays}일 (${day.achievedPct}%)`, cx, y); y += 26;
+            g.fillText(`${day.achievedLabel} ${day.achievedDays}/${day.scheduledDays}일 달성`, cx, y); y += 26;
             g.fillStyle = BOX; routineShareRR(g, PAD, y, contentW, listH, 18); g.fill();
             let iy = y + boxPadT;
             dayRoutines.forEach((r, idx) => {
@@ -5982,13 +5992,12 @@
 
         const [yy, mm, dd] = dateStr.split('-');
         const dow = ['일', '월', '화', '수', '목', '금', '토'][dowOf(dateStr)];
-        // 달성률은 '그 날짜가 속한 달' 기준 — 지금 이번 달이면 오늘까지, 지난 달이면 그 달 전체
-        const viewedYear = parseInt(yy, 10), viewedMonthIdx = parseInt(mm, 10) - 1;
+        // 달성률은 보고 있는 그 날짜 시점까지 — 오늘이면 오늘까지, 과거 날짜면 그 날짜까지로 계산한다
+        const viewedYear = parseInt(yy, 10), viewedMonthIdx = parseInt(mm, 10) - 1, viewedDay = parseInt(dd, 10);
         const now = new Date();
         const isCurrentMonth = viewedYear === now.getFullYear() && viewedMonthIdx === now.getMonth();
-        const uptoDay = isCurrentMonth ? now.getDate() : new Date(viewedYear, viewedMonthIdx + 1, 0).getDate();
-        const rateResult = computeRoutineAchievement(viewedYear, viewedMonthIdx, uptoDay);
-        // 최고 꾸준함은 항상 전체 기록 기준 그대로
+        const rateResult = computeRoutineAchievement(viewedYear, viewedMonthIdx, viewedDay);
+        // 최고 꾸준함은 항상 전체 기록(지금 시점) 기준 그대로
         const dayData = {
             dateLabel: `${parseInt(mm, 10)}월 ${parseInt(dd, 10)}일 ${dow}요일`,
             streakDays: getMaxRoutineStreak(),
