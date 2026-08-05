@@ -101,6 +101,8 @@
         .review-fs-photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
         .review-fs-photos img { width: 100px; height: 100px; object-fit: cover; border-radius: 10px; cursor: pointer; }
         .review-fs-footer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #eee; flex-shrink: 0; }
+        .report-tab-btn { flex: 1; padding: 8px 0; border: none; border-radius: 10px; background: #F5F5F5; color: #999; font-size: 12px; font-weight: 800; cursor: pointer; }
+        .report-tab-btn.active { background: var(--primary, #FF5A5F); color: #fff; }
         .review-fs-btn { flex: 1; padding: 12px 0; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; background: #F1F3F5; color: #555; }
         .excal-day { aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:9px; font-size:13px; font-weight:700; color:#333; cursor:pointer; -webkit-tap-highlight-color:transparent; user-select:none; }
         .excal-day.dim { color:#ddd; cursor:default; }
@@ -499,6 +501,33 @@
             <button class="review-fs-btn" style="background:var(--primary,#FF5A5F); color:#fff;" onclick="editReviewFromDetail()">수정</button>
         </div>
     </div>
+    <!-- 월간 리포트 -->
+    <div class="review-fs" id="reportFS">
+        <div class="review-fs-header">
+            <div class="review-fs-top">
+                <span class="review-fs-label">📅 월간 리포트</span>
+                <button class="review-fs-close" onclick="closeMonthlyReport()">✕</button>
+            </div>
+            <div style="display:flex; align-items:center; justify-content:center; gap:16px; margin-top:10px;">
+                <button onclick="reportShiftMonth(-1)" style="background:none; border:none; font-size:20px; cursor:pointer; color:#555;">‹</button>
+                <span id="reportMonthLabel" style="font-size:15px; font-weight:800;"></span>
+                <button onclick="reportShiftMonth(1)" id="reportNextBtn" style="background:none; border:none; font-size:20px; cursor:pointer; color:#555;">›</button>
+            </div>
+            <div style="display:flex; gap:6px; margin-top:12px;">
+                <button class="report-tab-btn active" id="reportTabBtn-consume" onclick="switchReportTab('consume')">💄 소비</button>
+                <button class="report-tab-btn" id="reportTabBtn-habit" onclick="switchReportTab('habit')">🌱 습관</button>
+                <button class="report-tab-btn" id="reportTabBtn-awards" onclick="switchReportTab('awards')">🏆 어워즈</button>
+            </div>
+        </div>
+        <div class="review-fs-body">
+            <div id="reportTabConsume"></div>
+            <div id="reportTabHabit" style="display:none; text-align:center; padding:60px 20px; color:#bbb; font-size:13px;">🌱 습관 리포트는 곧 만나요</div>
+            <div id="reportTabAwards" style="display:none; text-align:center; padding:60px 20px; color:#bbb; font-size:13px;">🏆 어워즈는 곧 만나요</div>
+        </div>
+        <div class="review-fs-footer">
+            <button class="review-fs-btn" style="flex:1; background:var(--primary,#FF5A5F); color:#fff;" onclick="shareMonthlyReport()">📤 이미지로 공유</button>
+        </div>
+    </div>
     <div class="confirm-overlay" id="photoViewer" style="background:rgba(0,0,0,0.93); z-index:1100; flex-direction:column;">
         <button class="pv-close" onclick="closePhotoViewer()">✕</button>
         <div class="pv-stage">
@@ -713,6 +742,18 @@
                 <span style="font-size:24px; font-weight:900; color:#E03131;" id="dash-risk-count">0</span>
                 <span style="font-size:11px; color:#ccc;">›</span>
             </div>
+        </div>
+
+        <!-- 월간 리포트 배너 -->
+        <div class="add-form" style="padding:14px 16px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; background:linear-gradient(135deg,#FFF3F3,#FFE8E8); border:1px solid #FFD9D9;" onclick="openMonthlyReport()">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div style="font-size:22px;">📅</div>
+                <div>
+                    <div style="font-size:13px; font-weight:800; color:var(--primary);">이번 달 리포트</div>
+                    <div style="font-size:10px; color:#aaa; margin-top:1px;">소비·습관을 한 달 단위로 돌아보기</div>
+                </div>
+            </div>
+            <span style="font-size:16px; color:#ddd;">›</span>
         </div>
 
         <!-- 달력 -->
@@ -4097,6 +4138,12 @@
             return rec && rec.checkedProductIds && rec.checkedProductIds.length > 0;
         });
     }
+    // 특정 '한 루틴'이 그 날 체크됐는지 (isRoutineDayDone과 같은 기준: 뭐라도 체크했으면 done)
+    function routineDoneOn(r, dateStr) {
+        if (!routineActiveOn(r, dateStr)) return false;
+        const rec = (r.checkHistory || []).find(h => h.date === dateStr);
+        return !!(rec && rec.checkedProductIds && rec.checkedProductIds.length > 0);
+    }
     // isRoutineDayDone과 달리 '모든' 루틴(요일중한번·주기 포함)을 본다.
     // 달성률·스트릭은 일 단위 집계라 주간형을 일부러 뺐지만(dailyRoutines()),
     // 달력 마커·대시보드처럼 '오늘 뭐라도 했는지'를 표시할 땐 주간형도 포함해야 한다.
@@ -5794,23 +5841,23 @@
         g.font = (it.done ? '700 ' : '500 ') + '19px sans-serif';
         g.fillText(it.name, x + half * 2 + 14, ty + 22);
     }
-    function routineShareDrawHeader(g, charImg, cx, BRAND) {
+    function routineShareDrawHeader(g, charImg, cx, BRAND, subtitle) {
         let y = 24 + 40;
         g.textAlign = 'center';
         g.fillStyle = BRAND; g.font = '800 26px sans-serif';
         g.fillText('다썼텅', cx, y); y += 30;
         g.fillStyle = '#B7C9A0'; g.font = '600 13px sans-serif';
-        g.fillText('오늘의 루틴', cx, y); y += 24;
+        g.fillText(subtitle || '오늘의 루틴', cx, y); y += 24;
         if (charImg) {
             const maxH = 88, dw = maxH * (charImg.width / charImg.height);
             g.drawImage(charImg, cx - dw / 2, y, dw, maxH);
         }
         return y + 100;
     }
-    function routineShareDrawFooter(g, cx, H) {
+    function routineShareDrawFooter(g, cx, H, text) {
         g.textAlign = 'center';
         g.fillStyle = '#C2CEB0'; g.font = '500 12px sans-serif';
-        g.fillText('다썼텅에서 기록한 루틴이에요 ✅', cx, H - 40);
+        g.fillText(text || '다썼텅에서 기록한 루틴이에요 ✅', cx, H - 40);
     }
     function routineShareDrawTagline(g, cx, y, text, TAG_BG, TAG) {
         g.textAlign = 'center'; g.font = '700 16px sans-serif';
@@ -5925,6 +5972,60 @@
     }
 
     // 캔버스를 blob으로 만들어 공유/다운로드 (리뷰 공유의 finishShare 방식과 동일)
+    // 월간 습관 리포트 카드: {monthLabel, pct, streakDays, top3:[{title,count}], badges:[{icon,label}]}
+    function renderHabitShareCard(canvas, data) {
+        const W = 720, dpr = 2, PAD = 44, contentW = W - PAD * 2;
+        const BRAND = '#5C9A1E', RING = '#7CBB2C', TRACK = '#E9F4D6', BOX = '#F4FAEC';
+        const FRAME_TOP = '#F4FBEA', FRAME_BOT = '#DCEFBE', TAG_BG = '#EDF7DD', TAG = '#4E8A16';
+        const top3H = data.top3.length ? data.top3.length * 46 + 30 : 0;
+        const badgeH = data.badges.length ? 60 : 0;
+        const H = PAD * 2 + (30 + 28 + 96) + 214 + (top3H ? top3H + 24 : 0) + (badgeH ? badgeH + 24 : 0) + 60;
+
+        canvas.width = W * dpr; canvas.height = H * dpr;
+        const g = canvas.getContext('2d'); g.scale(dpr, dpr);
+
+        return routineShareWithChar(canvas, char => {
+            routineSharePaintFrame(g, W, H, FRAME_TOP, FRAME_BOT);
+            const cx = W / 2;
+            let y = routineShareDrawHeader(g, char, cx, BRAND, `${data.monthLabel} 습관 리포트`);
+            const R = 60, rcy = y + R + 4;
+            routineShareDrawRing(g, cx, rcy, R, 15, (data.pct || 0) / 100, RING, TRACK, '성공률', (data.pct || 0) + '%');
+            y = rcy + R + 40;
+            g.textAlign = 'center'; g.fillStyle = BRAND; g.font = '800 30px sans-serif';
+            g.fillText(data.streakDays + ' Days', cx, y); y += 26;
+            g.fillStyle = '#9AAF82'; g.font = '600 14px sans-serif';
+            g.fillText('이 달 최고 연속 기록', cx, y); y += 26;
+
+            if (data.top3.length) {
+                g.fillStyle = BOX; routineShareRR(g, PAD, y, contentW, top3H, 18); g.fill();
+                let ty = y + 18;
+                const medals = ['🥇', '🥈', '🥉'];
+                data.top3.forEach((t, i) => {
+                    g.textAlign = 'left'; g.fillStyle = '#333'; g.font = '700 16px sans-serif';
+                    g.fillText(`${medals[i]} ${t.title}`, PAD + 22, ty + 22);
+                    g.textAlign = 'right'; g.fillStyle = BRAND; g.font = '800 15px sans-serif';
+                    g.fillText(t.count + '회', PAD + contentW - 22, ty + 22);
+                    ty += 46;
+                });
+                y += top3H + 24;
+            }
+            if (data.badges.length) {
+                let bx = PAD;
+                g.font = '700 13px sans-serif';
+                data.badges.forEach(b => {
+                    const label = b.icon + ' ' + b.label;
+                    const tw = g.measureText(label).width, pw = tw + 28, ph = 34;
+                    g.fillStyle = TAG_BG; routineShareRR(g, bx, y, pw, ph, 17); g.fill();
+                    g.fillStyle = TAG; g.textAlign = 'left'; g.textBaseline = 'middle';
+                    g.fillText(label, bx + 14, y + ph / 2 + 1); g.textBaseline = 'alphabetic';
+                    bx += pw + 8;
+                });
+                y += badgeH + 24;
+            }
+            routineShareDrawFooter(g, cx, H, '다썼텅에서 기록한 이번 달 습관이에요 🌱');
+        });
+    }
+
     function finishRoutineShare(canvas, filenameTag, shareTitle) {
         canvas.toBlob(blob => {
             if (!blob) { showToast('⚠️ 이미지 생성에 실패했어요'); return; }
@@ -6012,6 +6113,841 @@
         renderDayCard(out, dayData).then(() => {
             finishRoutineShare(out, '하루', dayData.dateLabel);
         });
+    }
+
+    // ══════════ 월간 리포트 ══════════
+    let reportYear, reportMonthIdx; // 보고 있는 연도·월(0-index)
+    let reportActiveTab = 'consume';
+
+    function openMonthlyReport() {
+        const n = new Date();
+        reportYear = n.getFullYear();
+        reportMonthIdx = n.getMonth();
+        reportActiveTab = 'consume';
+        renderMonthlyReport();
+        document.getElementById('reportFS').classList.add('active');
+    }
+    function closeMonthlyReport() {
+        document.getElementById('reportFS').classList.remove('active');
+    }
+    function reportShiftMonth(dir) {
+        let m = reportMonthIdx + dir, y = reportYear;
+        if (m < 0) { m = 11; y--; }
+        if (m > 11) { m = 0; y++; }
+        const n = new Date();
+        if (y > n.getFullYear() || (y === n.getFullYear() && m > n.getMonth())) return; // 미래 불가
+        reportYear = y; reportMonthIdx = m;
+        renderMonthlyReport();
+    }
+    function switchReportTab(tab) {
+        reportActiveTab = tab;
+        const labelMap = { consume: 'Consume', habit: 'Habit', awards: 'Awards' };
+        ['consume', 'habit', 'awards'].forEach(t => {
+            const btn = document.getElementById('reportTabBtn-' + t);
+            if (btn) btn.classList.toggle('active', t === tab);
+            const panel = document.getElementById('reportTab' + labelMap[t]);
+            if (panel) panel.style.display = (t === tab) ? 'block' : 'none';
+        });
+    }
+    function renderMonthlyReport() {
+        const n = new Date();
+        const isCur = (reportYear === n.getFullYear() && reportMonthIdx === n.getMonth());
+        document.getElementById('reportMonthLabel').textContent = `${reportYear}년 ${reportMonthIdx + 1}월`;
+        document.getElementById('reportNextBtn').style.opacity = isCur ? '0.3' : '1';
+        switchReportTab(reportActiveTab);
+        const stats = computeMonthlyConsumeStats(reportYear, reportMonthIdx);
+        renderConsumeTab(stats);
+        renderHabitTab(computeMonthlyHabitStats(reportYear, reportMonthIdx));
+        renderAwardsTab(computeMonthlyAwardsStats(reportYear, reportMonthIdx));
+    }
+
+    // 그 달의 소비 데이터 집계. skipCompare=true면 지난달 비교는 생략(재귀 1단계만 허용)
+    function computeMonthlyConsumeStats(year, monthIdx, skipCompare) {
+        const ym = `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
+        const inMonth = ts => typeof ts === 'number' && formatDateString(ts).slice(0, 7) === ym;
+
+        const tungEntries = [];
+        products.forEach(p => {
+            (p.tungHistory || []).forEach(h => {
+                if (inMonth(h.date)) tungEntries.push({ product: p, entry: h });
+            });
+        });
+        const tungCount = tungEntries.length;
+
+        const purchasedProducts = products.filter(p => inMonth(p.createdAt));
+        const purchaseCount = purchasedProducts.length;
+
+        const monthReviews = reviews.filter(r => inMonth(r.date));
+        const reviewCount = monthReviews.length;
+
+        // 카테고리별 비율 (공병 기준)
+        const catCounts = {};
+        tungEntries.forEach(({ product }) => {
+            const cat = categories.find(c => Number(c.id) === Number(product.categoryId));
+            const name = cat ? cat.name : '🫙 일단 쓰고 봄';
+            catCounts[name] = (catCounts[name] || 0) + 1;
+        });
+        const categoryBreakdown = Object.entries(catCounts).sort((a, b) => b[1] - a[1]);
+
+        // 평균 사용 기간 (실측만, 추정치 제외)
+        const realTungs = tungEntries.filter(t => !t.entry.provisional && typeof t.entry.days === 'number');
+        const avgUseDays = realTungs.length ? Math.round(realTungs.reduce((s, t) => s + t.entry.days, 0) / realTungs.length) : null;
+
+        // 평균 별점 / 재구매 의향
+        const ratedReviews = monthReviews.filter(r => r.rating);
+        const avgRating = ratedReviews.length ? (ratedReviews.reduce((s, r) => s + r.rating, 0) / ratedReviews.length) : null;
+        const repurchaseAnswered = monthReviews.filter(r => r.repurchase === 'yes' || r.repurchase === 'no');
+        const repurchaseYesCount = repurchaseAnswered.filter(r => r.repurchase === 'yes').length;
+        const repurchasePct = repurchaseAnswered.length ? Math.round(repurchaseYesCount / repurchaseAnswered.length * 100) : null;
+
+        // 이번 달 BEST
+        const bestRated = ratedReviews.length ? ratedReviews.reduce((a, b) => (b.rating > a.rating ? b : a)) : null;
+        const longestUsed = realTungs.length ? realTungs.reduce((a, b) => (b.entry.days > a.entry.days ? b : a)) : null;
+        const fastestFinished = realTungs.length ? realTungs.reduce((a, b) => (b.entry.days < a.entry.days ? b : a)) : null;
+        const repurchaseConfirmed = monthReviews.find(r => r.repurchase === 'yes') || null;
+
+        // 소비 성적표 (1~5, 기준 없으면 null → "기록 없음")
+        const emptyScore = tungCount >= 8 ? 5 : tungCount >= 5 ? 4 : tungCount >= 3 ? 3 : tungCount >= 1 ? 2 : 1;
+        const satisfactionScore = avgRating != null ? Math.max(1, Math.round(avgRating)) : null;
+        const repurchaseScore = repurchasePct != null ? (repurchasePct >= 90 ? 5 : repurchasePct >= 70 ? 4 : repurchasePct >= 50 ? 3 : repurchasePct >= 30 ? 2 : 1) : null;
+
+        let compare = null;
+        if (!skipCompare) {
+            let py = year, pm = monthIdx - 1;
+            if (pm < 0) { pm = 11; py--; }
+            const prev = computeMonthlyConsumeStats(py, pm, true);
+            compare = {
+                tungDiff: tungCount - prev.tungCount,
+                purchaseDiff: purchaseCount - prev.purchaseCount,
+                ratingDiff: (avgRating != null && prev.avgRating != null) ? Math.round((avgRating - prev.avgRating) * 10) / 10 : null,
+                repurchaseDiff: (repurchasePct != null && prev.repurchasePct != null) ? repurchasePct - prev.repurchasePct : null,
+                reviewDiff: reviewCount - prev.reviewCount,
+            };
+        }
+
+        return {
+            year, monthIdx, tungCount, purchaseCount, reviewCount,
+            categoryBreakdown, avgUseDays, avgRating, repurchasePct, repurchaseYesCount,
+            repurchaseAnsweredCount: repurchaseAnswered.length,
+            bestRated, longestUsed, fastestFinished, repurchaseConfirmed,
+            emptyScore, satisfactionScore, repurchaseScore,
+            tungEntries, compare,
+        };
+    }
+
+    function reportStarsHtml(n) {
+        const full = Math.max(0, Math.min(5, Math.round(n)));
+        return '★'.repeat(full) + '☆'.repeat(5 - full);
+    }
+
+    function renderConsumeTab(stats) {
+        const holder = document.getElementById('reportTabConsume');
+        const cardStyle = 'background:white; border-radius:14px; padding:16px; margin-bottom:12px; box-shadow:0 1px 6px rgba(0,0,0,0.06);';
+
+        // 📊 이번 달 요약
+        let html = `
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
+            <div style="${cardStyle} padding:12px; text-align:center; margin-bottom:0;">
+                <div style="font-size:18px;">🧴</div>
+                <div style="font-size:20px; font-weight:900; color:var(--primary);">${stats.tungCount}</div>
+                <div style="font-size:10px; color:#888; margin-top:2px;">공병 개수</div>
+            </div>
+            <div style="${cardStyle} padding:12px; text-align:center; margin-bottom:0;">
+                <div style="font-size:18px;">🛍️</div>
+                <div style="font-size:20px; font-weight:900; color:#333;">${stats.purchaseCount}</div>
+                <div style="font-size:10px; color:#888; margin-top:2px;">구매 개수</div>
+            </div>
+            <div style="${cardStyle} padding:12px; text-align:center; margin-bottom:0;">
+                <div style="font-size:18px;">⭐</div>
+                <div style="font-size:20px; font-weight:900; color:#333;">${stats.reviewCount}</div>
+                <div style="font-size:10px; color:#888; margin-top:2px;">리뷰 작성 수</div>
+            </div>
+        </div>`;
+
+        // 📈 소비 분석
+        html += `<div style="${cardStyle}">
+            <div style="font-size:13px; font-weight:800; margin-bottom:12px;">📈 소비 분석</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; margin-bottom:10px;">
+                <span style="color:#888;">공병 vs 구매</span>
+                <span style="font-weight:700;">🧴 ${stats.tungCount}개 · 🛍️ ${stats.purchaseCount}개</span>
+            </div>`;
+        if (stats.categoryBreakdown.length > 0) {
+            const total = stats.categoryBreakdown.reduce((s, kv) => s + kv[1], 0);
+            html += `<div style="margin-bottom:10px;">
+                <div style="font-size:12px; color:#888; margin-bottom:6px;">카테고리별 비율</div>
+                ${stats.categoryBreakdown.slice(0, 5).map(kv => {
+                    const name = kv[0], cnt = kv[1];
+                    const pct = Math.round(cnt / total * 100);
+                    return `<div style="margin-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:11px; margin-bottom:3px;">
+                            <span style="color:#555; word-break:keep-all;">${name}</span>
+                            <span style="color:#999; flex-shrink:0; margin-left:8px;">${pct}%</span>
+                        </div>
+                        <div style="height:7px; background:#F5F5F5; border-radius:4px; overflow:hidden;"><div style="width:${pct}%; height:100%; background:var(--primary);"></div></div>
+                    </div>`;
+                }).join('')}
+            </div>`;
+        }
+        html += `<div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;">
+                <span style="color:#888;">평균 사용 기간</span>
+                <span style="font-weight:700;">${stats.avgUseDays != null ? stats.avgUseDays + '일' : '—'}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;">
+                <span style="color:#888;">평균 별점</span>
+                <span style="font-weight:700;">${stats.avgRating != null ? stats.avgRating.toFixed(1) : '—'}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:13px;">
+                <span style="color:#888;">재구매 의향 비율</span>
+                <span style="font-weight:700;">${stats.repurchasePct != null ? stats.repurchasePct + '%' : '—'}</span>
+            </div>
+        </div>`;
+
+        // ❤️ 만족도
+        html += `<div style="${cardStyle} text-align:center;">
+            <div style="font-size:13px; font-weight:800; margin-bottom:10px;">❤️ 만족도</div>
+            ${stats.avgRating != null
+                ? `<div style="font-size:26px; color:#FFC048; letter-spacing:3px;">${reportStarsHtml(stats.avgRating)}</div><div style="font-size:16px; font-weight:800; margin-top:6px;">${stats.avgRating.toFixed(1)}</div>`
+                : `<div style="font-size:12px; color:#bbb; padding:8px 0;">이번 달엔 남긴 별점이 없어요</div>`}
+        </div>`;
+
+        // 🔄 재구매 의향
+        html += `<div style="${cardStyle}">
+            <div style="font-size:13px; font-weight:800; margin-bottom:10px;">🔄 재구매 의향</div>
+            ${stats.repurchaseAnsweredCount > 0
+                ? `<div style="display:flex; gap:10px;">
+                    <div style="flex:1; text-align:center; background:#EBFBEE; border-radius:10px; padding:10px;">
+                        <div style="font-size:16px; font-weight:800; color:#2F9E44;">👍 ${stats.repurchasePct}%</div>
+                    </div>
+                    <div style="flex:1; text-align:center; background:#FFF0F0; border-radius:10px; padding:10px;">
+                        <div style="font-size:16px; font-weight:800; color:#E03131;">👎 ${100 - stats.repurchasePct}%</div>
+                    </div>
+                </div>`
+                : `<div style="font-size:12px; color:#bbb; padding:8px 0; text-align:center;">이번 달엔 재구매 의사를 남긴 리뷰가 없어요</div>`}
+        </div>`;
+
+        // 📋 소비 성적표
+        const gradeRow = (label, score) => `<div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0;">
+            <span style="font-size:13px; color:#555;">${label}</span>
+            <span style="font-size:15px; color:#FFC048; letter-spacing:2px;">${score != null ? reportStarsHtml(score) : '<span style="font-size:11px; color:#ccc; letter-spacing:0;">기록 없음</span>'}</span>
+        </div>`;
+        html += `<div style="${cardStyle} border:1.5px solid #FFE3E3;">
+            <div style="font-size:13px; font-weight:800; margin-bottom:6px; color:var(--primary);">📋 소비 성적표</div>
+            ${gradeRow('비움', stats.emptyScore)}
+            ${gradeRow('만족도', stats.satisfactionScore)}
+            ${gradeRow('재구매', stats.repurchaseScore)}
+        </div>`;
+
+        // 🌿 이번 달 소비 밸런스
+        const filled = stats.emptyScore;
+        const balanceText = filled >= 4 ? '균형 잡힌 소비를 했어요.' : '조금 더 비워볼까요?';
+        html += `<div style="${cardStyle} text-align:center;">
+            <div style="font-size:13px; font-weight:800; margin-bottom:10px;">🌿 이번 달 소비 밸런스</div>
+            <div style="font-size:20px; letter-spacing:3px;">${'🟩'.repeat(filled)}${'⬜'.repeat(5 - filled)}</div>
+            <div style="font-size:12px; color:#888; margin-top:8px;">${balanceText}</div>
+        </div>`;
+
+        // 🏆 이번 달 BEST
+        const bestRows = [];
+        if (stats.bestRated) bestRows.push(['최고 평점 제품', `${stats.bestRated.productName} <span style="color:#FFC048; letter-spacing:1px;">${reportStarsHtml(stats.bestRated.rating)}</span>`]);
+        if (stats.longestUsed) bestRows.push(['가장 오래 사용한 제품', `${stats.longestUsed.product.name} (${stats.longestUsed.entry.days}일)`]);
+        if (stats.fastestFinished) bestRows.push(['가장 빨리 공병 낸 제품', `${stats.fastestFinished.product.name} (${stats.fastestFinished.entry.days}일)`]);
+        if (stats.repurchaseConfirmed) bestRows.push(['재구매 확정 제품', stats.repurchaseConfirmed.productName]);
+        html += `<div style="${cardStyle}">
+            <div style="font-size:13px; font-weight:800; margin-bottom:10px;">🏆 이번 달 BEST</div>
+            ${bestRows.length > 0
+                ? bestRows.map(kv => `<div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid #f5f5f5; font-size:12.5px;"><span style="color:#888;">${kv[0]}</span><span style="font-weight:700; color:#333; text-align:right; max-width:60%;">${kv[1]}</span></div>`).join('')
+                : `<div style="font-size:12px; color:#bbb; text-align:center; padding:8px 0;">이번 달엔 기록이 없어요</div>`}
+        </div>`;
+
+        // 📸 공병 컬렉션
+        html += `<div style="${cardStyle}">
+            <div style="font-size:13px; font-weight:800; margin-bottom:10px;">📸 공병 컬렉션</div>
+            ${stats.tungEntries.length > 0
+                ? `<div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px;">
+                    ${stats.tungEntries.slice(0, 12).map(te => {
+                        const product = te.product, entry = te.entry;
+                        const review = reviews.find(r => r.productId === product.id && r.tungNo === entry.tungNo);
+                        const photoId = review && review.photos && review.photos[0];
+                        const photoUrl = photoId ? photoCache[photoId] : null;
+                        return `<div style="aspect-ratio:1; border-radius:10px; overflow:hidden; background:#FFF3F3; display:flex; align-items:center; justify-content:center;">
+                            ${photoUrl ? `<img src="${photoUrl}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:22px;">🫙</span>`}
+                        </div>`;
+                    }).join('')}
+                </div>`
+                : `<div style="font-size:12px; color:#bbb; text-align:center; padding:8px 0;">이번 달엔 공병이 없어요</div>`}
+        </div>`;
+
+        // 📈 지난달과 비교
+        if (stats.compare) {
+            const c = stats.compare;
+            const diffStr = (v, unit) => v == null ? '—' : (v > 0 ? `+${v}${unit}` : v < 0 ? `${v}${unit}` : `±0${unit}`);
+            const diffColor = v => v == null ? '#bbb' : v > 0 ? '#2F9E44' : v < 0 ? '#E03131' : '#888';
+            const cmpRow = (label, v, unit) => `<div style="display:flex; justify-content:space-between; padding:7px 0; font-size:13px;">
+                <span style="color:#888;">${label}</span><span style="font-weight:800; color:${diffColor(v)};">${diffStr(v, unit)}</span>
+            </div>`;
+            html += `<div style="${cardStyle} margin-bottom:70px;">
+                <div style="font-size:13px; font-weight:800; margin-bottom:6px;">📈 지난달과 비교</div>
+                ${cmpRow('공병', c.tungDiff, '개')}
+                ${cmpRow('구매', c.purchaseDiff, '개')}
+                ${cmpRow('평균 별점', c.ratingDiff, '')}
+                ${cmpRow('재구매율', c.repurchaseDiff, '%')}
+            </div>`;
+        }
+
+        holder.innerHTML = html;
+    }
+
+    // 소비 리포트를 이미지로 공유 (상품평 공유 카드와 같은 canvas 방식)
+    // 그 달의 습관(루틴) 데이터 집계
+    function computeMonthlyHabitStats(year, monthIdx) {
+        const n = new Date();
+        const isCurrentMonth = (year === n.getFullYear() && monthIdx === n.getMonth());
+        const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+        const uptoDay = isCurrentMonth ? n.getDate() : daysInMonth;
+        const mm = String(monthIdx + 1).padStart(2, '0');
+        const dayList = [];
+        for (let d = 1; d <= uptoDay; d++) dayList.push(`${year}-${mm}-${String(d).padStart(2, '0')}`);
+
+        const rate = computeRoutineAchievement(year, monthIdx, uptoDay); // {doneDays, scheduledDays, pct}
+
+        // 이 달 안에서의 최고 연속 기록 (예정 없는 날은 건너뛰고 연속 유지, 달이 바뀌면 리셋)
+        let monthMaxStreak = 0, curStreak = 0;
+        dayList.forEach(dateStr => {
+            if (!isRoutineScheduledDay(dateStr)) return;
+            if (isRoutineDayDone(dateStr)) { curStreak++; monthMaxStreak = Math.max(monthMaxStreak, curStreak); }
+            else curStreak = 0;
+        });
+
+        // 루틴별 이 달 완료 횟수 → TOP3
+        const perRoutine = routines.map(r => {
+            let cnt = 0, scheduled = 0;
+            dayList.forEach(dateStr => {
+                if (!routineActiveOn(r, dateStr) || routineExcludedOn(r, dateStr)) return;
+                scheduled++;
+                if (routineDoneOn(r, dateStr)) cnt++;
+            });
+            return { routine: r, count: cnt, scheduled, rate: scheduled ? Math.round(cnt / scheduled * 100) : 0 };
+        }).filter(x => x.count > 0).sort((a, b) => b.count - a.count);
+        const top3 = perRoutine.slice(0, 3);
+
+        // 히트맵용 일자별 완료 비율
+        const heatmap = dayList.map(dateStr => {
+            const activeRs = routines.filter(r => routineActiveOn(r, dateStr) && !routineExcludedOn(r, dateStr));
+            const doneRs = activeRs.filter(r => routineDoneOn(r, dateStr));
+            const ratio = activeRs.length ? doneRs.length / activeRs.length : null; // null = 예정된 루틴 없음
+            return { dateStr, day: parseInt(dateStr.slice(8), 10), dow: dowOf(dateStr), ratio };
+        });
+
+        // 요일별 성공률 → 가장 잘 지킨 요일
+        const dowStats = [0, 1, 2, 3, 4, 5, 6].map(() => ({ scheduled: 0, done: 0 }));
+        dayList.forEach(dateStr => {
+            const activeRs = routines.filter(r => routineActiveOn(r, dateStr) && !routineExcludedOn(r, dateStr));
+            if (activeRs.length === 0) return;
+            const dow = dowOf(dateStr);
+            dowStats[dow].scheduled += activeRs.length;
+            dowStats[dow].done += activeRs.filter(r => routineDoneOn(r, dateStr)).length;
+        });
+        let bestDow = null, bestDowRate = -1;
+        dowStats.forEach((s, i) => {
+            if (s.scheduled === 0) return;
+            const r2 = s.done / s.scheduled;
+            if (r2 > bestDowRate) { bestDowRate = r2; bestDow = i; }
+        });
+
+        // 루틴 배지 (시간대 데이터가 없어 '아침형' 대신 '퍼펙트 루틴'으로 대체)
+        const badges = [];
+        if (rate.scheduledDays > 0 && rate.pct >= 80) badges.push({ icon: '🏅', label: '꾸준왕' });
+        if (monthMaxStreak >= 7) badges.push({ icon: '🔥', label: '연속 달성' });
+        const perfectRoutine = perRoutine.find(x => x.scheduled >= 3 && x.rate === 100);
+        if (perfectRoutine) badges.push({ icon: '💯', label: '퍼펙트 루틴' });
+
+        // 지난달 대비 성공률 변화 (어워즈 탭의 성장 비교용, 가벼운 계산만)
+        let py = year, pm = monthIdx - 1;
+        if (pm < 0) { pm = 11; py--; }
+        const prevDaysInMonth = new Date(py, pm + 1, 0).getDate();
+        const prevRate = computeRoutineAchievement(py, pm, prevDaysInMonth);
+        const compare = { pctDiff: (rate.scheduledDays > 0 && prevRate.scheduledDays > 0) ? rate.pct - prevRate.pct : null };
+
+        return {
+            year, monthIdx, isCurrentMonth, daysInMonth, uptoDay,
+            doneDays: rate.doneDays, scheduledDays: rate.scheduledDays, pct: rate.pct,
+            monthMaxStreak, top3, heatmap,
+            bestDow, bestDowRate: bestDow != null ? Math.round(bestDowRate * 100) : null,
+            badges, compare,
+        };
+    }
+
+    function renderHabitTab(stats) {
+        const holder = document.getElementById('reportTabHabit');
+        const cardStyle = 'background:white; border-radius:14px; padding:16px; margin-bottom:12px; box-shadow:0 1px 6px rgba(0,0,0,0.06);';
+
+        if (routines.length === 0 || stats.scheduledDays === 0) {
+            holder.innerHTML = `<div style="text-align:center; padding:60px 20px; color:#bbb; font-size:13px;">이번 달엔 루틴 기록이 없어요</div>`;
+            return;
+        }
+
+        // 루틴 요약 3개
+        let html = `
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px;">
+            <div style="${cardStyle} padding:12px; text-align:center; margin-bottom:0;">
+                <div style="font-size:18px;">🔥</div>
+                <div style="font-size:20px; font-weight:900; color:#FF6B35;">${stats.monthMaxStreak}<span style="font-size:12px;">일</span></div>
+                <div style="font-size:10px; color:#888; margin-top:2px;">연속 기록</div>
+            </div>
+            <div style="${cardStyle} padding:12px; text-align:center; margin-bottom:0;">
+                <div style="font-size:18px;">✅</div>
+                <div style="font-size:20px; font-weight:900; color:#5C9A1E;">${stats.doneDays}</div>
+                <div style="font-size:10px; color:#888; margin-top:2px;">완료 횟수</div>
+            </div>
+            <div style="${cardStyle} padding:12px; text-align:center; margin-bottom:0;">
+                <div style="font-size:18px;">🎯</div>
+                <div style="font-size:20px; font-weight:900; color:#333;">${stats.pct}%</div>
+                <div style="font-size:10px; color:#888; margin-top:2px;">성공률</div>
+            </div>
+        </div>`;
+
+        // TOP3 루틴
+        html += `<div style="${cardStyle}">
+            <div style="font-size:13px; font-weight:800; margin-bottom:10px;">🏆 TOP3 루틴</div>
+            ${stats.top3.length > 0
+                ? stats.top3.map((x, i) => {
+                    const medal = ['🥇', '🥈', '🥉'][i];
+                    return `<div style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; ${i < stats.top3.length - 1 ? 'border-bottom:1px solid #f5f5f5;' : ''}">
+                        <span style="font-size:13px;"><span style="margin-right:6px;">${medal}</span>${x.routine.emoji || ''} ${x.routine.name}</span>
+                        <span style="font-size:12px; font-weight:800; color:#5C9A1E;">${x.count}회</span>
+                    </div>`;
+                }).join('')
+                : `<div style="font-size:12px; color:#bbb; text-align:center; padding:8px 0;">이번 달엔 완료 기록이 없어요</div>`}
+        </div>`;
+
+        // 루틴 히트맵 (GitHub 스타일)
+        const leadBlank = stats.heatmap.length ? stats.heatmap[0].dow : 0;
+        const heatColor = ratio => ratio == null ? '#F0F0F0' : ratio === 0 ? '#FFE1E1' : ratio < 1 ? '#BEE3A8' : '#5C9A1E';
+        html += `<div style="${cardStyle}">
+            <div style="font-size:13px; font-weight:800; margin-bottom:10px;">🗓️ 루틴 히트맵</div>
+            <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px;">
+                ${['일', '월', '화', '수', '목', '금', '토'].map(d => `<div style="font-size:9px; color:#bbb; text-align:center;">${d}</div>`).join('')}
+                ${Array(leadBlank).fill('<div></div>').join('')}
+                ${stats.heatmap.map(h => `<div title="${h.day}일" style="aspect-ratio:1; border-radius:4px; background:${heatColor(h.ratio)};"></div>`).join('')}
+            </div>
+        </div>`;
+
+        // 시간 분석 — 가장 잘 지킨 요일
+        const dowNames = ['일', '월', '화', '수', '목', '금', '토'];
+        html += `<div style="${cardStyle} text-align:center;">
+            <div style="font-size:13px; font-weight:800; margin-bottom:10px;">📊 시간 분석</div>
+            ${stats.bestDow != null
+                ? `<div style="font-size:14px;">가장 잘 지킨 요일은 <b style="color:var(--primary);">${dowNames[stats.bestDow]}요일</b>이에요 (${stats.bestDowRate}%)</div>`
+                : `<div style="font-size:12px; color:#bbb;">아직 데이터가 부족해요</div>`}
+        </div>`;
+
+        // 루틴 배지
+        html += `<div style="${cardStyle} margin-bottom:70px;">
+            <div style="font-size:13px; font-weight:800; margin-bottom:10px;">🎖️ 루틴 배지</div>
+            ${stats.badges.length > 0
+                ? `<div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    ${stats.badges.map(b => `<div style="background:#F1F8E9; color:#5C9A1E; font-size:12px; font-weight:800; padding:8px 12px; border-radius:12px;">${b.icon} ${b.label}</div>`).join('')}
+                </div>`
+                : `<div style="font-size:12px; color:#bbb; text-align:center; padding:8px 0;">아직 획득한 배지가 없어요</div>`}
+        </div>`;
+
+        holder.innerHTML = html;
+    }
+
+    // 소비·습관 데이터를 조합해 어워즈를 만든다 (1·2단계 결과를 재사용)
+    function computeMonthlyAwardsStats(year, monthIdx) {
+        const consume = computeMonthlyConsumeStats(year, monthIdx);
+        const habit = computeMonthlyHabitStats(year, monthIdx);
+
+        // 공병왕 카테고리 (이 달 공병 최다 카테고리)
+        const topCategory = consume.categoryBreakdown.length ? consume.categoryBreakdown[0] : null;
+
+        // 최애 제품 (전체 기록 기준 — 같은 이름으로 가장 많이 재등록한 제품)
+        const nameCounts = {};
+        products.forEach(p => { nameCounts[p.name] = (nameCounts[p.name] || 0) + 1; });
+        let favoriteProduct = null;
+        Object.entries(nameCounts).forEach(kv => {
+            if (kv[1] >= 2 && (!favoriteProduct || kv[1] > favoriteProduct.count)) favoriteProduct = { name: kv[0], count: kv[1] };
+        });
+
+        const hasAnyData = consume.tungCount > 0 || consume.purchaseCount > 0 || habit.scheduledDays > 0;
+        const typeTitle = hasAnyData ? getConsumeTypeTitle(consume) : null;
+        const mascotComment = getTungMascotComment(consume, habit);
+
+        return { consume, habit, topCategory, favoriteProduct, typeTitle, mascotComment };
+    }
+
+    // 소비 성적표 점수 조합으로 이번 달 소비 타입을 정한다 (규칙 기반, 위에서부터 첫 매치)
+    function getConsumeTypeTitle(stats) {
+        const es = stats.emptyScore, ss = stats.satisfactionScore, rs = stats.repurchaseScore;
+        const catCount = stats.categoryBreakdown.length;
+        if (es >= 4 && stats.tungCount >= stats.purchaseCount) return { emoji: '🌿', label: '미니멀 소비가' };
+        if (ss != null && ss >= 4 && rs != null && rs >= 4) return { emoji: '💚', label: '현명한 소비가' };
+        if (rs != null && rs >= 4) return { emoji: '🎯', label: '계획형 소비가' };
+        if (catCount >= 4 || stats.purchaseCount >= 5) return { emoji: '🛍️', label: '호기심 많은 소비가' };
+        return { emoji: '✨', label: '신중한 탐험가' };
+    }
+
+    function getTungMascotComment(consume, habit) {
+        if (consume.tungCount === 0 && consume.purchaseCount === 0 && habit.scheduledDays === 0) {
+            return '이번 달은 기록이 좀 적었어요. 다음 달엔 같이 채워봐요 🫙';
+        }
+        if (consume.tungCount > 0 && consume.tungCount >= consume.purchaseCount) {
+            return '이번 달은 구매보다 비움이 많았어요! 정말 멋진 소비 습관이에요 💚';
+        }
+        if (habit.scheduledDays > 0 && habit.pct >= 80) {
+            return `이번 달 루틴 성공률 ${habit.pct}%! 꾸준함이 빛나는 한 달이었어요 🔥`;
+        }
+        if (consume.repurchasePct != null && consume.repurchasePct >= 80) {
+            return '재구매하고 싶은 제품이 많았던 달이네요. 취향을 잘 알아가고 있어요 ✨';
+        }
+        if (consume.purchaseCount > consume.tungCount) {
+            return '이번 달은 새로 들인 게 더 많았어요. 다음 달엔 비우기에 집중해볼까요? 🌱';
+        }
+        return '이번 달도 기록해줘서 고마워요. 다음 달도 함께해요 🫙';
+    }
+
+    function renderAwardsTab(stats) {
+        const holder = document.getElementById('reportTabAwards');
+        const cardStyle = 'background:white; border-radius:14px; padding:16px; margin-bottom:12px; box-shadow:0 1px 6px rgba(0,0,0,0.06);';
+        const c = stats.consume, h = stats.habit;
+
+        if (c.tungCount === 0 && c.purchaseCount === 0 && h.scheduledDays === 0) {
+            holder.innerHTML = `<div style="text-align:center; padding:60px 20px; color:#bbb; font-size:13px;">이번 달엔 어워즈를 만들 기록이 아직 없어요</div>`;
+            return;
+        }
+
+        // 이번 달 소비 타입 (히어로)
+        let html = '';
+        if (stats.typeTitle) {
+            html += `<div style="background:linear-gradient(135deg,#FFF3F3,#FFE3E5); border-radius:16px; padding:24px 16px; margin-bottom:14px; text-align:center;">
+                <div style="font-size:12px; color:#FF9DA0; font-weight:700; margin-bottom:8px;">이번 달 당신은</div>
+                <div style="font-size:22px; font-weight:900; color:var(--primary);">${stats.typeTitle.emoji} '${stats.typeTitle.label}'</div>
+                <div style="font-size:12px; color:#FF9DA0; font-weight:700; margin-top:8px;">였습니다</div>
+            </div>`;
+        }
+
+        // 💄 소비 어워즈
+        const consumeAwards = [];
+        if (stats.topCategory) consumeAwards.push(['🏆 공병왕', `${stats.topCategory[0]} · ${stats.topCategory[1]}개`]);
+        if (c.bestRated) consumeAwards.push(['🏆 최고 평점', `${c.bestRated.productName} <span style="color:#FFC048; letter-spacing:1px;">${reportStarsHtml(c.bestRated.rating)}</span>`]);
+        if (stats.favoriteProduct) consumeAwards.push(['🏆 최애 제품', `${stats.favoriteProduct.name} · ${stats.favoriteProduct.count}번째 재구매`]);
+        if (c.repurchaseConfirmed) consumeAwards.push(['🏆 재구매왕', c.repurchaseConfirmed.productName]);
+        if (c.longestUsed) consumeAwards.push(['🏆 오래 함께한 제품', `${c.longestUsed.product.name} · ${c.longestUsed.entry.days}일`]);
+
+        html += `<div style="${cardStyle}">
+            <div style="font-size:13px; font-weight:800; margin-bottom:10px; color:var(--primary);">💄 소비 어워즈</div>
+            ${consumeAwards.length > 0
+                ? consumeAwards.map(kv => `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f5f5f5; font-size:12.5px;"><span style="color:#888;">${kv[0]}</span><span style="font-weight:700; color:#333; text-align:right; max-width:60%;">${kv[1]}</span></div>`).join('')
+                : `<div style="font-size:12px; color:#bbb; text-align:center; padding:8px 0;">이번 달엔 기록이 없어요</div>`}
+        </div>`;
+
+        // 🌱 습관 어워즈
+        const habitAwards = [];
+        if (h.top3.length) habitAwards.push(['🏆 루틴왕', `${h.top3[0].routine.emoji || ''} ${h.top3[0].routine.name} · ${h.top3[0].count}회`]);
+        if (h.monthMaxStreak > 0) habitAwards.push(['🏆 연속 기록왕', `${h.monthMaxStreak}일 연속`]);
+        if (h.scheduledDays > 0) habitAwards.push(['🏆 꾸준왕', `성공률 ${h.pct}%`]);
+
+        html += `<div style="${cardStyle}">
+            <div style="font-size:13px; font-weight:800; margin-bottom:10px; color:#5C9A1E;">🌱 습관 어워즈</div>
+            ${habitAwards.length > 0
+                ? habitAwards.map(kv => `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f5f5f5; font-size:12.5px;"><span style="color:#888;">${kv[0]}</span><span style="font-weight:700; color:#333;">${kv[1]}</span></div>`).join('')
+                : `<div style="font-size:12px; color:#bbb; text-align:center; padding:8px 0;">이번 달엔 루틴 기록이 없어요</div>`}
+        </div>`;
+
+        // 📈 성장 비교
+        if (c.compare) {
+            const diffStr = (v, unit) => v == null ? '—' : (v > 0 ? `+${v}${unit}` : v < 0 ? `${v}${unit}` : `±0${unit}`);
+            const diffColor = v => v == null ? '#bbb' : v > 0 ? '#2F9E44' : v < 0 ? '#E03131' : '#888';
+            const cmpRow = (label, v, unit) => `<div style="display:flex; justify-content:space-between; padding:7px 0; font-size:13px;">
+                <span style="color:#888;">${label}</span><span style="font-weight:800; color:${diffColor(v)};">${diffStr(v, unit)}</span>
+            </div>`;
+            html += `<div style="${cardStyle}">
+                <div style="font-size:13px; font-weight:800; margin-bottom:6px;">📈 지난달보다</div>
+                ${cmpRow('공병', c.compare.tungDiff, '개')}
+                ${cmpRow('구매', c.compare.purchaseDiff, '개')}
+                ${cmpRow('루틴 성공률', h.compare ? h.compare.pctDiff : null, '%')}
+                ${cmpRow('리뷰', c.compare.reviewDiff, '개')}
+            </div>`;
+        }
+
+        // 💚 텅이의 한마디
+        html += `<div style="${cardStyle} margin-bottom:70px; text-align:center; background:#F1F8E9; border:none;">
+            <div style="font-size:13px; font-weight:800; margin-bottom:8px; color:#5C9A1E;">💚 텅이의 한마디</div>
+            <div style="font-size:13px; color:#555; line-height:1.5;">"${stats.mascotComment}"</div>
+        </div>`;
+
+        holder.innerHTML = html;
+    }
+
+    function shareMonthlyReport() {
+        if (reportActiveTab === 'consume') shareConsumeReport();
+        else if (reportActiveTab === 'habit') shareHabitReport();
+        else if (reportActiveTab === 'awards') shareAwardsReport();
+    }
+
+    function shareConsumeReport() {
+        showToast('🖼️ 이미지를 만드는 중...');
+        const stats = computeMonthlyConsumeStats(reportYear, reportMonthIdx);
+
+        const W = 720, dpr = 2, PAD = 44, contentW = W - PAD * 2;
+        function rr(g, x, y, w, h, rad) {
+            g.beginPath();
+            g.moveTo(x + rad, y);
+            g.arcTo(x + w, y, x + w, y + h, rad);
+            g.arcTo(x + w, y + h, x, y + h, rad);
+            g.arcTo(x, y + h, x, y, rad);
+            g.arcTo(x, y, x + w, y, rad);
+            g.closePath();
+        }
+
+        const gradeRows = [['비움', stats.emptyScore], ['만족도', stats.satisfactionScore], ['재구매', stats.repurchaseScore]];
+        const bestRows = [];
+        if (stats.bestRated) bestRows.push(['최고 평점', stats.bestRated.productName]);
+        if (stats.longestUsed) bestRows.push(['가장 오래 사용', stats.longestUsed.product.name]);
+        if (stats.fastestFinished) bestRows.push(['가장 빨리 공병', stats.fastestFinished.product.name]);
+
+        const gradeH = 40 * gradeRows.length + 24;
+        const bestH = bestRows.length ? 36 * bestRows.length + 24 : 0;
+        const H = 40 + 26 + 30 + 96 + 30 + 90 + gradeH + 24 + 70 + (bestH ? bestH + 24 : 0) + 60 + 60;
+
+        const cv = document.createElement('canvas');
+        cv.width = W * dpr; cv.height = H * dpr;
+        const g = cv.getContext('2d'); g.scale(dpr, dpr);
+
+        function finishShare() {
+            cv.toBlob(blob => {
+                if (!blob) { showToast('⚠️ 이미지 생성에 실패했어요'); return; }
+                const filename = `다썼텅_소비리포트_${stats.year}${String(stats.monthIdx + 1).padStart(2, '0')}.png`;
+                const file = new File([blob], filename, { type: 'image/png' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    navigator.share({ files: [file], title: filename }).catch(() => {});
+                } else {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = filename; a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    showToast('🖼️ 이미지를 저장했어요');
+                }
+            }, 'image/png');
+        }
+
+        function draw() {
+            const bg = g.createLinearGradient(0, 0, 0, H);
+            bg.addColorStop(0, '#FFF3F3'); bg.addColorStop(1, '#FFE3E5');
+            g.fillStyle = bg; g.fillRect(0, 0, W, H);
+            g.fillStyle = '#fff'; rr(g, 24, 24, W - 48, H - 48, 26); g.fill();
+            const cx = W / 2;
+            let y = 24 + 40;
+            g.textAlign = 'center';
+            g.fillStyle = '#FF5A5F'; g.font = '800 26px sans-serif';
+            g.fillText('다썼텅', cx, y); y += 26;
+            g.fillStyle = '#FFAFB2'; g.font = '600 13px sans-serif';
+            g.fillText(`${stats.year}년 ${stats.monthIdx + 1}월 소비 리포트`, cx, y); y += 46;
+
+            // 이번 달 요약 3개
+            const boxW = (contentW - 16) / 3;
+            [['🧴', stats.tungCount, '공병'], ['🛍️', stats.purchaseCount, '구매'], ['⭐', stats.reviewCount, '리뷰']].forEach((item, i) => {
+                const bx = PAD + i * (boxW + 8);
+                g.fillStyle = '#FFF8F8'; rr(g, bx, y, boxW, 76, 14); g.fill();
+                g.textAlign = 'center';
+                g.font = '20px sans-serif'; g.fillText(item[0], bx + boxW / 2, y + 28);
+                g.fillStyle = '#333'; g.font = '800 20px sans-serif'; g.fillText(String(item[1]), bx + boxW / 2, y + 52);
+                g.fillStyle = '#999'; g.font = '600 10px sans-serif'; g.fillText(item[2], bx + boxW / 2, y + 68);
+            });
+            y += 76 + 24;
+
+            // 소비 성적표
+            g.fillStyle = '#FFF8F8'; rr(g, PAD, y, contentW, gradeH, 18); g.fill();
+            g.textAlign = 'left'; g.fillStyle = '#FF5A5F'; g.font = '800 15px sans-serif';
+            g.fillText('📋 소비 성적표', PAD + 22, y + 30);
+            let gy = y + 30 + 40;
+            gradeRows.forEach(row => {
+                g.textAlign = 'left'; g.fillStyle = '#555'; g.font = '700 15px sans-serif';
+                g.fillText(row[0], PAD + 22, gy);
+                g.textAlign = 'right'; g.fillStyle = '#FFC048'; g.font = '17px sans-serif';
+                g.fillText(row[1] != null ? '★'.repeat(row[1]) + '☆'.repeat(5 - row[1]) : '기록 없음', PAD + contentW - 22, gy);
+                gy += 40;
+            });
+            y += gradeH + 24;
+
+            // 소비 밸런스
+            const filled = stats.emptyScore;
+            g.textAlign = 'center'; g.fillStyle = '#333'; g.font = '800 14px sans-serif';
+            g.fillText('🌿 이번 달 소비 밸런스', cx, y + 22);
+            g.font = '22px sans-serif';
+            g.fillText('🟩'.repeat(filled) + '⬜'.repeat(5 - filled), cx, y + 50);
+            y += 70;
+
+            // BEST
+            if (bestRows.length) {
+                g.fillStyle = '#FFF8F8'; rr(g, PAD, y, contentW, bestH, 18); g.fill();
+                g.textAlign = 'left'; g.fillStyle = '#FF5A5F'; g.font = '800 15px sans-serif';
+                g.fillText('🏆 이번 달 BEST', PAD + 22, y + 30);
+                let by = y + 30 + 36;
+                bestRows.forEach(row => {
+                    g.textAlign = 'left'; g.fillStyle = '#999'; g.font = '600 12px sans-serif';
+                    g.fillText(row[0], PAD + 22, by);
+                    g.textAlign = 'right'; g.fillStyle = '#333'; g.font = '700 13px sans-serif';
+                    g.fillText(row[1], PAD + contentW - 22, by);
+                    by += 36;
+                });
+                y += bestH + 24;
+            }
+
+            g.textAlign = 'center'; g.fillStyle = '#C79EA0'; g.font = '500 12px sans-serif';
+            g.fillText('다썼텅에서 기록한 이번 달 소비예요 💄', cx, H - 40);
+
+            finishShare();
+        }
+        draw();
+    }
+
+    // 습관 리포트 공유 — 이미 있는 루틴 공유 카드 헬퍼(초록 테마)를 재사용
+    function shareHabitReport() {
+        showToast('🖼️ 이미지를 만드는 중...');
+        const stats = computeMonthlyHabitStats(reportYear, reportMonthIdx);
+        const data = {
+            monthLabel: `${stats.year}년 ${stats.monthIdx + 1}월`,
+            pct: stats.pct,
+            streakDays: stats.monthMaxStreak,
+            top3: stats.top3.map(x => ({ title: `${x.routine.emoji || ''} ${x.routine.name}`.trim(), count: x.count })),
+            badges: stats.badges,
+        };
+        const out = document.createElement('canvas');
+        renderHabitShareCard(out, data).then(() => {
+            finishRoutineShare(out, '습관리포트', data.monthLabel + ' 습관 리포트');
+        });
+    }
+
+    // 어워즈 리포트 공유 — 소비 카드와 같은 pink 테마 canvas 방식
+    function shareAwardsReport() {
+        showToast('🖼️ 이미지를 만드는 중...');
+        const stats = computeMonthlyAwardsStats(reportYear, reportMonthIdx);
+        const c = stats.consume, h = stats.habit;
+
+        const W = 720, dpr = 2, PAD = 44, contentW = W - PAD * 2;
+        function rr(g, x, y, w, h2, rad) {
+            g.beginPath();
+            g.moveTo(x + rad, y);
+            g.arcTo(x + w, y, x + w, y + h2, rad);
+            g.arcTo(x + w, y + h2, x, y + h2, rad);
+            g.arcTo(x, y + h2, x, y, rad);
+            g.arcTo(x, y, x + w, y, rad);
+            g.closePath();
+        }
+
+        const consumeRows = [];
+        if (stats.topCategory) consumeRows.push(['공병왕', `${stats.topCategory[0]} · ${stats.topCategory[1]}개`]);
+        if (c.bestRated) consumeRows.push(['최고 평점', c.bestRated.productName]);
+        if (stats.favoriteProduct) consumeRows.push(['최애 제품', stats.favoriteProduct.name]);
+        if (c.repurchaseConfirmed) consumeRows.push(['재구매왕', c.repurchaseConfirmed.productName]);
+        if (c.longestUsed) consumeRows.push(['오래 함께한 제품', c.longestUsed.product.name]);
+
+        const habitRows = [];
+        if (h.top3.length) habitRows.push(['루틴왕', `${h.top3[0].routine.emoji || ''} ${h.top3[0].routine.name}`.trim()]);
+        if (h.monthMaxStreak > 0) habitRows.push(['연속 기록왕', `${h.monthMaxStreak}일 연속`]);
+        if (h.scheduledDays > 0) habitRows.push(['꾸준왕', `성공률 ${h.pct}%`]);
+
+        const cv = document.createElement('canvas');
+        const ctxTmp = cv.getContext('2d');
+        ctxTmp.font = '600 13px sans-serif';
+        const commentLines = wrapCanvasText(ctxTmp, stats.mascotComment, contentW - 48);
+
+        const heroH = 130;
+        const consumeH = consumeRows.length ? consumeRows.length * 34 + 54 : 0;
+        const habitH = habitRows.length ? habitRows.length * 34 + 54 : 0;
+        const commentH = 40 + commentLines.length * 22 + 20;
+        const H = 40 + 26 + 30 + heroH + 20 + (consumeH ? consumeH + 20 : 0) + (habitH ? habitH + 20 : 0) + commentH + 20 + 60;
+
+        cv.width = W * dpr; cv.height = H * dpr;
+        const g = cv.getContext('2d'); g.scale(dpr, dpr);
+
+        function finishShare() {
+            cv.toBlob(blob => {
+                if (!blob) { showToast('⚠️ 이미지 생성에 실패했어요'); return; }
+                const filename = `다썼텅_어워즈_${stats.consume.year}${String(stats.consume.monthIdx + 1).padStart(2, '0')}.png`;
+                const file = new File([blob], filename, { type: 'image/png' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    navigator.share({ files: [file], title: filename }).catch(() => {});
+                } else {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = filename; a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    showToast('🖼️ 이미지를 저장했어요');
+                }
+            }, 'image/png');
+        }
+
+        function draw() {
+            const bg = g.createLinearGradient(0, 0, 0, H);
+            bg.addColorStop(0, '#FFF3F3'); bg.addColorStop(1, '#FFE3E5');
+            g.fillStyle = bg; g.fillRect(0, 0, W, H);
+            g.fillStyle = '#fff'; rr(g, 24, 24, W - 48, H - 48, 26); g.fill();
+            const cx = W / 2;
+            let y = 24 + 40;
+            g.textAlign = 'center';
+            g.fillStyle = '#FF5A5F'; g.font = '800 26px sans-serif';
+            g.fillText('다썼텅', cx, y); y += 26;
+            g.fillStyle = '#FFAFB2'; g.font = '600 13px sans-serif';
+            g.fillText(`${c.year}년 ${c.monthIdx + 1}월 어워즈`, cx, y); y += 46;
+
+            // 히어로: 이번 달 소비 타입
+            if (stats.typeTitle) {
+                g.fillStyle = '#FFEDED'; rr(g, PAD, y, contentW, heroH, 18); g.fill();
+                g.textAlign = 'center'; g.fillStyle = '#FF9DA0'; g.font = '700 12px sans-serif';
+                g.fillText('이번 달 당신은', cx, y + 34);
+                g.fillStyle = '#FF5A5F'; g.font = '800 22px sans-serif';
+                g.fillText(`${stats.typeTitle.emoji} '${stats.typeTitle.label}'`, cx, y + 70);
+                g.fillStyle = '#FF9DA0'; g.font = '700 12px sans-serif';
+                g.fillText('였습니다', cx, y + 100);
+            }
+            y += heroH + 20;
+
+            if (consumeRows.length) {
+                g.fillStyle = '#FFF8F8'; rr(g, PAD, y, contentW, consumeH, 18); g.fill();
+                g.textAlign = 'left'; g.fillStyle = '#FF5A5F'; g.font = '800 14px sans-serif';
+                g.fillText('💄 소비 어워즈', PAD + 22, y + 28);
+                let ry = y + 28 + 34;
+                consumeRows.forEach(row => {
+                    g.textAlign = 'left'; g.fillStyle = '#999'; g.font = '600 12px sans-serif';
+                    g.fillText(row[0], PAD + 22, ry);
+                    g.textAlign = 'right'; g.fillStyle = '#333'; g.font = '700 13px sans-serif';
+                    g.fillText(row[1], PAD + contentW - 22, ry);
+                    ry += 34;
+                });
+                y += consumeH + 20;
+            }
+
+            if (habitRows.length) {
+                g.fillStyle = '#F4FAEC'; rr(g, PAD, y, contentW, habitH, 18); g.fill();
+                g.textAlign = 'left'; g.fillStyle = '#5C9A1E'; g.font = '800 14px sans-serif';
+                g.fillText('🌱 습관 어워즈', PAD + 22, y + 28);
+                let ry = y + 28 + 34;
+                habitRows.forEach(row => {
+                    g.textAlign = 'left'; g.fillStyle = '#999'; g.font = '600 12px sans-serif';
+                    g.fillText(row[0], PAD + 22, ry);
+                    g.textAlign = 'right'; g.fillStyle = '#333'; g.font = '700 13px sans-serif';
+                    g.fillText(row[1], PAD + contentW - 22, ry);
+                    ry += 34;
+                });
+                y += habitH + 20;
+            }
+
+            // 텅이의 한마디
+            g.fillStyle = '#F1F8E9'; rr(g, PAD, y, contentW, commentH, 18); g.fill();
+            g.textAlign = 'center'; g.fillStyle = '#5C9A1E'; g.font = '800 13px sans-serif';
+            g.fillText('💚 텅이의 한마디', cx, y + 26);
+            g.fillStyle = '#555'; g.font = '600 13px sans-serif';
+            commentLines.forEach((line, i) => g.fillText(line, cx, y + 26 + 24 + i * 22));
+
+            g.textAlign = 'center'; g.fillStyle = '#C79EA0'; g.font = '500 12px sans-serif';
+            g.fillText('다썼텅에서 기록한 이번 달 어워즈예요 🏆', cx, H - 40);
+
+            finishShare();
+        }
+        draw();
     }
 
     function shareReview(reviewId) {
