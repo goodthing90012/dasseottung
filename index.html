@@ -528,6 +528,18 @@
             <button class="review-fs-btn" style="flex:1; background:var(--primary,#FF5A5F); color:#fff;" onclick="shareMonthlyReport()">📤 이미지로 공유</button>
         </div>
     </div>
+    <!-- 루틴 탭 날짜 이동용 미니 달력 -->
+    <div class="confirm-overlay" id="routineCalPickerOverlay">
+        <div style="background:var(--card); border-radius:16px; padding:16px; width:88%; max-width:340px; box-shadow:0 10px 30px rgba(0,0,0,0.25);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                <button onclick="changeRoutinePickerMonth(-1)" style="background:none; border:none; font-size:18px; cursor:pointer; color:#555;">‹</button>
+                <span id="routineCalPickerLabel" style="font-size:14px; font-weight:bold;"></span>
+                <button onclick="changeRoutinePickerMonth(1)" id="routineCalPickerNext" style="background:none; border:none; font-size:18px; cursor:pointer; color:#555;">›</button>
+            </div>
+            <div id="routineCalPickerGrid"></div>
+            <button onclick="closeRoutineDatePicker()" style="width:100%; margin-top:14px; padding:10px; border:none; border-radius:10px; background:#F5F5F5; color:#666; font-size:13px; font-weight:700; cursor:pointer;">닫기</button>
+        </div>
+    </div>
     <div class="confirm-overlay" id="photoViewer" style="background:rgba(0,0,0,0.93); z-index:1100; flex-direction:column;">
         <button class="pv-close" onclick="closePhotoViewer()">✕</button>
         <div class="pv-stage">
@@ -892,6 +904,7 @@
             <span id="routineDateTitle">오늘의 루틴</span>
             <div style="display:flex; gap:6px; align-items:center;">
                 <button onclick="shareDayAsImage()" title="하루 전체 이미지로 공유" style="background:#F1F8E9; border:none; color:#5C9A1E; font-size:11px; font-weight:700; padding:5px 9px; border-radius:8px; cursor:pointer; margin-right:2px; white-space:nowrap;">🖼️ 공유</button>
+                <button onclick="openRoutineDatePicker()" title="날짜로 이동" style="background:none; border:none; font-size:15px; cursor:pointer; color:#555;">📅</button>
                 <button onclick="changeRoutineDate(-1)" id="routineDatePrev" style="background:none; border:none; font-size:18px; cursor:pointer; color:#555;">‹</button>
                 <span id="routineDateLabel" style="font-size:12px; font-weight:bold; min-width:80px; text-align:center;"></span>
                 <button onclick="changeRoutineDate(1)" id="routineDateNext" style="background:none; border:none; font-size:18px; cursor:pointer; color:#555;">›</button>
@@ -1904,6 +1917,28 @@
 
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
+        {
+            version: 'v3.4.0',
+            date: '2026.08',
+            title: '월간 리포트',
+            items: [
+                '📅 대시보드에 \'이번 달 리포트\' 배너 추가 — 눌러서 한 달 총정리를 볼 수 있어요',
+                '💄 소비 탭: 공병·구매·리뷰 요약, 소비 성적표, 이번 달 BEST, 공병 컬렉션, 지난달 비교',
+                '🌱 습관 탭: 연속 기록, TOP3 루틴, 루틴 히트맵, 요일 분석, 루틴 배지',
+                '🏆 어워즈 탭: 이번 달 소비 타입 한 줄 타이틀, 소비·습관 어워즈, 텅이의 한마디',
+                '🖼️ 소비·습관·어워즈 세 탭 모두 이미지로 공유할 수 있어요'
+            ]
+        },
+        {
+            version: 'v3.3.0',
+            date: '2026.08',
+            title: '루틴 이미지 공유',
+            items: [
+                '🖼️ 루틴 하나를 예쁜 카드 이미지로 공유할 수 있어요 (오늘 완료율 게이지 + 연속 기록 + 체크리스트)',
+                '📆 하루 전체 루틴을 한 장으로 모아 공유하는 기능도 추가했어요',
+                '🔥 게이지 안에 달성률까지 바로 보여요'
+            ]
+        },
         {
             version: 'v3.2.1',
             date: '2026.07',
@@ -4297,6 +4332,76 @@
     function goToRoutineToday() {
         if (routineDateOffset === 0) return;
         routineDateOffset = 0;
+        renderRoutineTab();
+    }
+    // 루틴 탭 날짜 이동용 미니 달력 (대시보드 달력과 같은 그리드 디자인 재사용)
+    let routinePickerYear, routinePickerMonth; // 0-index month
+    function openRoutineDatePicker() {
+        const cur = dateStrToDate(getSelectedRoutineStr());
+        routinePickerYear = cur.getFullYear();
+        routinePickerMonth = cur.getMonth();
+        renderRoutineCalPicker();
+        document.getElementById('routineCalPickerOverlay').classList.add('active');
+    }
+    function closeRoutineDatePicker() {
+        document.getElementById('routineCalPickerOverlay').classList.remove('active');
+    }
+    function changeRoutinePickerMonth(dir) {
+        routinePickerMonth += dir;
+        if (routinePickerMonth < 0) { routinePickerMonth = 11; routinePickerYear--; }
+        if (routinePickerMonth > 11) { routinePickerMonth = 0; routinePickerYear++; }
+        renderRoutineCalPicker();
+    }
+    function renderRoutineCalPicker() {
+        const label = document.getElementById('routineCalPickerLabel');
+        const grid = document.getElementById('routineCalPickerGrid');
+        if (!label || !grid) return;
+        label.textContent = `${routinePickerYear}년 ${routinePickerMonth + 1}월`;
+
+        const n = new Date();
+        const isAtCurrentMonth = (routinePickerYear === n.getFullYear() && routinePickerMonth === n.getMonth());
+        const nextBtn = document.getElementById('routineCalPickerNext');
+        if (nextBtn) nextBtn.style.opacity = isAtCurrentMonth ? '0.25' : '1';
+
+        const firstDay = new Date(routinePickerYear, routinePickerMonth, 1).getDay();
+        const daysInMonth = new Date(routinePickerYear, routinePickerMonth + 1, 0).getDate();
+        const todayStr = formatDateString(getTodayTimeline());
+        const minStr = formatDateString(getTodayTimeline() + ROUTINE_VIEW_MIN_OFFSET * 24 * 60 * 60 * 1000);
+        const selectedStr = getSelectedRoutineStr();
+
+        let html = '<div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center;">';
+        ['일', '월', '화', '수', '목', '금', '토'].forEach(d => {
+            html += `<div style="font-size:10px; color:#AAA; padding:4px 0;">${d}</div>`;
+        });
+        for (let i = 0; i < firstDay; i++) html += '<div></div>';
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${routinePickerYear}-${String(routinePickerMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const disabled = dateStr > todayStr || dateStr < minStr;
+            const isToday = dateStr === todayStr;
+            const isSelected = dateStr === selectedStr;
+            const hasActivity = !disabled && isRoutineDayDoneAny(dateStr);
+
+            let bg = 'transparent', color = '#333';
+            if (isSelected) { bg = 'var(--primary)'; color = '#fff'; }
+            else if (isToday) { bg = '#FFE3E5'; color = 'var(--primary)'; }
+            if (disabled) color = '#ddd';
+
+            html += `<div ${disabled ? '' : `onclick="jumpToRoutineDate('${dateStr}'); closeRoutineDatePicker();"`} style="position:relative; padding:8px 0; border-radius:10px; background:${bg}; color:${color}; font-size:13px; font-weight:${(isToday || isSelected) ? 'bold' : 'normal'}; cursor:${disabled ? 'default' : 'pointer'};">
+                ${d}
+                ${(hasActivity && !isSelected) ? '<div style="position:absolute; bottom:2px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:#5C9A1E;"></div>' : ''}
+            </div>`;
+        }
+        html += '</div>';
+        grid.innerHTML = html;
+    }
+    function jumpToRoutineDate(dateStr) {
+        if (!dateStr) return;
+        const picked = dateStrToDate(dateStr).getTime();
+        let offset = Math.round((picked - getTodayTimeline()) / (1000 * 60 * 60 * 24));
+        if (offset > 0) offset = 0;               // 미래 선택 방지
+        if (offset < ROUTINE_VIEW_MIN_OFFSET) offset = ROUTINE_VIEW_MIN_OFFSET; // 90일 제한
+        routineDateOffset = offset;
         renderRoutineTab();
     }
 
