@@ -822,11 +822,23 @@
                 <select id="prodScheduleTarget"></select>
             </div>
             <div class="form-group">
+                <label>소진 방식</label>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" id="segTypeBottle" class="seg-btn active" onclick="setItemType('bottle')">🧴 통형 (계속 사용)</button>
+                    <button type="button" id="segTypeCount" class="seg-btn" onclick="setItemType('count')">📦 개수형 (낱개 소진)</button>
+                </div>
+            </div>
+            <div class="form-group">
                 <label>사용 상태</label>
                 <div style="display:flex; gap:8px;">
                     <button type="button" id="segSealed" class="seg-btn active" onclick="setUsageState('sealed')">📦 미개봉</button>
                     <button type="button" id="segInUse" class="seg-btn" onclick="setUsageState('inuse')">✏️ 지금 쓰는 중</button>
                 </div>
+            </div>
+            <div class="form-group" id="countDetail" style="display:none;">
+                <label id="countQtyLabel" style="font-size:11px; color:var(--gray);">총 수량은 몇 개인가요?</label>
+                <input type="number" id="prodCountQty" min="1" max="999" placeholder="예: 90"
+                    style="width:100%; font-size:14px; padding:8px 10px; border:1px solid var(--light-gray); border-radius:8px; box-sizing:border-box;">
             </div>
             <div class="form-group" id="inUseDetail" style="display:none;">
                 <label>상품 사용 시작일을 아시나요?</label>
@@ -2355,6 +2367,125 @@
         const today = getTodayTimeline();
 
         filteredProducts.forEach(p => {
+            // 개수형(낱개 소진) 제품은 통형과 완전히 다른 카드 — 여기서 분리 처리
+            if (p.itemType === 'count') {
+                const catName = (Number(p.categoryId) === 0)
+                    ? '🫙 일단 쓰고 봄'
+                    : ((categories.find(c => Number(c.id) === Number(p.categoryId)) || {}).name || '미지정');
+                const unit = p.unit || '개';
+                const isExhausted = p.stock <= 0;
+                const pace = computeCountPace(p);
+                const hist = p.countHistory || [];
+                const totalDays = (isExhausted && p.registeredAsNew !== false && hist.length > 0)
+                    ? Math.round((hist[hist.length - 1].date - p.createdAt) / (1000 * 60 * 60 * 24))
+                    : null;
+                const paceText = totalDays != null
+                    ? `<div style="font-size:11px; color:#5C9A1E; margin-top:6px; font-weight:700;">🎉 총 ${totalDays}일 만에 다 썼어요</div>`
+                    : (pace
+                        ? `<div style="font-size:11px; color:#888; margin-top:6px;">평균 ${pace.avgInterval}일마다 하나씩${!isExhausted ? ` · 이 페이스면 약 ${pace.daysLeft}일 남음` : ''}</div>`
+                        : '');
+                // 총 수량을 아는 '새 제품'만 진행률 바 표시 (얼마나 남았는지 %) — 스테퍼 숫자와 겹치지 않는 새로운 정보
+                const progressBar = (p.originalStock && p.originalStock > 0)
+                    ? `<div style="margin-top:8px;">
+                        <div style="display:flex; justify-content:space-between; font-size:11px; color:#888; margin-bottom:3px;">
+                            <span>${p.stock} / ${p.originalStock}${unit} 남음</span>
+                            <span>${Math.round(p.stock / p.originalStock * 100)}%</span>
+                        </div>
+                        <div style="height:7px; background:#F5F5F5; border-radius:4px; overflow:hidden;"><div style="width:${Math.round(p.stock / p.originalStock * 100)}%; height:100%; background:var(--primary);"></div></div>
+                    </div>`
+                    : '';
+                // 재고 여유 배지 — 총 수량을 알면 비율로, 모르면 개수 기준으로 대략 판단
+                let stockLevelBadge = '';
+                if (!isExhausted) {
+                    const ratio = (p.originalStock && p.originalStock > 0) ? (p.stock / p.originalStock) : null;
+                    let level;
+                    if (ratio != null) level = ratio <= 0.15 ? 'low' : (ratio <= 0.4 ? 'mid' : 'high');
+                    else level = p.stock <= 5 ? 'low' : (p.stock <= 15 ? 'mid' : 'high');
+                    const meta = level === 'low'
+                        ? { bg: '#FFEBEB', fg: '#FF3B30', label: '🔴 얼마 안 남았어요' }
+                        : level === 'mid'
+                            ? { bg: '#FFF4E6', fg: '#F08C00', label: '🟠 줄어드는 중' }
+                            : { bg: '#EBFBEE', fg: '#2F9E44', label: '🟢 넉넉해요' };
+                    stockLevelBadge = `<span class="badge" style="background:${meta.bg}; color:${meta.fg};">${meta.label}</span>`;
+                }
+                // 최근 사용 시점
+                const lastUsedText = (!isExhausted && hist.length > 0)
+                    ? (() => {
+                        const daysSince = Math.round((getTodayTimeline() - hist[hist.length - 1].date) / (1000 * 60 * 60 * 24));
+                        return daysSince <= 0 ? '오늘 사용했어요' : `${daysSince}일 전에 사용했어요`;
+                    })()
+                    : '';
+                const card = document.createElement('div');
+                card.className = 'product-card';
+                card.id = `product-card-${p.id}`;
+                card.innerHTML = `
+                    <button class="btn-del-corner" onclick="confirmDeleteProduct(${p.id})">삭제 🗑️</button>
+                    <div class="prod-info" style="padding-right:42px;">
+                        <div style="margin-bottom:7px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                            <span class="badge neutral">📦 개수형</span>
+                            ${isExhausted ? '<span class="badge danger">다 썼어요</span>' : stockLevelBadge}
+                        </div>
+                        <div class="prod-name" style="display:flex; align-items:center; gap:6px;">
+                            <span style="flex:1;">${p.name}</span>
+                            <button onclick="editProductName(${p.id})" style="background:none; border:none; cursor:pointer; font-size:13px; padding:0 2px; flex-shrink:0;" title="이름 수정">✏️</button>
+                        </div>
+                        <div class="prod-status">${catName}${p.registeredAsNew === false ? ' · 이미 쓰던 것' : ''}</div>
+                        ${lastUsedText ? `<div style="font-size:11px; color:#9AAF82; margin-top:4px; font-weight:700;">🕓 ${lastUsedText}</div>` : ''}
+                        ${progressBar}
+                        ${paceText}
+                        <div style="margin-top:6px; display:flex; align-items:center; gap:5px;">
+                            <span style="font-size:11px; color:#888; white-space:nowrap;">🗓️ 화장대 등록일</span>
+                            <span style="font-size:11px; color:#AAA; font-weight:600;">${formatDateString(p.createdAt)}</span>
+                        </div>
+                        <div class="stock-control" style="margin-top:8px;">
+                            <span style="font-size:10px; color:#AAA; margin-right:2px;">현재 재고</span>
+                            <button class="btn-qty" onclick="adjustCountStock(${p.id}, -1)">-</button>
+                            <input type="number" min="0" max="999" value="${p.stock}"
+                                style="width:44px; text-align:center; font-size:13px; font-weight:bold; border:1.5px solid #E0E0E0; border-radius:8px; padding:3px 0;"
+                                onchange="setCountStock(${p.id}, this)"
+                                onclick="this.select()">
+                            <span style="font-size:12px; color:#888; margin-left:-2px;">${unit}</span>
+                            <button class="btn-qty" onclick="adjustCountStock(${p.id}, 1)">+</button>
+                        </div>
+                        <div style="font-size:9px; color:#CCC; margin-top:3px;">위 숫자칸은 재고 보정·재입고용이에요 (기록 안 남음)</div>
+                    </div>
+                    <div class="right-actions">
+                        <div class="tung-bottle-wrapper ${isExhausted ? 'empty' : ''}"
+                            onclick="${isExhausted ? `showToast('😢 이미 다 썼어요')` : `decrementCountStock(${p.id}, this)`}"
+                            style="${isExhausted ? 'opacity:0.45; cursor:not-allowed;' : ''}">
+                            <svg viewBox="0 0 44 58" style="width:100%; height:calc(100% - 16px); overflow:visible; display:block;">
+                              <!-- 뚜껑 -->
+                              <rect x="10" y="2" width="24" height="9" rx="4"
+                                fill="${isExhausted ? '#eee' : '#FF8FA3'}"
+                                stroke="${isExhausted ? '#FF3B30' : '#444444'}" stroke-width="1.8"/>
+                              <!-- 뚜껑 하이라이트 -->
+                              <rect x="12" y="3.5" width="8" height="2.5" rx="1.2" fill="white" opacity="${isExhausted ? '0' : '0.45'}"/>
+                              <!-- 어깨 (경사부) -->
+                              <path d="M10 11 Q10 17 7 19 L7 50 Q7 54 11 54 L33 54 Q37 54 37 50 L37 19 Q34 17 34 11 Z"
+                                fill="${isExhausted ? '#f5f5f5' : '#FFF0F2'}"
+                                stroke="${isExhausted ? '#FF3B30' : '#444444'}" stroke-width="1.8"/>
+                              <!-- 내용물 -->
+                              <path d="M9 20 L9 50 Q9 53 11 53 L33 53 Q35 53 35 50 L35 20 Z"
+                                fill="${isExhausted ? 'transparent' : 'var(--liquid-full)'}"
+                                style="transform: scaleY(${isExhausted ? 0 : 1}); transform-origin: bottom;"/>
+                              <!-- 병 테두리 재강조 -->
+                              <path d="M10 11 Q10 17 7 19 L7 50 Q7 54 11 54 L33 54 Q37 54 37 50 L37 19 Q34 17 34 11 Z"
+                                fill="none" stroke="${isExhausted ? '#FF3B30' : '#444444'}" stroke-width="1.8"/>
+                              <!-- 하이라이트 광택 -->
+                              <rect x="10" y="21" width="4" height="20" rx="2" fill="white" opacity="${isExhausted ? '0' : '0.22'}"/>
+                              <!-- 재고수 표시 -->
+                              <text x="22" y="39" text-anchor="middle" font-size="${isExhausted ? '10' : '13'}" font-weight="900"
+                                fill="${isExhausted ? '#FF3B30' : '#FF5A5F'}" font-family="-apple-system,sans-serif"
+                                paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round">
+                                ${isExhausted ? '텅!' : p.stock + unit}
+                              </text>
+                            </svg>
+                            <div class="tung-text">${isExhausted ? '😢텅' : '사용'}</div>
+                        </div>
+                    </div>`;
+                listEl.appendChild(card);
+                return;
+            }
             const isUnknownCat = (Number(p.categoryId) === 0);
             const isUnopened = !!p.unopened; // [신기능] 미개봉 플래그
             const myCategory = isUnknownCat
@@ -4924,11 +5055,68 @@
     // [등록 마커] 배부른 텅이 = 제품이 화장대에 새로 들어온 날 (텅이의 반대 상태)
     const CHAR_REGISTER = "data:image/png;base64,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";
 
+    // ══════════ 개수형(낱개 소진) 제품 — 소진/재입고/페이스 예측 ══════════
+    // 1개 사용: 재고 -1 + countHistory에 기록(페이스 계산용). 통형의 tungHistory/달력 공병 마커와는
+    // 의도적으로 안 엮는다 — 알약 하나 먹은 걸 "공병"으로 잡으면 달력이 매일 여러 점으로 도배된다.
+    // 버튼 모양/애니메이션(대기 흔들림·누르면 바운스)만 텅 버튼과 동일하게 tung-bottle-wrapper를 재사용.
+    function decrementCountStock(id, el) {
+        const p = products.find(x => x.id === id);
+        if (!p || p.itemType !== 'count') return;
+        if (p.stock <= 0) { showToast('이미 다 썼어요'); return; }
+        if (el) {
+            el.classList.add('pressing');
+            setTimeout(() => el.classList.remove('pressing'), 480);
+        }
+        p.stock -= 1;
+        if (!p.countHistory) p.countHistory = [];
+        p.countHistory.push({ date: getTodayTimeline() });
+        const msg = p.stock === 0
+            ? `📦 [${p.name}] 재고가 다 떨어졌어요! 새로 사면 아래 숫자칸으로 채워주세요`
+            : `✅ [${p.name}] 1${p.unit || '개'} 사용 · ${p.stock}${p.unit || '개'} 남음`;
+        saveToStorage();
+        setTimeout(() => { showToast(msg); renderProducts(); }, 260);
+    }
+    // 재고 보정·재입고용 +/- (기록 안 남김 — 소비가 아니라 수량 조정이라서)
+    function adjustCountStock(id, amount) {
+        const p = products.find(x => x.id === id);
+        if (!p || p.itemType !== 'count') return;
+        p.stock = Math.max(0, Math.min(999, p.stock + amount));
+        saveToStorage();
+        renderProducts();
+    }
+    // 재입고용 직접 입력 (예: 10개 남았는데 30개 새로 사면 40으로 바로 수정)
+    function setCountStock(id, inputEl) {
+        const p = products.find(x => x.id === id);
+        if (!p || p.itemType !== 'count') return;
+        let val = parseInt(inputEl.value);
+        if (isNaN(val) || val < 0) val = 0;
+        if (val > 999) val = 999;
+        inputEl.value = val;
+        p.stock = val;
+        saveToStorage();
+        renderProducts();
+    }
+    // countHistory의 소진 간격을 평균 내어 페이스(며칠마다 하나씩) 예측. 2회 이상 기록부터 유효.
+    function computeCountPace(p) {
+        const hist = (p.countHistory || []).slice().sort((a, b) => a.date - b.date);
+        if (hist.length < 2) return null;
+        let totalGap = 0, n = 0;
+        for (let i = 1; i < hist.length; i++) {
+            const days = Math.round((hist[i].date - hist[i - 1].date) / (1000 * 60 * 60 * 24));
+            if (days >= 0) { totalGap += days; n++; }
+        }
+        if (n === 0) return null;
+        const avgInterval = Math.round((totalGap / n) * 10) / 10;
+        const daysLeft = p.stock > 0 ? Math.round(p.stock * avgInterval) : 0;
+        return { avgInterval, daysLeft };
+    }
+
     // 홈 대시보드 전체 렌더
     // [소진위험 판정] renderProducts()의 '주기 전 소진위험'(badge danger)과 동일한 조건을 재현.
     // ⚠️ renderProducts의 소진일 계산 로직을 바꾸면 이 함수도 같이 맞춰줘야 함.
     function isExhaustionRisk(p, today) {
         if (!p) return false;
+        if (p.itemType === 'count') return false; // 개수형은 통형 소진위험 계산 대상이 아님(카드 안 페이스로 별도 표시)
         const isUnopened = !!p.unopened;
         if (isUnopened) return false;          // 미개봉은 '📦 미개봉' 배지 → 위험 아님
         if (!(p.stock > 0)) return false;      // 재고 0은 '재고 없음' 배지 → 위험과 별개
@@ -7316,11 +7504,32 @@
     let regUsageState = 'sealed';   // 'sealed' | 'inuse'
     let regStartKnown = true;       // 쓰는 중일 때 시작일을 아는지
     let regRemainRatio = 0.85;      // 시작일 모를 때 선택한 잔량 비율
+    let regItemType = 'bottle';     // 'bottle'(통형, 연속사용) | 'count'(개수형, 낱개소진)
+    function setItemType(type) {
+        regItemType = type;
+        document.getElementById('segTypeBottle').classList.toggle('active', type === 'bottle');
+        document.getElementById('segTypeCount').classList.toggle('active', type === 'count');
+        updateAddFormVisibility();
+    }
+    // 소진방식(통형/개수형) × 사용상태(미개봉/쓰는 중)에 따라 등록 폼 하단 블록을 정리
+    function updateAddFormVisibility() {
+        const inUseDetail = document.getElementById('inUseDetail');
+        const countDetail = document.getElementById('countDetail');
+        const qtyLabel = document.getElementById('countQtyLabel');
+        if (regItemType === 'count') {
+            if (inUseDetail) inUseDetail.style.display = 'none';
+            if (countDetail) countDetail.style.display = 'block';
+            if (qtyLabel) qtyLabel.textContent = (regUsageState === 'sealed') ? '총 수량은 몇 개인가요?' : '지금 남은 개수는 몇 개인가요?';
+        } else {
+            if (countDetail) countDetail.style.display = 'none';
+            if (inUseDetail) inUseDetail.style.display = (regUsageState === 'inuse') ? 'block' : 'none';
+        }
+    }
     function setUsageState(state) {
         regUsageState = state;
         document.getElementById('segSealed').classList.toggle('active', state === 'sealed');
         document.getElementById('segInUse').classList.toggle('active', state === 'inuse');
-        document.getElementById('inUseDetail').style.display = (state === 'inuse') ? 'block' : 'none';
+        updateAddFormVisibility();
         refreshRemainBlock();
     }
     function setStartKnown(known) {
@@ -7356,12 +7565,24 @@
         const today = getTodayTimeline();
         const isUnknown = (categoryId === 0 || isNaN(categoryId));
 
-        // ── 사용 상태에 따른 개봉 정보 계산 ──
+        // ── 개수형: 통형과 완전히 다른 필드 세트라 여기서 분기 처리 ──
+        let initCountStock = null;
+        const initCountUnit = '개';
+        if (regItemType === 'count') {
+            const qtyVal = parseInt(document.getElementById('prodCountQty').value);
+            if (isNaN(qtyVal) || qtyVal < 1) {
+                showToast(regUsageState === 'sealed' ? '⚠️ 총 수량을 입력해주세요' : '⚠️ 지금 남은 개수를 입력해주세요');
+                return;
+            }
+            initCountStock = Math.min(qtyVal, 999);
+        }
+
+        // ── 사용 상태에 따른 개봉 정보 계산 (통형 전용) ──
         // sealed: 미개봉 / inuse+날짜: 정확한 개봉일 / inuse+잔량: 추정 개봉일 + 첫 텅 provisional 처리
         let initOpenedDate = null;
         let initUnopened = true;
         let initProvisional = false;
-        if (regUsageState === 'inuse') {
+        if (regItemType === 'bottle' && regUsageState === 'inuse') {
             initUnopened = false;
             if (regStartKnown) {
                 const v = document.getElementById('prodOpenedDate').value;
@@ -7384,6 +7605,7 @@
         // 폼 리셋 전에 토스트 표기용으로 상태 스냅샷
         const regUsageStateAtAdd = regUsageState;
         const regStartKnownAtAdd = regStartKnown;
+        const regItemTypeAtAdd = regItemType;
 
         const duplicates = [];
         const toAdd = [];
@@ -7403,10 +7625,14 @@
                 createdAt: Date.now() + i,   // [등록일] id에 의존하지 않도록 명시적으로도 남긴다
                 name,
                 categoryId: isUnknown ? 0 : categoryId,
-                stock: 1,
+                itemType: regItemType,   // 'bottle' | 'count' — 등록 후 변경 금지
+                stock: regItemType === 'count' ? initCountStock : 1,
+                originalStock: (regItemType === 'count' && regUsageState === 'sealed') ? initCountStock : null, // 새 제품일 때만 총 수량 스냅샷(불변) — 진행률 표시용
+                unit: regItemType === 'count' ? initCountUnit : null,
+                countHistory: regItemType === 'count' ? [] : undefined, // 개수형 소진 이력(페이스 계산용) — 달력/tungHistory와는 별개
                 targetScheduleId: isNaN(targetScheduleId) ? 0 : targetScheduleId,
                 openedDate: initOpenedDate,
-                unopened: initUnopened,
+                unopened: regItemType === 'count' ? false : initUnopened,
                 registeredAsNew: (regUsageState === 'sealed'),   // 등록 시점 스냅샷(불변) — '지금 쓰는 중'으로 등록하면 false. 나중에 개봉해도 안 바뀜. 월간 리포트 구매 개수 집계에 씀
                 provisionalFirstTung: initProvisional,
                 tungHistory: [],
@@ -7418,6 +7644,8 @@
         textarea.value = '';
         textarea.style.height = 'auto';
         document.getElementById('prodOpenedDate').value = formatDateString(today);
+        document.getElementById('prodCountQty').value = '';
+        setItemType('bottle');
         setUsageState('sealed');
         setStartKnown(true);
 
@@ -7425,11 +7653,13 @@
             showToast(`⚠️ [${duplicates.join(', ')}] 이미 등록된 제품이라 중복 등록은 어려워요`);
             return;
         }
-        const stateLabel = (regUsageStateAtAdd === 'inuse')
-            ? (regStartKnownAtAdd
-                ? '쓰는 중 · 개봉일 기준'
-                : (isUnknown ? '쓰는 중 · 오늘부터 학습(첫 소진 제외)' : '쓰는 중 · 잔량 추정(첫 소진 제외)'))
-            : '미개봉';
+        const stateLabel = regItemTypeAtAdd === 'count'
+            ? (regUsageStateAtAdd === 'sealed' ? `개수형 · 총 ${initCountStock}${initCountUnit}` : `개수형 · 남은 ${initCountStock}${initCountUnit}`)
+            : (regUsageStateAtAdd === 'inuse'
+                ? (regStartKnownAtAdd
+                    ? '쓰는 중 · 개봉일 기준'
+                    : (isUnknown ? '쓰는 중 · 오늘부터 학습(첫 소진 제외)' : '쓰는 중 · 잔량 추정(첫 소진 제외)'))
+                : '미개봉');
         if (duplicates.length > 0) {
             showToast(`📦 ${toAdd.length}개 등록 완료! [${duplicates.join(', ')}]은 중복이라 제외됐어요`);
         } else if (toAdd.length === 1) {
