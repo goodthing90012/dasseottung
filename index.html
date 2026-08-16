@@ -6280,7 +6280,9 @@
         });
         const tungCount = tungEntries.length;
 
-        const purchasedProducts = products.filter(p => inMonth(p.createdAt));
+        // registeredAsNew가 false면 '등록 당시 이미 쓰던 것' → 이번 달 구매로 안 침
+        // (필드 자체가 없는 옛날 제품은 undefined이므로 기존 동작대로 구매로 집계)
+        const purchasedProducts = products.filter(p => inMonth(p.createdAt) && p.registeredAsNew !== false);
         const purchaseCount = purchasedProducts.length;
 
         const monthReviews = reviews.filter(r => inMonth(r.date));
@@ -7405,6 +7407,7 @@
                 targetScheduleId: isNaN(targetScheduleId) ? 0 : targetScheduleId,
                 openedDate: initOpenedDate,
                 unopened: initUnopened,
+                registeredAsNew: (regUsageState === 'sealed'),   // 등록 시점 스냅샷(불변) — '지금 쓰는 중'으로 등록하면 false. 나중에 개봉해도 안 바뀜. 월간 리포트 구매 개수 집계에 씀
                 provisionalFirstTung: initProvisional,
                 tungHistory: [],
                 memos: []
