@@ -2385,13 +2385,14 @@
                         ? `<div style="font-size:11px; color:#888; margin-top:6px;">평균 ${pace.avgInterval}일마다 하나씩${!isExhausted ? ` · 이 페이스면 약 ${pace.daysLeft}일 남음` : ''}</div>`
                         : '');
                 // 총 수량을 아는 '새 제품'만 진행률 바 표시 (얼마나 남았는지 %) — 스테퍼 숫자와 겹치지 않는 새로운 정보
+                const progressPct = (p.originalStock && p.originalStock > 0) ? Math.min(100, Math.round(p.stock / p.originalStock * 100)) : 0;
                 const progressBar = (p.originalStock && p.originalStock > 0)
                     ? `<div style="margin-top:8px;">
                         <div style="display:flex; justify-content:space-between; font-size:11px; color:#888; margin-bottom:3px;">
                             <span>${p.stock} / ${p.originalStock}${unit} 남음</span>
-                            <span>${Math.round(p.stock / p.originalStock * 100)}%</span>
+                            <span>${progressPct}%</span>
                         </div>
-                        <div style="height:7px; background:#F5F5F5; border-radius:4px; overflow:hidden;"><div style="width:${Math.round(p.stock / p.originalStock * 100)}%; height:100%; background:var(--primary);"></div></div>
+                        <div style="height:7px; background:#F5F5F5; border-radius:4px; overflow:hidden;"><div style="width:${progressPct}%; height:100%; background:var(--primary);"></div></div>
                     </div>`
                     : '';
                 // 재고 여유 배지 — 총 수량을 알면 비율로, 모르면 개수 기준으로 대략 판단
@@ -5080,7 +5081,9 @@
     function adjustCountStock(id, amount) {
         const p = products.find(x => x.id === id);
         if (!p || p.itemType !== 'count') return;
-        p.stock = Math.max(0, Math.min(999, p.stock + amount));
+        const newStock = Math.max(0, Math.min(999, p.stock + amount));
+        if (p.originalStock != null && newStock > p.originalStock) p.originalStock = newStock; // 재입고로 예전 총량을 넘으면 그 시점을 새 기준(100%)으로 잡는다
+        p.stock = newStock;
         saveToStorage();
         renderProducts();
     }
@@ -5092,6 +5095,7 @@
         if (isNaN(val) || val < 0) val = 0;
         if (val > 999) val = 999;
         inputEl.value = val;
+        if (p.originalStock != null && val > p.originalStock) p.originalStock = val; // 재입고로 예전 총량을 넘으면 그 시점을 새 기준(100%)으로 잡는다
         p.stock = val;
         saveToStorage();
         renderProducts();
