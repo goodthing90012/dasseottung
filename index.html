@@ -852,8 +852,8 @@
                 <input type="number" id="prodCountQty" min="1" max="999" placeholder="예: 90"
                     style="width:100%; font-size:14px; padding:8px 10px; border:1px solid var(--light-gray); border-radius:8px; box-sizing:border-box;">
                 <div id="countOriginalBlock" style="display:none; margin-top:10px;">
-                    <label style="font-size:11px; color:var(--gray);">원래 총 수량을 아세요? (선택, 모르면 비워두세요)</label>
-                    <input type="number" id="prodCountOriginal" min="1" max="999" placeholder="예: 90 (입력하면 바로 진행률이 떠요)"
+                    <label style="font-size:11px; color:var(--gray);">📦 한 박스(포장)에 원래 몇 개 들어있었는지 아세요? (선택 — 위 '남은 개수'와는 다른 숫자예요, 모르면 비워두세요)</label>
+                    <input type="number" id="prodCountOriginal" min="1" max="999" placeholder="예: 30개들이 박스면 30"
                         style="width:100%; font-size:14px; padding:8px 10px; border:1px solid var(--light-gray); border-radius:8px; box-sizing:border-box;">
                 </div>
             </div>
@@ -3328,7 +3328,7 @@
         pendingEditOriginalStockId = id;
         const input = document.getElementById('editOriginalStockInput');
         input.value = p.originalStock != null ? p.originalStock : '';
-        input.min = p.stock; // 현재 재고보다 적게는 설정 불가
+        input.min = 1; // 박스 크기는 현재 재고와 무관 — 박스를 여러 개 쟁여둔 경우 재고보다 작을 수 있음
         document.getElementById('editOriginalStockOverlay').classList.add('active');
         setTimeout(() => { input.focus(); input.select(); }, 50);
     }
@@ -3344,10 +3344,8 @@
             showToast('⚠️ 총 수량을 입력해주세요');
             return;
         }
-        if (val < p.stock) {
-            showToast('⚠️ 총 수량은 현재 재고보다 적을 수 없어요');
-            return;
-        }
+        // '총 수량'은 이제 박스 하나의 크기라, 박스를 여러 개 쟁여둔 경우 현재 재고보다 작을 수 있다 (예: 재고 35개, 박스는 30개들이).
+        // 그래서 현재 재고와의 대소 비교는 하지 않는다.
         p.originalStock = Math.min(val, 999);
         showToast('🔢 총 수량이 설정됐어요');
         cancelEditOriginalStock();
@@ -7699,8 +7697,9 @@
                 const origRaw = document.getElementById('prodCountOriginal').value;
                 if (origRaw !== '') {
                     const origVal = parseInt(origRaw);
-                    if (isNaN(origVal) || origVal < initCountStock) {
-                        showToast('⚠️ 원래 총 수량은 남은 개수보다 적을 수 없어요');
+                    // '박스 크기'는 지금 남은 개수와 무관 — 박스를 여러 개 쟁여둔 경우 남은 개수보다 작을 수 있음(예: 35개 남았는데 박스는 30개들이)
+                    if (isNaN(origVal) || origVal < 1) {
+                        showToast('⚠️ 박스 수량을 올바르게 입력해주세요');
                         return;
                     }
                     initCountOriginal = Math.min(origVal, 999);
