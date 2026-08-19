@@ -2404,19 +2404,21 @@
                 // 진행률 바는 '재고 몇 개 남았나'가 아니라 '이번 박스를 몇 % 썼나'(누적 사용 횟수 기준)로 계산한다.
                 // 재고 기준으로 하면 다 쓰기 전 재입고했을 때 여유분을 다 쓸 때까지 게이지가 100%에 멈춰있는 것처럼
                 // 보이는 문제가 있어서, countHistory(실제 '사용' 누른 기록)만 갖고 계산해 재입고와 완전히 무관하게 만든다.
+                // 단, 보여줄 땐 '남은 비율'로 뒤집는다 — 앱 전체가 재고 여유(🟢넉넉해요 등) 프레임이라
+                // 꽉 찬 바 = 여유 있음이 더 직관적. 계산은 그대로 사용 기준, 방향만 반전.
                 const boxUsage = (p.originalStock && p.originalStock > 0)
                     ? (() => {
                         const total = (p.countHistory || []).length;
                         let used = total % p.originalStock;
-                        if (used === 0 && total > 0) used = p.originalStock; // 방금 박스를 딱 채워 끝낸 상태 = 100%로 표시
-                        return { used, total: p.originalStock };
+                        if (used === 0 && total > 0) used = p.originalStock; // 방금 박스를 딱 채워 끝낸 상태 = 다 쓴 걸로 표시
+                        return { used, total: p.originalStock, remaining: p.originalStock - used };
                     })()
                     : null;
-                const progressPct = boxUsage ? Math.round(boxUsage.used / boxUsage.total * 100) : 0;
+                const progressPct = boxUsage ? Math.round(boxUsage.remaining / boxUsage.total * 100) : 0;
                 const progressBar = boxUsage
                     ? `<div style="margin-top:8px;">
                         <div style="display:flex; justify-content:space-between; font-size:11px; color:#888; margin-bottom:3px;">
-                            <span>이번 박스 ${boxUsage.used} / ${boxUsage.total}${unit} 사용 <button onclick="editOriginalStock(${p.id})" style="background:none; border:none; cursor:pointer; font-size:10px; padding:0 2px; color:#BBB;" title="총 수량 수정">✏️</button></span>
+                            <span>이번 박스 ${boxUsage.remaining} / ${boxUsage.total}${unit} 남음 <button onclick="editOriginalStock(${p.id})" style="background:none; border:none; cursor:pointer; font-size:10px; padding:0 2px; color:#BBB;" title="총 수량 수정">✏️</button></span>
                             <span>${progressPct}%</span>
                         </div>
                         <div style="height:7px; background:#F5F5F5; border-radius:4px; overflow:hidden;"><div style="width:${progressPct}%; height:100%; background:var(--primary);"></div></div>
