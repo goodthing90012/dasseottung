@@ -2401,12 +2401,22 @@
                     : (pace
                         ? `<div style="font-size:11px; color:#888; margin-top:6px;">평균 ${pace.avgInterval}일마다 하나씩${!isExhausted ? ` · 이 페이스면 약 ${pace.daysLeft}일 남음` : ''}</div>`
                         : '');
-                // 총 수량을 아는 '새 제품'만 진행률 바 표시 (얼마나 남았는지 %) — 스테퍼 숫자와 겹치지 않는 새로운 정보
-                const progressPct = (p.originalStock && p.originalStock > 0) ? Math.min(100, Math.round(p.stock / p.originalStock * 100)) : 0;
-                const progressBar = (p.originalStock && p.originalStock > 0)
+                // 진행률 바는 '재고 몇 개 남았나'가 아니라 '이번 박스를 몇 % 썼나'(누적 사용 횟수 기준)로 계산한다.
+                // 재고 기준으로 하면 다 쓰기 전 재입고했을 때 여유분을 다 쓸 때까지 게이지가 100%에 멈춰있는 것처럼
+                // 보이는 문제가 있어서, countHistory(실제 '사용' 누른 기록)만 갖고 계산해 재입고와 완전히 무관하게 만든다.
+                const boxUsage = (p.originalStock && p.originalStock > 0)
+                    ? (() => {
+                        const total = (p.countHistory || []).length;
+                        let used = total % p.originalStock;
+                        if (used === 0 && total > 0) used = p.originalStock; // 방금 박스를 딱 채워 끝낸 상태 = 100%로 표시
+                        return { used, total: p.originalStock };
+                    })()
+                    : null;
+                const progressPct = boxUsage ? Math.round(boxUsage.used / boxUsage.total * 100) : 0;
+                const progressBar = boxUsage
                     ? `<div style="margin-top:8px;">
                         <div style="display:flex; justify-content:space-between; font-size:11px; color:#888; margin-bottom:3px;">
-                            <span>${p.stock} / ${p.originalStock}${unit} 남음 <button onclick="editOriginalStock(${p.id})" style="background:none; border:none; cursor:pointer; font-size:10px; padding:0 2px; color:#BBB;" title="총 수량 수정">✏️</button></span>
+                            <span>이번 박스 ${boxUsage.used} / ${boxUsage.total}${unit} 사용 <button onclick="editOriginalStock(${p.id})" style="background:none; border:none; cursor:pointer; font-size:10px; padding:0 2px; color:#BBB;" title="총 수량 수정">✏️</button></span>
                             <span>${progressPct}%</span>
                         </div>
                         <div style="height:7px; background:#F5F5F5; border-radius:4px; overflow:hidden;"><div style="width:${progressPct}%; height:100%; background:var(--primary);"></div></div>
@@ -2433,6 +2443,9 @@
                         return daysSince <= 0 ? '오늘 사용했어요' : `${daysSince}일 전에 사용했어요`;
                     })()
                     : '';
+                // 박스(등록 총 수량) 완료 횟수 — 통형의 텅 카운트 배지와 같은 자리·같은 스타일
+                const exhaustCount = (p.exhaustedHistory || []).length;
+                const latestBoxReview = exhaustCount > 0 ? getLatestReview(p.id, exhaustCount) : null;
                 const card = document.createElement('div');
                 card.className = 'product-card';
                 card.id = `product-card-${p.id}`;
@@ -2448,6 +2461,7 @@
                             <button onclick="editProductName(${p.id})" style="background:none; border:none; cursor:pointer; font-size:13px; padding:0 2px; flex-shrink:0;" title="이름 수정">✏️</button>
                         </div>
                         <div class="prod-status">${catName}${p.registeredAsNew === false ? ' · 이미 쓰던 것' : ''}</div>
+                        ${exhaustCount > 0 ? `<div class="tung-count-badge">🫙 ${getTungOrdinalLabel(exhaustCount)}${latestBoxReview ? '' : ' · 리뷰 없음'}</div>` : ''}
                         ${lastUsedText ? `<div style="font-size:11px; color:#9AAF82; margin-top:4px; font-weight:700;">🕓 ${lastUsedText}</div>` : ''}
                         ${progressBar}
                         ${paceText}
@@ -5123,20 +5137,46 @@
         p.stock -= 1;
         if (!p.countHistory) p.countHistory = [];
         p.countHistory.push({ date: getTodayTimeline() });
+        // '박스(등록 총 수량) 하나 완료' 시점만 화장품 공병처럼 달력에 남긴다 — 매번 사용할 때마다는 안 남김(달력 도배 방지).
+        // 총 수량을 알면: 앱이 실제로 기록한 사용 횟수(countHistory.length)가 총 수량의 배수에 도달할 때.
+        //   → '이미 쓰던 것'으로 등록하기 전에 이미 먹은 만큼은 countHistory에 없어서 자동으로 카운팅 제외됨.
+        // 총 수량을 모르면(기준이 없음): 예전처럼 재고 0을 신호로 대체 사용.
+        const boxCompleted = (p.originalStock && p.originalStock > 0)
+            ? (p.countHistory.length % p.originalStock === 0)
+            : (p.stock === 0);
+        if (boxCompleted) {
+            if (!p.exhaustedHistory) p.exhaustedHistory = [];
+            p.exhaustedHistory.push({ date: getTodayTimeline() });
+        }
         const msg = p.stock === 0
             ? `📦 [${p.name}] 재고가 다 떨어졌어요! 새로 사면 아래 숫자칸으로 채워주세요`
             : `✅ [${p.name}] 1${p.unit || '개'} 사용 · ${p.stock}${p.unit || '개'} 남음`;
         saveToStorage();
-        setTimeout(() => { showToast(msg); renderProducts(); }, 260);
+        setTimeout(() => {
+            showToast(msg);
+            renderProducts();
+            // 박스 하나 완료 시점엔 통형 텅과 동일하게 리뷰 작성을 열어준다 (exhaustedHistory.length = 몇 번째 박스인지)
+            if (boxCompleted && isReviewFeatureEnabled()) {
+                openReviewModal(id, p.name, p.exhaustedHistory.length);
+            }
+        }, 260);
     }
     // 재고 보정·재입고용 +/- (기록 안 남김 — 소비가 아니라 수량 조정이라서)
+    // 개수형 재입고 시 '박스 완료' 기준(originalStock)을 언제 갱신할지 정하는 공용 규칙.
+    // - 다 쓰고(재고 0) 나서 재입고 = 새 박스 시작 → 그 값 자체를 새 기준으로 삼음(박스가 커지든 작아지든 그대로 반영)
+    // - 총량을 아예 몰랐다가 중간에 처음 알게 됨 → 그 시점 기준으로 한 번 시작
+    // - 그 외(총량을 이미 아는데 다 쓰기 전에 미리 채움) → 기준 그대로 유지. 매번 갱신하면 박스 완료
+    //   카운팅(countHistory.length % originalStock)이 재입고할 때마다 흔들려서, 다 쓰기 전 재입고가 잦은
+    //   경우엔 일부러 안 건드리는 쪽을 택함.
+    function updateOriginalStockOnRestock(p, newStock) {
+        if (newStock <= p.stock) return; // 재입고(늘어나는) 방향이 아니면 손대지 않음
+        if (p.stock === 0 || p.originalStock == null) p.originalStock = newStock;
+    }
     function adjustCountStock(id, amount) {
         const p = products.find(x => x.id === id);
         if (!p || p.itemType !== 'count') return;
         const newStock = Math.max(0, Math.min(999, p.stock + amount));
-        // 재고가 늘어나는 방향(재입고)일 때만 기준을 갱신한다.
-        // 총량을 아예 몰랐던 '이미 쓰던 것'도 여기서 처음 재입고하면 그 순간부터 진행률 게이지가 생긴다.
-        if (newStock > p.stock && (p.originalStock == null || newStock > p.originalStock)) p.originalStock = newStock;
+        updateOriginalStockOnRestock(p, newStock);
         p.stock = newStock;
         saveToStorage();
         renderProducts();
@@ -5149,8 +5189,7 @@
         if (isNaN(val) || val < 0) val = 0;
         if (val > 999) val = 999;
         inputEl.value = val;
-        // 재고가 늘어나는 방향(재입고)일 때만 기준을 갱신한다. (아래 adjustCountStock과 동일한 규칙)
-        if (val > p.stock && (p.originalStock == null || val > p.originalStock)) p.originalStock = val;
+        updateOriginalStockOnRestock(p, val);
         p.stock = val;
         saveToStorage();
         renderProducts();
@@ -5405,6 +5444,15 @@
             });
         });
 
+        // 개수형 '다 씀' — 리뷰 연결은 없음(개수형엔 리뷰 흐름 자체가 없음), 이름만 나열
+        const countExhausted = [];
+        products.forEach(p => {
+            if (p.itemType !== 'count') return;
+            (p.exhaustedHistory || []).forEach(h => {
+                if (formatDateString(h.date) === dateStr) countExhausted.push({ name: p.name });
+            });
+        });
+
         // 루틴 [V1 정책: 1개 이상 체크 = 완료]
         const doneRoutines = [];
         routines.forEach(r => {
@@ -5422,7 +5470,7 @@
         // [등록] 그 날 화장대에 새로 들인 제품들 — 등록도 엄연한 기록이므로 단독으로도 패널을 연다
         const registered = getProductsRegisteredOn(dateStr);
 
-        if (tungs.length === 0 && doneRoutines.length === 0 && registered.length === 0) {
+        if (tungs.length === 0 && countExhausted.length === 0 && doneRoutines.length === 0 && registered.length === 0) {
             detail.style.display = 'none';
             return;
         }
@@ -5452,6 +5500,11 @@
                             <span>• ${t.name}</span>${badge}
                         </div>`;
             }).join('');
+            html += '</div>';
+        }
+        if (countExhausted.length > 0) {
+            html += `<div style="margin-bottom:8px;"><div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:4px;">📦 다 쓴 개수형</div>`;
+            html += countExhausted.map(t => `<div style="font-size:12px;color:#555;padding:4px 0;">• ${t.name}</div>`).join('');
             html += '</div>';
         }
         if (doneRoutines.length > 0) {
@@ -5519,10 +5572,12 @@
             //  완료한 날엔 아무 캐릭터도 안 뜨는 문제가 있었다)
             const routineDone = isRoutineDayDoneAny(dateStr);
 
-            // 텅 여부 (formatDateString으로 로컬 날짜 비교)
-            const tungDone = products.some(p =>
-                (p.tungHistory||[]).some(h => formatDateString(h.date) === dateStr)
-            );
+            // 텅 여부 (formatDateString으로 로컬 날짜 비교) — 개수형은 매번 사용이 아니라
+            // '다 쓴 순간'(exhaustedHistory)만 화장품 공병과 같은 취급으로 포함시킨다.
+            const tungDone = products.some(p => {
+                if (p.itemType === 'count') return (p.exhaustedHistory || []).some(h => formatDateString(h.date) === dateStr);
+                return (p.tungHistory || []).some(h => formatDateString(h.date) === dateStr);
+            });
 
             // [등록] 그 날 등록된 제품이 있는지 — 1개든 10개든 배지는 1개만
             const regCount = getProductsRegisteredOn(dateStr).length;
