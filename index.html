@@ -5146,7 +5146,13 @@
             : (p.stock === 0);
         if (boxCompleted) {
             if (!p.exhaustedHistory) p.exhaustedHistory = [];
-            p.exhaustedHistory.push({ date: getTodayTimeline() });
+            // 이 박스의 사용 기간(며칠 걸렸는지) — 리포트의 '가장 오래/빨리 쓴 제품'에서 통형이랑 같이 비교하는 데 씀.
+            // originalStock이 이 박스 내내 똑같았다는 전제로, 방금 쌓인 마지막 N개(N=총 수량) 구간을 이 박스로 본다.
+            // 그 구간 시작 = 그 앞 탭 날짜(또는 첫 박스면 등록일), 끝 = 지금.
+            const startIdx = p.countHistory.length - p.originalStock;
+            const boxStartDate = startIdx > 0 ? p.countHistory[startIdx - 1].date : p.createdAt;
+            const boxDays = Math.max(0, Math.round((getTodayTimeline() - boxStartDate) / (1000 * 60 * 60 * 24)));
+            p.exhaustedHistory.push({ date: getTodayTimeline(), days: boxDays });
         }
         const msg = p.stock === 0
             ? `📦 [${p.name}] 재고가 다 떨어졌어요! 새로 사면 아래 숫자칸으로 채워주세요`
@@ -6574,13 +6580,29 @@
         const ym = `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
         const inMonth = ts => typeof ts === 'number' && formatDateString(ts).slice(0, 7) === ym;
 
+        // '공병' 집계 — 통형은 tungHistory, 개수형은 exhaustedHistory(박스 완료)를 같은 모양으로 맞춰서 합친다.
+        // 이렇게 하나로 합쳐두면 카테고리 비율·평균 사용기간·이번 달 BEST·소비 성적표·밸런스·어워즈·지난달 비교·
+        // 공병 컬렉션까지 전부 자동으로 개수형을 같이 반영하게 된다.
         const tungEntries = [];
         products.forEach(p => {
-            (p.tungHistory || []).forEach(h => {
-                if (inMonth(h.date)) tungEntries.push({ product: p, entry: h });
-            });
+            if (p.itemType === 'count') {
+                (p.exhaustedHistory || []).forEach((h, idx) => {
+                    if (inMonth(h.date)) tungEntries.push({ product: p, entry: { date: h.date, days: h.days, provisional: false, tungNo: idx + 1 } });
+                });
+            } else {
+                (p.tungHistory || []).forEach(h => {
+                    if (inMonth(h.date)) tungEntries.push({ product: p, entry: h });
+                });
+            }
         });
         const tungCount = tungEntries.length;
+
+        // 개수형 낱개 소비 개수 — 박스 완료(위 tungCount)와는 별개로, 이번 달에 '1개 사용'을 실제로 몇 번 눌렀는지
+        let countUsageTotal = 0;
+        products.forEach(p => {
+            if (p.itemType !== 'count') return;
+            (p.countHistory || []).forEach(h => { if (inMonth(h.date)) countUsageTotal++; });
+        });
 
         // registeredAsNew가 false면 '등록 당시 이미 쓰던 것' → 이번 달 구매로 안 침
         // (필드 자체가 없는 옛날 제품은 undefined이므로 기존 동작대로 구매로 집계)
@@ -6632,11 +6654,12 @@
                 ratingDiff: (avgRating != null && prev.avgRating != null) ? Math.round((avgRating - prev.avgRating) * 10) / 10 : null,
                 repurchaseDiff: (repurchasePct != null && prev.repurchasePct != null) ? repurchasePct - prev.repurchasePct : null,
                 reviewDiff: reviewCount - prev.reviewCount,
+                countUsageDiff: countUsageTotal - prev.countUsageTotal,
             };
         }
 
         return {
-            year, monthIdx, tungCount, purchaseCount, reviewCount,
+            year, monthIdx, tungCount, purchaseCount, reviewCount, countUsageTotal,
             categoryBreakdown, avgUseDays, avgRating, repurchasePct, repurchaseYesCount,
             repurchaseAnsweredCount: repurchaseAnswered.length,
             bestRated, longestUsed, fastestFinished, repurchaseConfirmed,
@@ -6706,10 +6729,14 @@
                 <span style="color:#888;">평균 별점</span>
                 <span style="font-weight:700;">${stats.avgRating != null ? stats.avgRating.toFixed(1) : '—'}</span>
             </div>
-            <div style="display:flex; justify-content:space-between; font-size:13px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px;${stats.countUsageTotal > 0 ? ' margin-bottom:8px;' : ''}">
                 <span style="color:#888;">재구매 의향 비율</span>
                 <span style="font-weight:700;">${stats.repurchasePct != null ? stats.repurchasePct + '%' : '—'}</span>
             </div>
+            ${stats.countUsageTotal > 0 ? `<div style="display:flex; justify-content:space-between; font-size:13px;">
+                <span style="color:#888;">낱개 소비 개수</span>
+                <span style="font-weight:700;">${stats.countUsageTotal}개</span>
+            </div>` : ''}
         </div>`;
 
         // ❤️ 만족도
@@ -6801,6 +6828,7 @@
                 ${cmpRow('구매', c.purchaseDiff, '개')}
                 ${cmpRow('평균 별점', c.ratingDiff, '')}
                 ${cmpRow('재구매율', c.repurchaseDiff, '%')}
+                ${(stats.countUsageTotal > 0 || c.countUsageDiff) ? cmpRow('낱개 소비', c.countUsageDiff, '개') : ''}
             </div>`;
         }
 
@@ -7078,6 +7106,7 @@
                 ${cmpRow('구매', c.compare.purchaseDiff, '개')}
                 ${cmpRow('루틴 성공률', h.compare ? h.compare.pctDiff : null, '%')}
                 ${cmpRow('리뷰', c.compare.reviewDiff, '개')}
+                ${(c.countUsageTotal > 0 || c.compare.countUsageDiff) ? cmpRow('낱개 소비', c.compare.countUsageDiff, '개') : ''}
             </div>`;
         }
 
