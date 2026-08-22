@@ -296,13 +296,29 @@
     </div>
     <div class="confirm-overlay" id="editOriginalStockOverlay">
         <div class="confirm-box">
-            <p>총 수량 설정</p>
-            <div style="font-size:11px; color:var(--gray); margin-bottom:8px; margin-top:-6px;">진행률 게이지의 기준이 돼요. 재고 자체는 안 바뀌어요.</div>
+            <p>이번 박스 크기 수정</p>
+            <div style="font-size:11px; color:var(--gray); margin-bottom:8px; margin-top:-6px;">지금 쓰고 있는 맨 앞 박스의 크기예요. 대기 중인 다른 박스는 안 바뀌어요.</div>
             <input type="number" id="editOriginalStockInput" min="1" max="999"
                 style="width:100%; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:14px; margin-bottom:14px;">
             <div class="confirm-btn-row">
                 <button class="confirm-btn no" onclick="cancelEditOriginalStock()">취소</button>
                 <button class="confirm-btn yes" style="background:var(--primary, #FF5A5F);" onclick="saveEditOriginalStock()">저장</button>
+            </div>
+        </div>
+    </div>
+    <div class="confirm-overlay" id="addBoxOverlay">
+        <div class="confirm-box">
+            <p>박스 추가</p>
+            <div style="font-size:11px; color:var(--gray); margin-bottom:8px; margin-top:-6px;">지금 쓰고 있는 박스를 다 쓰면 자동으로 이어져요.</div>
+            <label style="font-size:11px; color:var(--gray); display:block; text-align:left; margin-bottom:4px;">박스당 개수</label>
+            <input type="number" id="addBoxSizeInput" min="1" max="999" placeholder="예: 30"
+                style="width:100%; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:14px; margin-bottom:10px;">
+            <label style="font-size:11px; color:var(--gray); display:block; text-align:left; margin-bottom:4px;">몇 박스?</label>
+            <input type="number" id="addBoxCountInput" min="1" max="20" value="1"
+                style="width:100%; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:14px; margin-bottom:14px;">
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelAddBox()">취소</button>
+                <button class="confirm-btn yes" style="background:var(--primary, #FF5A5F);" onclick="saveAddBox()">추가</button>
             </div>
         </div>
     </div>
@@ -2386,11 +2402,13 @@
         filteredProducts.forEach(p => {
             // 개수형(낱개 소진) 제품은 통형과 완전히 다른 카드 — 여기서 분리 처리
             if (p.itemType === 'count') {
+                ensureBoxQueue(p);
                 const catName = (Number(p.categoryId) === 0)
                     ? '🫙 일단 쓰고 봄'
                     : ((categories.find(c => Number(c.id) === Number(p.categoryId)) || {}).name || '미지정');
                 const unit = p.unit || '개';
-                const isExhausted = p.stock <= 0;
+                const front = p.boxQueue.length ? p.boxQueue[0] : null;
+                const isExhausted = !front;
                 const pace = computeCountPace(p);
                 const hist = p.countHistory || [];
                 const totalDays = (isExhausted && p.registeredAsNew !== false && hist.length > 0)
@@ -2401,33 +2419,28 @@
                     : (pace
                         ? `<div style="font-size:11px; color:#888; margin-top:6px;">평균 ${pace.avgInterval}일마다 하나씩${!isExhausted ? ` · 이 페이스면 약 ${pace.daysLeft}일 남음` : ''}</div>`
                         : '');
-                // 진행률 바는 '재고 몇 개 남았나'가 아니라 '이번 박스를 몇 % 썼나'(누적 사용 횟수 기준)로 계산한다.
-                // 재고 기준으로 하면 다 쓰기 전 재입고했을 때 여유분을 다 쓸 때까지 게이지가 100%에 멈춰있는 것처럼
-                // 보이는 문제가 있어서, countHistory(실제 '사용' 누른 기록)만 갖고 계산해 재입고와 완전히 무관하게 만든다.
-                // 단, 보여줄 땐 '남은 비율'로 뒤집는다 — 앱 전체가 재고 여유(🟢넉넉해요 등) 프레임이라
-                // 꽉 찬 바 = 여유 있음이 더 직관적. 계산은 그대로 사용 기준, 방향만 반전.
-                const boxUsage = (p.originalStock && p.originalStock > 0)
-                    ? (() => {
-                        const total = (p.countHistory || []).length;
-                        let used = total % p.originalStock;
-                        if (used === 0 && total > 0) used = p.originalStock; // 방금 박스를 딱 채워 끝낸 상태 = 다 쓴 걸로 표시
-                        return { used, total: p.originalStock, remaining: p.originalStock - used };
-                    })()
-                    : null;
-                const progressPct = boxUsage ? Math.round(boxUsage.remaining / boxUsage.total * 100) : 0;
-                const progressBar = boxUsage
+                // 진행률 바는 이제 그냥 '맨 앞 박스가 몇 % 남았나'다 — 박스를 줄(큐)로 관리하게 되면서
+                // 예전처럼 누적 사용 횟수를 총 수량으로 나눠 계산할 필요가 없어졌다(재입고 타이밍과 원천적으로 무관).
+                // 다만 재설계 이전에 이미 뒤섞여 있던 옛날 데이터(마이그레이션으로 remaining>size가 될 수 있음)를
+                // 방어하기 위해 100%로 캡은 걸어둔다.
+                const boxPct = (front && front.size != null) ? Math.min(100, Math.round(front.remaining / front.size * 100)) : 0;
+                const progressBar = (front && front.size != null)
                     ? `<div style="margin-top:8px;">
                         <div style="display:flex; justify-content:space-between; font-size:11px; color:#888; margin-bottom:3px;">
-                            <span>이번 박스 ${boxUsage.remaining} / ${boxUsage.total}${unit} 남음 <button onclick="editOriginalStock(${p.id})" style="background:none; border:none; cursor:pointer; font-size:10px; padding:0 2px; color:#BBB;" title="총 수량 수정">✏️</button></span>
-                            <span>${progressPct}%</span>
+                            <span>이번 박스 ${front.remaining} / ${front.size}${unit} 남음 <button onclick="editOriginalStock(${p.id})" style="background:none; border:none; cursor:pointer; font-size:10px; padding:0 2px; color:#BBB;" title="이번 박스 크기 수정">✏️</button></span>
+                            <span>${boxPct}%</span>
                         </div>
-                        <div style="height:7px; background:#F5F5F5; border-radius:4px; overflow:hidden;"><div style="width:${progressPct}%; height:100%; background:var(--primary);"></div></div>
+                        <div style="height:7px; background:#F5F5F5; border-radius:4px; overflow:hidden;"><div style="width:${boxPct}%; height:100%; background:var(--primary);"></div></div>
                     </div>`
                     : `<div style="margin-top:8px;"><button onclick="editOriginalStock(${p.id})" style="background:none; border:1px dashed #DDD; border-radius:8px; cursor:pointer; font-size:10px; color:#AAA; padding:4px 8px;">🔢 총 수량 입력하면 진행률이 떠요</button></div>`;
-                // 재고 여유 배지 — 총 수량을 알면 비율로, 모르면 개수 기준으로 대략 판단
+                // 대기 중인 다음 박스가 있으면 살짝 보여준다 — 큐 구조를 체감할 수 있게
+                const nextBoxHint = (p.boxQueue.length > 1)
+                    ? `<div style="font-size:10px; color:#AAA; margin-top:3px;">📦 다음 박스 대기 중: ${p.boxQueue[1].size != null ? p.boxQueue[1].size + unit : '크기 모름'}${p.boxQueue.length > 2 ? ` 외 ${p.boxQueue.length - 2}박스` : ''}</div>`
+                    : '';
+                // 재고 여유 배지 — 총 수량을 알면 비율로, 모르면 개수 기준으로 대략 판단 (전체 재고 p.stock 기준, 큐 전체 합계)
                 let stockLevelBadge = '';
                 if (!isExhausted) {
-                    const ratio = (p.originalStock && p.originalStock > 0) ? (p.stock / p.originalStock) : null;
+                    const ratio = (front.size && front.size > 0) ? (p.stock / front.size) : null;
                     let level;
                     if (ratio != null) level = ratio <= 0.15 ? 'low' : (ratio <= 0.4 ? 'mid' : 'high');
                     else level = p.stock <= 5 ? 'low' : (p.stock <= 15 ? 'mid' : 'high');
@@ -2445,9 +2458,10 @@
                         return daysSince <= 0 ? '오늘 사용했어요' : `${daysSince}일 전에 사용했어요`;
                     })()
                     : '';
-                // 박스(등록 총 수량) 완료 횟수 — 통형의 텅 카운트 배지와 같은 자리·같은 스타일
+                // 박스 완료 횟수 — 통형의 텅 카운트 배지와 같은 자리·같은 스타일
                 const exhaustCount = (p.exhaustedHistory || []).length;
                 const latestBoxReview = exhaustCount > 0 ? getLatestReview(p.id, exhaustCount) : null;
+                const front_cap = front && front.size != null ? front.size : 999;
                 const card = document.createElement('div');
                 card.className = 'product-card';
                 card.id = `product-card-${p.id}`;
@@ -2466,22 +2480,24 @@
                         ${exhaustCount > 0 ? `<div class="tung-count-badge">🫙 ${getTungOrdinalLabel(exhaustCount)}${latestBoxReview ? '' : ' · 리뷰 없음'}</div>` : ''}
                         ${lastUsedText ? `<div style="font-size:11px; color:#9AAF82; margin-top:4px; font-weight:700;">🕓 ${lastUsedText}</div>` : ''}
                         ${progressBar}
+                        ${nextBoxHint}
                         ${paceText}
                         <div style="margin-top:6px; display:flex; align-items:center; gap:5px;">
                             <span style="font-size:11px; color:#888; white-space:nowrap;">🗓️ 화장대 등록일</span>
                             <span style="font-size:11px; color:#AAA; font-weight:600;">${formatDateString(p.createdAt)}</span>
                         </div>
-                        <div class="stock-control" style="margin-top:8px;">
-                            <span style="font-size:10px; color:#AAA; margin-right:2px;">현재 재고</span>
-                            <button class="btn-qty" onclick="adjustCountStock(${p.id}, -1)">-</button>
-                            <input type="number" min="0" max="999" value="${p.stock}"
+                        <div class="stock-control" style="margin-top:8px; display:flex; align-items:center; gap:6px;">
+                            <span style="font-size:10px; color:#AAA;">이번 박스 보정</span>
+                            <button class="btn-qty" onclick="adjustCountStock(${p.id}, -1)" ${isExhausted ? 'disabled' : ''}>-</button>
+                            <input type="number" min="0" max="${front_cap}" value="${front ? front.remaining : 0}"
                                 style="width:44px; text-align:center; font-size:13px; font-weight:bold; border:1.5px solid #E0E0E0; border-radius:8px; padding:3px 0;"
                                 onchange="setCountStock(${p.id}, this)"
-                                onclick="this.select()">
+                                onclick="this.select()" ${isExhausted ? 'disabled' : ''}>
                             <span style="font-size:12px; color:#888; margin-left:-2px;">${unit}</span>
-                            <button class="btn-qty" onclick="adjustCountStock(${p.id}, 1)">+</button>
+                            <button class="btn-qty" onclick="adjustCountStock(${p.id}, 1)" ${isExhausted ? 'disabled' : ''}>+</button>
                         </div>
-                        <div style="font-size:9px; color:#CCC; margin-top:3px;">위 숫자칸은 재고 보정·재입고용이에요 (기록 안 남음)</div>
+                        <button onclick="openAddBoxModal(${p.id})" style="width:100%; margin-top:8px; background:#F1F8E9; color:#5C9A1E; border:none; border-radius:8px; font-size:12px; font-weight:700; padding:8px 0; cursor:pointer;">+ 📦 박스 추가</button>
+                        <div style="font-size:9px; color:#CCC; margin-top:3px;">위 스테퍼는 이번 박스 재고 보정용이에요 (기록 안 남음)</div>
                     </div>
                     <div class="right-actions">
                         <div class="tung-bottle-wrapper ${isExhausted ? 'empty' : ''}"
@@ -3325,9 +3341,10 @@
     function editOriginalStock(id) {
         const p = products.find(prod => prod.id === id);
         if (!p || p.itemType !== 'count') return;
+        ensureBoxQueue(p);
         pendingEditOriginalStockId = id;
         const input = document.getElementById('editOriginalStockInput');
-        input.value = p.originalStock != null ? p.originalStock : '';
+        input.value = (p.boxQueue.length && p.boxQueue[0].size != null) ? p.boxQueue[0].size : '';
         input.min = 1; // 박스 크기는 현재 재고와 무관 — 박스를 여러 개 쟁여둔 경우 재고보다 작을 수 있음
         document.getElementById('editOriginalStockOverlay').classList.add('active');
         setTimeout(() => { input.focus(); input.select(); }, 50);
@@ -3344,9 +3361,17 @@
             showToast('⚠️ 총 수량을 입력해주세요');
             return;
         }
-        // '총 수량'은 이제 박스 하나의 크기라, 박스를 여러 개 쟁여둔 경우 현재 재고보다 작을 수 있다 (예: 재고 35개, 박스는 30개들이).
-        // 그래서 현재 재고와의 대소 비교는 하지 않는다.
-        p.originalStock = Math.min(val, 999);
+        // 이건 '지금 맨 앞에서 쓰고 있는 박스'의 크기를 고치는 것 — 뒤에 대기 중인 다른 박스는 안 건드림.
+        ensureBoxQueue(p);
+        const sizeCapped = Math.min(val, 999);
+        if (!p.boxQueue.length) {
+            p.boxQueue = [{ size: sizeCapped, remaining: sizeCapped, startDate: getTodayTimeline() }];
+        } else {
+            const front = p.boxQueue[0];
+            front.size = sizeCapped;
+            if (front.remaining > sizeCapped) front.remaining = sizeCapped; // 남은 게 새 크기보다 많으면 캡
+        }
+        syncCountMirrors(p);
         showToast('🔢 총 수량이 설정됐어요');
         cancelEditOriginalStock();
         renderProducts();
@@ -5126,36 +5151,51 @@
     // 1개 사용: 재고 -1 + countHistory에 기록(페이스 계산용). 통형의 tungHistory/달력 공병 마커와는
     // 의도적으로 안 엮는다 — 알약 하나 먹은 걸 "공병"으로 잡으면 달력이 매일 여러 점으로 도배된다.
     // 버튼 모양/애니메이션(대기 흔들림·누르면 바운스)만 텅 버튼과 동일하게 tung-bottle-wrapper를 재사용.
+    // ══════════ 개수형 박스 큐 ══════════
+    // 박스를 숫자 하나(originalStock)로 뭉뚱그리던 이전 방식은, 다 쓰기 전에 새 박스를 추가하면
+    // 이전 박스 남은 것과 새 박스가 섞여버리는 문제가 있었다. 그래서 박스를 줄(큐)로 관리한다:
+    //   p.boxQueue = [{ size, remaining, startDate }, ...]  ─ 맨 앞이 지금 쓰고 있는 박스.
+    // 소비는 항상 맨 앞 박스부터 깎이고, 맨 앞이 0이 되면 큐에서 빠지고 다음 박스로 자연스럽게 넘어간다.
+    // p.stock/p.originalStock은 하위호환용 미러 필드(합계/맨 앞 박스 크기)로 계속 동기화해둔다.
+    function ensureBoxQueue(p) {
+        if (p.boxQueue) return;
+        if (p.originalStock && p.originalStock > 0) {
+            p.boxQueue = p.stock > 0 ? [{ size: p.originalStock, remaining: p.stock, startDate: p.createdAt }] : [];
+        } else {
+            p.boxQueue = p.stock > 0 ? [{ size: null, remaining: p.stock, startDate: p.createdAt }] : [];
+        }
+    }
+    function syncCountMirrors(p) {
+        p.stock = p.boxQueue.reduce((s, b) => s + b.remaining, 0);
+        p.originalStock = p.boxQueue.length ? p.boxQueue[0].size : null;
+    }
     function decrementCountStock(id, el) {
         const p = products.find(x => x.id === id);
         if (!p || p.itemType !== 'count') return;
-        if (p.stock <= 0) { showToast('이미 다 썼어요'); return; }
+        ensureBoxQueue(p);
+        if (!p.boxQueue.length || p.boxQueue[0].remaining <= 0) { showToast('이미 다 썼어요'); return; }
         if (el) {
             el.classList.add('pressing');
             setTimeout(() => el.classList.remove('pressing'), 480);
         }
-        p.stock -= 1;
         if (!p.countHistory) p.countHistory = [];
         p.countHistory.push({ date: getTodayTimeline() });
-        // '박스(등록 총 수량) 하나 완료' 시점만 화장품 공병처럼 달력에 남긴다 — 매번 사용할 때마다는 안 남김(달력 도배 방지).
-        // 총 수량을 알면: 앱이 실제로 기록한 사용 횟수(countHistory.length)가 총 수량의 배수에 도달할 때.
-        //   → '이미 쓰던 것'으로 등록하기 전에 이미 먹은 만큼은 countHistory에 없어서 자동으로 카운팅 제외됨.
-        // 총 수량을 모르면(기준이 없음): 예전처럼 재고 0을 신호로 대체 사용.
-        const boxCompleted = (p.originalStock && p.originalStock > 0)
-            ? (p.countHistory.length % p.originalStock === 0)
-            : (p.stock === 0);
+
+        const front = p.boxQueue[0];
+        front.remaining -= 1;
+        // '박스 완료' = 맨 앞 박스가 정확히 0이 되는 순간 — 다른 박스 수량과 섞일 일이 없다.
+        const boxCompleted = front.remaining <= 0;
         if (boxCompleted) {
+            const boxDays = Math.max(0, Math.round((getTodayTimeline() - (front.startDate || p.createdAt)) / (1000 * 60 * 60 * 24)));
             if (!p.exhaustedHistory) p.exhaustedHistory = [];
-            // 이 박스의 사용 기간(며칠 걸렸는지) — 리포트의 '가장 오래/빨리 쓴 제품'에서 통형이랑 같이 비교하는 데 씀.
-            // originalStock이 이 박스 내내 똑같았다는 전제로, 방금 쌓인 마지막 N개(N=총 수량) 구간을 이 박스로 본다.
-            // 그 구간 시작 = 그 앞 탭 날짜(또는 첫 박스면 등록일), 끝 = 지금.
-            const startIdx = p.countHistory.length - p.originalStock;
-            const boxStartDate = startIdx > 0 ? p.countHistory[startIdx - 1].date : p.createdAt;
-            const boxDays = Math.max(0, Math.round((getTodayTimeline() - boxStartDate) / (1000 * 60 * 60 * 24)));
             p.exhaustedHistory.push({ date: getTodayTimeline(), days: boxDays });
+            p.boxQueue.shift(); // 다음 박스로 전환
+            if (p.boxQueue.length) p.boxQueue[0].startDate = getTodayTimeline(); // 다음 박스가 지금부터 시작
         }
+        syncCountMirrors(p);
+
         const msg = p.stock === 0
-            ? `📦 [${p.name}] 재고가 다 떨어졌어요! 새로 사면 아래 숫자칸으로 채워주세요`
+            ? `📦 [${p.name}] 재고가 다 떨어졌어요! "+ 박스 추가"로 채워주세요`
             : `✅ [${p.name}] 1${p.unit || '개'} 사용 · ${p.stock}${p.unit || '개'} 남음`;
         saveToStorage();
         setTimeout(() => {
@@ -5167,36 +5207,67 @@
             }
         }, 260);
     }
-    // 재고 보정·재입고용 +/- (기록 안 남김 — 소비가 아니라 수량 조정이라서)
-    // 개수형 재입고 시 '박스 완료' 기준(originalStock)을 언제 갱신할지 정하는 공용 규칙.
-    // - 다 쓰고(재고 0) 나서 재입고 = 새 박스 시작 → 그 값 자체를 새 기준으로 삼음(박스가 커지든 작아지든 그대로 반영)
-    // - 총량을 아예 몰랐다가 중간에 처음 알게 됨 → 그 시점 기준으로 한 번 시작
-    // - 그 외(총량을 이미 아는데 다 쓰기 전에 미리 채움) → 기준 그대로 유지. 매번 갱신하면 박스 완료
-    //   카운팅(countHistory.length % originalStock)이 재입고할 때마다 흔들려서, 다 쓰기 전 재입고가 잦은
-    //   경우엔 일부러 안 건드리는 쪽을 택함.
-    function updateOriginalStockOnRestock(p, newStock) {
-        if (newStock <= p.stock) return; // 재입고(늘어나는) 방향이 아니면 손대지 않음
-        if (p.stock === 0 || p.originalStock == null) p.originalStock = newStock;
-    }
+    // 맨 앞 박스 재고를 소소하게 보정하는 용도(±1). 기록은 안 남고, 박스 크기(size)를 못 넘는다.
     function adjustCountStock(id, amount) {
         const p = products.find(x => x.id === id);
         if (!p || p.itemType !== 'count') return;
-        const newStock = Math.max(0, Math.min(999, p.stock + amount));
-        updateOriginalStockOnRestock(p, newStock);
-        p.stock = newStock;
+        ensureBoxQueue(p);
+        if (!p.boxQueue.length) { showToast('먼저 "+ 박스 추가"로 채워주세요'); return; }
+        const front = p.boxQueue[0];
+        const cap = front.size != null ? front.size : 999;
+        front.remaining = Math.max(0, Math.min(cap, front.remaining + amount));
+        syncCountMirrors(p);
         saveToStorage();
         renderProducts();
     }
-    // 재입고용 직접 입력 (예: 10개 남았는데 30개 새로 사면 40으로 바로 수정)
+    // 맨 앞 박스 재고를 숫자로 직접 보정 (박스 크기를 넘는 값은 박스 크기로 캡)
     function setCountStock(id, inputEl) {
         const p = products.find(x => x.id === id);
         if (!p || p.itemType !== 'count') return;
+        ensureBoxQueue(p);
+        if (!p.boxQueue.length) { showToast('먼저 "+ 박스 추가"로 채워주세요'); inputEl.value = 0; return; }
+        const front = p.boxQueue[0];
         let val = parseInt(inputEl.value);
         if (isNaN(val) || val < 0) val = 0;
-        if (val > 999) val = 999;
+        const cap = front.size != null ? front.size : 999;
+        if (val > cap) val = cap;
         inputEl.value = val;
-        updateOriginalStockOnRestock(p, val);
-        p.stock = val;
+        front.remaining = val;
+        syncCountMirrors(p);
+        saveToStorage();
+        renderProducts();
+    }
+    // 새 박스를 큐 맨 뒤에 추가 — 지금 박스를 다 쓰면 자동으로 이어진다.
+    let pendingAddBoxId = null;
+    function openAddBoxModal(id) {
+        const p = products.find(x => x.id === id);
+        if (!p || p.itemType !== 'count') return;
+        pendingAddBoxId = id;
+        document.getElementById('addBoxSizeInput').value = '';
+        document.getElementById('addBoxCountInput').value = '1';
+        document.getElementById('addBoxOverlay').classList.add('active');
+        setTimeout(() => document.getElementById('addBoxSizeInput').focus(), 50);
+    }
+    function cancelAddBox() {
+        pendingAddBoxId = null;
+        document.getElementById('addBoxOverlay').classList.remove('active');
+    }
+    function saveAddBox() {
+        const p = products.find(x => x.id === pendingAddBoxId);
+        if (!p) { cancelAddBox(); return; }
+        const size = parseInt(document.getElementById('addBoxSizeInput').value);
+        let count = parseInt(document.getElementById('addBoxCountInput').value);
+        if (isNaN(size) || size < 1) { showToast('⚠️ 박스당 개수를 입력해주세요'); return; }
+        if (isNaN(count) || count < 1) count = 1;
+        count = Math.min(count, 20);
+        ensureBoxQueue(p);
+        const sizeCapped = Math.min(size, 999);
+        const wasEmpty = p.boxQueue.length === 0;
+        for (let i = 0; i < count; i++) p.boxQueue.push({ size: sizeCapped, remaining: sizeCapped, startDate: null });
+        if (wasEmpty) p.boxQueue[0].startDate = getTodayTimeline(); // 비어있다가 추가되면 그 즉시 사용 시작으로 봄
+        syncCountMirrors(p);
+        showToast(`📦 ${count}박스(박스당 ${sizeCapped}${p.unit || '개'}) 추가했어요 · 총 재고 ${p.stock}${p.unit || '개'}`);
+        cancelAddBox();
         saveToStorage();
         renderProducts();
     }
@@ -7779,16 +7850,19 @@
         });
 
         toAdd.forEach((name, i) => {
+            const createdAtVal = Date.now() + i;
+            const initBoxSize = regItemType === 'count'
+                ? (regUsageState === 'sealed' ? initCountStock : initCountOriginal) // 새 제품=입력한 총 수량, 이미 쓰던 것=선택 입력했으면 그 값(없으면 null → 박스 크기 모름)
+                : null;
             products.push({
                 id: Date.now() + i,
-                createdAt: Date.now() + i,   // [등록일] id에 의존하지 않도록 명시적으로도 남긴다
+                createdAt: createdAtVal,   // [등록일] id에 의존하지 않도록 명시적으로도 남긴다
                 name,
                 categoryId: isUnknown ? 0 : categoryId,
                 itemType: regItemType,   // 'bottle' | 'count' — 등록 후 변경 금지
                 stock: regItemType === 'count' ? initCountStock : 1,
-                originalStock: regItemType === 'count'
-                    ? (regUsageState === 'sealed' ? initCountStock : initCountOriginal) // 새 제품=입력한 총 수량, 이미 쓰던 것=선택 입력했으면 그 값(없으면 null → 재입고 때 자동 시작)
-                    : null,
+                originalStock: initBoxSize, // 하위호환용 미러(맨 앞 박스 크기) — 실제 값은 boxQueue가 갖고 있음
+                boxQueue: regItemType === 'count' ? [{ size: initBoxSize, remaining: initCountStock, startDate: createdAtVal }] : undefined,
                 unit: regItemType === 'count' ? initCountUnit : null,
                 countHistory: regItemType === 'count' ? [] : undefined, // 개수형 소진 이력(페이스 계산용) — 달력/tungHistory와는 별개
                 targetScheduleId: isNaN(targetScheduleId) ? 0 : targetScheduleId,
