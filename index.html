@@ -1170,7 +1170,7 @@
             <div class="setting-form">
                 <div class="section-title">🗄️ 보관함</div>
                 <div style="font-size:12px; color:var(--gray); line-height:1.5; margin-bottom:12px;">
-                    목록에서 치운 제품이 여기 보관돼요. <b>텅·소진·달력 기록은 그대로</b> 남아 있어요.<br>
+                    목록에서 삭제한 제품이 여기 보관돼요. <b>텅·소진·달력 기록은 그대로</b> 남아 있어요.<br>
                     되돌리거나 영구 삭제할 수 있어요.
                 </div>
                 <div id="storageUsage" style="margin-bottom:12px;"></div>
@@ -7645,11 +7645,16 @@
     // 보관 해제 = 다시 목록으로
     function restoreProduct(productId) {
         const p = products.find(prod => prod.id === productId);
-        if (p) {
-            p.archived = false;
-            delete p.archivedAt;
-            showToast('↩️ 목록으로 되돌렸어요');
+        if (!p) { syncAllAndRender(); return; }
+        // 등록할 때 중복 이름을 막는 것과 똑같은 규칙 — 되돌렸을 때 같은 이름 제품이 목록에 두 개 뜨는 걸 방지
+        const dup = products.some(prod => !prod.archived && prod.id !== p.id && prod.name === p.name);
+        if (dup) {
+            showToast(`⚠️ [${p.name}] 이름의 제품이 이미 목록에 있어서 되돌릴 수 없어요`);
+            return;
         }
+        p.archived = false;
+        delete p.archivedAt;
+        showToast('↩️ 목록으로 되돌렸어요');
         syncAllAndRender();
     }
     // 영구 삭제: 제품과 루틴 참조까지 완전히 제거 (체크 기록은 보존)
