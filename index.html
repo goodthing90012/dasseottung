@@ -1963,6 +1963,19 @@
     // 업데이트 내역 데이터 (최신순)
     const UPDATE_HISTORY = [
         {
+            version: 'v3.5.0',
+            date: '2026.08',
+            title: '개수형(낱개 소진) 제품 지원',
+            items: [
+                '📦 영양제·마스크팩처럼 한 개씩 낱개로 소진되는 제품을 새로 등록할 수 있어요 (통형/개수형 선택)',
+                '💊 "1개 사용" 버튼으로 소진 기록, 진행률 게이지·재고 여유 배지로 한눈에 확인',
+                '📈 며칠마다 하나씩 쓰는지 페이스를 자동으로 계산해서 알려줘요',
+                '➕ "박스 추가"로 새 박스를 미리 쟁여두면, 지금 박스를 다 쓴 뒤 자동으로 이어져요',
+                '🩷 박스를 다 쓰면 통형처럼 리뷰 작성·달력 기록·월간 리포트에도 반영돼요',
+                '📝 메모 기능도 개수형 제품에 동일하게 지원돼요'
+            ]
+        },
+        {
             version: 'v3.4.0',
             date: '2026.08',
             title: '월간 리포트',
@@ -2487,7 +2500,6 @@
                             <span style="font-size:11px; color:#AAA; font-weight:600;">${formatDateString(p.createdAt)}</span>
                         </div>
                         <div class="stock-control" style="margin-top:8px; display:flex; align-items:center; gap:6px;">
-                            <span style="font-size:10px; color:#AAA;">이번 박스 보정</span>
                             <button class="btn-qty" onclick="adjustCountStock(${p.id}, -1)" ${isExhausted ? 'disabled' : ''}>-</button>
                             <input type="number" min="0" max="${front_cap}" value="${front ? front.remaining : 0}"
                                 style="width:44px; text-align:center; font-size:13px; font-weight:bold; border:1.5px solid #E0E0E0; border-radius:8px; padding:3px 0;"
