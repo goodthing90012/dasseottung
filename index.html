@@ -3880,7 +3880,11 @@
     function saveReview() {
         const text = document.getElementById('reviewTextInput').value.trim();
         const p = products.find(prod => prod.id === pendingReviewProductId);
-        if (!text || !p) { skipReview(); return; }
+        if (!p) { skipReview(); return; }
+        if (!text) {
+            showToast('⚠️ 내용을 입력해주세요');
+            return;
+        }
         reviews.unshift({
             id: Date.now(),
             productId: p.id,
@@ -3974,7 +3978,11 @@
     }
     function saveEditReview() {
         const text = document.getElementById('editReviewTextInput').value.trim();
-        if (!text || !editingReviewId) { cancelEditReview(); return; }
+        if (!editingReviewId) { cancelEditReview(); return; }
+        if (!text) {
+            showToast('⚠️ 내용을 입력해주세요');
+            return;
+        }
         const r = reviews.find(rv => rv.id === editingReviewId);
         if (r) {
             r.text = text;

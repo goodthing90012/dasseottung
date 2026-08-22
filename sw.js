@@ -2,7 +2,7 @@
 // 업데이트 정책: '앱 새로고침' 버튼을 누를 때만 캐시를 비우고 다시 받는다.
 // (자동 강제 업데이트는 오프라인 캐시 리스크 때문에 도입하지 않음 → skipWaiting 미사용)
 
-const CACHE = 'dasseottung-v42';
+const CACHE = 'dasseottung-v43';
 
 // 앱 셸: 오프라인에서도 앱이 뜨도록 미리 캐시해 둔다.
 // (이미지/이모지는 index.html 안에 base64로 인라인되어 있어 별도 캐싱 불필요)
