@@ -2604,11 +2604,21 @@
             // [변경점] 소진일 계산: 현재 통은 (평균일 - 며칠 썼는지)만큼만 남은 걸로 계산
             // 나머지 미개봉 재고(stock - 1개)는 그대로 평균일씩 더함
             let totalRemainingDays = 0;
+            let isOverdue = false;   // 현재 통이 예상 주기를 이미 넘겨서 쓰고 있는 상태 — "소진 N일 후" 문구만 보면 오해하기 쉬워서 별도 문구를 쓴다
+            let sealedUnitsCount = 0;
             if (p.stock > 0) {
                 const remainingInCurrentBottle = Math.max(effectiveCategoryDays - daysUsed, 0);
-                const sealedUnits = p.stock - 1; // 현재 쓰는 1개를 제외한 미개봉 재고
-                totalRemainingDays = remainingInCurrentBottle + (sealedUnits * effectiveCategoryDays);
+                sealedUnitsCount = p.stock - 1; // 현재 쓰는 1개를 제외한 미개봉 재고
+                isOverdue = (effectiveCategoryDays != null && effectiveCategoryDays > 0) && daysUsed > effectiveCategoryDays;
+                totalRemainingDays = remainingInCurrentBottle + (sealedUnitsCount * effectiveCategoryDays);
             }
+            // 예상 주기 초과 시 보여줄 문구 — "소진 N일 후"라고만 하면 "벌써 N일이나 넘게 썼는데 왜 N일 남았다는 거지"로
+            // 헷갈리기 쉬워서, "지금 통은 이미 초과됐고 여분으로 N일 더 버틴다"는 걸 앞에 명시한다.
+            const overduePrefix = isOverdue
+                ? (sealedUnitsCount > 0
+                    ? `현재 통은 예상보다 오래 쓰고 있어요 · 여분 ${sealedUnitsCount}개로 ${totalRemainingDays}일 더 버틸 수 있어요`
+                    : `현재 통은 예상 주기를 넘겨서 쓰고 있어요 · 곧 텅날 수 있어요`)
+                : null;
             
             let statusBadge = ''; let alertText = ''; let usedText = '';
 
@@ -2644,11 +2654,20 @@
                 } else {
                     // [변경점] 평균값이 있으면(0일 수도 있음) openedDate 기준으로 totalRemainingDays도 계산
                     // avgDays가 0이면 falsy라 if(avgDays)로 체크하면 안 됨 → null 여부로 명확히 체크
+                    let unknownCatSealedUnits = 0;
+                    let unknownCatOverdue = false;
                     if (avgDays !== null) {
                         const remainingInCurrentBottle = Math.max(avgDays - daysUsed, 0);
-                        const sealedUnits = p.stock - 1;
-                        totalRemainingDays = remainingInCurrentBottle + (sealedUnits * avgDays);
+                        unknownCatSealedUnits = p.stock - 1;
+                        unknownCatOverdue = avgDays > 0 && daysUsed > avgDays;
+                        totalRemainingDays = remainingInCurrentBottle + (unknownCatSealedUnits * avgDays);
                     }
+                    // 알려진 카테고리 쪽과 같은 이유로, 실측 평균을 이미 넘겨 쓰고 있으면 "소진 N일 후"만으론 헷갈려서 앞세워 알려준다
+                    const unknownCatOverduePrefix = unknownCatOverdue
+                        ? (unknownCatSealedUnits > 0
+                            ? `현재 통은 실측 평균보다 오래 쓰고 있어요 · 여분 ${unknownCatSealedUnits}개로 ${totalRemainingDays}일 더 버틸 수 있어요`
+                            : `현재 통은 실측 평균을 넘겨서 쓰고 있어요 · 곧 텅날 수 있어요`)
+                        : null;
 
                     if (!matchedSched) {
                         // 세일/구매 일정이 연동 안 된 경우 — 기존처럼 분석 단계 안내만
@@ -2663,7 +2682,7 @@
                             alertText = `1번 더 텅하면 평균이 잡혀요`;
                         } else {
                             statusBadge = '<span class="badge enough">📊 평균 ' + avgDays + '일 소진</span>';
-                            alertText = `${history.length}회 분석 기준 · 평균 ${avgDays}일마다 한 통 소진`;
+                            alertText = unknownCatOverduePrefix || `${history.length}회 분석 기준 · 평균 ${avgDays}일마다 한 통 소진`;
                         }
                     } else {
                         // [변경점] 세일/구매 일정이 연동된 경우 — D-day와 실제 비교
@@ -2673,12 +2692,16 @@
                             alertText = `세일까지 D-${dDayLeft} · 아직 데이터가 부족해 비교는 어려워요 (텅 ${needMore}번 더 누르면 비교 가능)`;
                         } else if (totalRemainingDays >= dDayLeft) {
                             statusBadge = '<span class="badge enough">구매일전 안전함</span>';
-                            alertText = `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
+                            alertText = unknownCatOverduePrefix
+                                ? `${unknownCatOverduePrefix} (세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`
+                                : `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
                         } else {
                             const shortfallDays = dDayLeft - totalRemainingDays;
                             const neededUnits = avgDays > 0 ? Math.ceil(shortfallDays / avgDays) : 1;
                             statusBadge = '<span class="badge danger">주기 전 소진위험</span>';
-                            alertText = `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`;
+                            alertText = unknownCatOverduePrefix
+                                ? `${unknownCatOverduePrefix} (세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`
+                                : `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`;
                         }
                     }
 
@@ -2702,15 +2725,20 @@
                             : '즉시 구매 필요';
                     }
                 } else if (!matchedSched) {
-                    statusBadge = '<span class="badge neutral">일단 씀</span>'; alertText = `소진까지 약 ${totalRemainingDays}일 남음`;
+                    statusBadge = '<span class="badge neutral">일단 씀</span>';
+                    alertText = overduePrefix || `소진까지 약 ${totalRemainingDays}일 남음`;
                 } else if (totalRemainingDays >= dDayLeft) {
                     statusBadge = '<span class="badge enough">구매일전 안전함</span>'; 
-                    alertText = `소진 ${totalRemainingDays}일 후 (알림 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
+                    alertText = overduePrefix
+                        ? `${overduePrefix} (알림 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`
+                        : `소진 ${totalRemainingDays}일 후 (알림 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
                 } else {
                     const shortfallDays = dDayLeft - totalRemainingDays;
                     const neededUnits = Math.ceil(shortfallDays / (effectiveCategoryDays > 0 ? effectiveCategoryDays : 30));
                     statusBadge = '<span class="badge danger">주기 전 소진위험</span>'; 
-                    alertText = `소진 ${totalRemainingDays}일 후 (세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`;
+                    alertText = overduePrefix
+                        ? `${overduePrefix} (세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`
+                        : `소진 ${totalRemainingDays}일 후 (세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`;
                 }
                 if (p.stock > 0) {
                     // [변경] 실측 기록(첫 통 기간 → 실측 평균)을 앞세우고, 예측 주기는 실측과 다를 때만 보조로
