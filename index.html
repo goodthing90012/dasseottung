@@ -169,6 +169,7 @@
         .right-actions { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 95px; gap: 4px; }
         .btn-del-action { background: none; border: none; color: #FF3B30; font-size: 11px; cursor: pointer; padding: 2px; font-weight: bold; }
         .btn-del-corner { position: absolute; top: 8px; right: 8px; background: #FFEBEB; border: none; color: #FF3B30; font-size: 11px; cursor: pointer; padding: 4px 8px; border-radius: 8px; font-weight: bold; z-index: 2; }
+        .card-selected { background: #FFF3F3 !important; border: 1.5px solid #FFB3B3 !important; }
 
         /* 삭제 확인 모달 */
         .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 999; align-items: center; justify-content: center; }
@@ -325,9 +326,11 @@
     <div class="confirm-overlay" id="bulkScheduleOverlay">
         <div class="confirm-box">
             <p>행사 일괄 반영</p>
-            <div style="font-size:11px; color:var(--gray); margin-bottom:10px; margin-top:-6px;">선택한 카테고리의 제품 전체에 세일 일정을 한 번에 반영해요. (통형·개수형 모두 적용)</div>
-            <label style="font-size:11px; color:var(--gray); display:block; text-align:left; margin-bottom:4px;">대상 카테고리</label>
-            <select id="bulkScheduleCategorySelect" style="width:100%; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:14px; margin-bottom:10px;"></select>
+            <div id="bulkScheduleDesc" style="font-size:11px; color:var(--gray); margin-bottom:10px; margin-top:-6px;">선택한 카테고리의 제품 전체에 세일 일정을 한 번에 반영해요. (통형·개수형 모두 적용)</div>
+            <div id="bulkScheduleCategoryRow">
+                <label style="font-size:11px; color:var(--gray); display:block; text-align:left; margin-bottom:4px;">대상 카테고리</label>
+                <select id="bulkScheduleCategorySelect" style="width:100%; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:14px; margin-bottom:10px;"></select>
+            </div>
             <label style="font-size:11px; color:var(--gray); display:block; text-align:left; margin-bottom:4px;">적용할 세일 일정</label>
             <select id="bulkScheduleTargetSelect" style="width:100%; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:14px; margin-bottom:14px;"></select>
             <div class="confirm-btn-row">
@@ -941,6 +944,15 @@
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
             <button onclick="openMemoBoard()" style="display:inline-flex; align-items:center; gap:5px; background:#F8F9FA; border:1px solid #E9ECEF; border-radius:9px; color:#666; font-size:11px; font-weight:700; padding:7px 11px; cursor:pointer; white-space:nowrap;">📝 메모 모아보기</button>
             <button onclick="openBulkScheduleModal()" style="display:inline-flex; align-items:center; gap:5px; background:#F8F9FA; border:1px solid #E9ECEF; border-radius:9px; color:#666; font-size:11px; font-weight:700; padding:7px 11px; cursor:pointer; white-space:nowrap;">📌 행사 일괄 반영</button>
+            <button id="bulkSelectToggleBtn" onclick="toggleBulkSelectMode()" style="display:inline-flex; align-items:center; gap:5px; background:#F8F9FA; border:1px solid #E9ECEF; border-radius:9px; color:#666; font-size:11px; font-weight:700; padding:7px 11px; cursor:pointer; white-space:nowrap;">☑️ 카드 선택</button>
+        </div>
+
+        <div id="bulkSelectBar" style="display:none; position:sticky; top:0; z-index:5; background:#FFF3F3; border:1.5px solid #FFD9D9; border-radius:12px; padding:10px 12px; margin-bottom:12px; align-items:center; justify-content:space-between; gap:8px;">
+            <span style="font-size:12px; font-weight:700; color:var(--primary);"><span id="bulkSelectCount">0</span>개 선택됨</span>
+            <div style="display:flex; gap:6px;">
+                <button onclick="openBulkScheduleForSelected()" style="background:var(--primary); color:#fff; border:none; border-radius:8px; font-size:11px; font-weight:700; padding:6px 10px; cursor:pointer; white-space:nowrap;">📌 세일 일괄 적용</button>
+                <button onclick="toggleBulkSelectMode()" style="background:#F0F0F0; color:#666; border:none; border-radius:8px; font-size:11px; font-weight:700; padding:6px 10px; cursor:pointer; white-space:nowrap;">취소</button>
+            </div>
         </div>
 
         <div class="section-title">내 화장대 재고 현황 <span id="productCount" style="font-size:12px; color:#999; font-weight:normal;"></span></div>
@@ -2504,8 +2516,9 @@
                 const isCountUnopened = isCountBoxUnopened(front);
                 const isCountPausedNow = isCountPaused(p);
                 const card = document.createElement('div');
-                card.className = 'product-card';
+                card.className = 'product-card' + (bulkSelectMode && bulkSelectedIds.has(p.id) ? ' card-selected' : '');
                 card.id = `product-card-${p.id}`;
+                if (bulkSelectMode) { card.style.cursor = 'pointer'; card.onclick = () => toggleCardSelection(p.id); }
                 card.innerHTML = `
                     <button class="btn-del-corner" onclick="confirmDeleteProduct(${p.id})">삭제 🗑️</button>
                     <div class="prod-info" style="padding-right:42px;">
@@ -2838,8 +2851,9 @@
             const liquidFillColor = isBottleEmpty ? 'transparent' : (isUnopened ? '#CCCCCC' : 'var(--liquid-full)');
 
             const card = document.createElement('div');
-            card.className = 'product-card';
+            card.className = 'product-card' + (bulkSelectMode && bulkSelectedIds.has(p.id) ? ' card-selected' : '');
             card.id = `product-card-${p.id}`;   // 대시보드에서 이 제품으로 이동할 때 앵커
+            if (bulkSelectMode) { card.style.cursor = 'pointer'; card.onclick = () => toggleCardSelection(p.id); }
             card.innerHTML = `
                 <button class="btn-del-corner" onclick="confirmDeleteProduct(${p.id})">삭제 🗑️</button>
                 <div class="prod-info" style="padding-right:42px;">
@@ -3499,8 +3513,41 @@
         }
     }
 
-    // ══════════ 행사 일괄 반영 — 카테고리를 골라 그 카테고리 제품 전체에 세일 일정을 한 번에 적용 ══════════
+    // ══════════ 행사 일괄 반영 — ①카테고리를 골라 일괄 적용 ②카드를 직접 선택해서 일괄 적용 ══════════
+    let bulkScheduleMode = 'category'; // 'category' | 'selection' — 어떤 방식으로 열렸는지
+    let bulkSelectMode = false;        // 카드에 체크박스를 보여주는 선택 모드 on/off
+    let bulkSelectedIds = new Set();
+
+    function toggleBulkSelectMode() {
+        bulkSelectMode = !bulkSelectMode;
+        if (!bulkSelectMode) bulkSelectedIds.clear();
+        const btn = document.getElementById('bulkSelectToggleBtn');
+        if (btn) {
+            btn.textContent = bulkSelectMode ? '✕ 선택 종료' : '☑️ 카드 선택';
+            btn.style.background = bulkSelectMode ? '#FFF3F3' : '#F8F9FA';
+            btn.style.color = bulkSelectMode ? 'var(--primary)' : '#666';
+        }
+        updateBulkSelectBar();
+        renderProducts();
+    }
+    function toggleCardSelection(id) {
+        if (bulkSelectedIds.has(id)) bulkSelectedIds.delete(id); else bulkSelectedIds.add(id);
+        updateBulkSelectBar();
+        renderProducts(); // 음영 즉시 반영
+    }
+    function updateBulkSelectBar() {
+        const bar = document.getElementById('bulkSelectBar');
+        if (!bar) return;
+        bar.style.display = bulkSelectMode ? 'flex' : 'none';
+        const countEl = document.getElementById('bulkSelectCount');
+        if (countEl) countEl.textContent = bulkSelectedIds.size;
+    }
+
     function openBulkScheduleModal() {
+        bulkScheduleMode = 'category';
+        document.getElementById('bulkScheduleDesc').textContent = '선택한 카테고리의 제품 전체에 세일 일정을 한 번에 반영해요. (통형·개수형 모두 적용)';
+        document.getElementById('bulkScheduleCategoryRow').style.display = 'block';
+
         const today = getTodayTimeline();
         const catSel = document.getElementById('bulkScheduleCategorySelect');
         let catHtml = '<option value="all">전체 카테고리</option><option value="0">🫙 일단 쓰고 봄</option>';
@@ -3517,25 +3564,57 @@
 
         document.getElementById('bulkScheduleOverlay').classList.add('active');
     }
+    // 카드 선택 모드에서 고른 제품들에만 적용할 때 — 카테고리 선택 없이 세일만 고르면 된다
+    function openBulkScheduleForSelected() {
+        if (bulkSelectedIds.size === 0) {
+            showToast('먼저 카드를 선택해주세요');
+            return;
+        }
+        bulkScheduleMode = 'selection';
+        document.getElementById('bulkScheduleDesc').textContent = `선택한 ${bulkSelectedIds.size}개 제품에만 세일 일정을 반영해요.`;
+        document.getElementById('bulkScheduleCategoryRow').style.display = 'none';
+
+        const today = getTodayTimeline();
+        const schedSel = document.getElementById('bulkScheduleTargetSelect');
+        let schedHtml = '<option value="0">일정 없이 일단 씀</option>';
+        schedules.forEach(s => {
+            const sDiff = Math.ceil((s.targetDate - today) / (1000 * 60 * 60 * 24));
+            schedHtml += `<option value="${s.id}">${s.name} (D-${sDiff})</option>`;
+        });
+        schedSel.innerHTML = schedHtml;
+
+        document.getElementById('bulkScheduleOverlay').classList.add('active');
+    }
     function cancelBulkSchedule() {
         document.getElementById('bulkScheduleOverlay').classList.remove('active');
     }
     function applyBulkSchedule() {
-        const catVal = document.getElementById('bulkScheduleCategorySelect').value;
         const schedVal = Number(document.getElementById('bulkScheduleTargetSelect').value);
         let count = 0;
-        products.forEach(p => {
-            if (p.archived) return;
-            if (catVal !== 'all' && Number(p.categoryId) !== Number(catVal)) return;
-            p.targetScheduleId = schedVal;
-            count++;
-        });
+
+        if (bulkScheduleMode === 'selection') {
+            products.forEach(p => {
+                if (p.archived || !bulkSelectedIds.has(p.id)) return;
+                p.targetScheduleId = schedVal;
+                count++;
+            });
+        } else {
+            const catVal = document.getElementById('bulkScheduleCategorySelect').value;
+            products.forEach(p => {
+                if (p.archived) return;
+                if (catVal !== 'all' && Number(p.categoryId) !== Number(catVal)) return;
+                p.targetScheduleId = schedVal;
+                count++;
+            });
+        }
+
         cancelBulkSchedule();
         if (count === 0) {
             showToast('해당하는 제품이 없어요');
             return;
         }
         showToast(`📌 ${count}개 제품에 일괄 반영했어요`);
+        if (bulkScheduleMode === 'selection') toggleBulkSelectMode(); // 적용 후 선택 모드 종료
         saveToStorage();
         renderProducts();
     }
