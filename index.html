@@ -322,6 +322,20 @@
             </div>
         </div>
     </div>
+    <div class="confirm-overlay" id="bulkScheduleOverlay">
+        <div class="confirm-box">
+            <p>행사 일괄 반영</p>
+            <div style="font-size:11px; color:var(--gray); margin-bottom:10px; margin-top:-6px;">선택한 카테고리의 제품 전체에 세일 일정을 한 번에 반영해요. (통형·개수형 모두 적용)</div>
+            <label style="font-size:11px; color:var(--gray); display:block; text-align:left; margin-bottom:4px;">대상 카테고리</label>
+            <select id="bulkScheduleCategorySelect" style="width:100%; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:14px; margin-bottom:10px;"></select>
+            <label style="font-size:11px; color:var(--gray); display:block; text-align:left; margin-bottom:4px;">적용할 세일 일정</label>
+            <select id="bulkScheduleTargetSelect" style="width:100%; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:14px; margin-bottom:14px;"></select>
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelBulkSchedule()">취소</button>
+                <button class="confirm-btn yes" style="background:var(--primary, #FF5A5F);" onclick="applyBulkSchedule()">일괄 적용</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="editReviewOverlay">
         <div class="confirm-box">
             <p id="editReviewModalTitle" style="margin-bottom:10px;">상품평 수정</p>
@@ -924,7 +938,10 @@
 
         <!-- 메모 모아보기는 '목록을 보는 도구'라 필터 카드 아래에 두고 왼쪽 정렬한다.
              제품 카드의 삭제 버튼이 오른쪽 위에 있어, 오른쪽 정렬하면 오탭 위험이 있다. -->
-        <button onclick="openMemoBoard()" style="display:inline-flex; align-items:center; gap:5px; background:#F8F9FA; border:1px solid #E9ECEF; border-radius:9px; color:#666; font-size:11px; font-weight:700; padding:7px 11px; cursor:pointer; white-space:nowrap; margin-bottom:14px;">📝 메모 모아보기</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+            <button onclick="openMemoBoard()" style="display:inline-flex; align-items:center; gap:5px; background:#F8F9FA; border:1px solid #E9ECEF; border-radius:9px; color:#666; font-size:11px; font-weight:700; padding:7px 11px; cursor:pointer; white-space:nowrap;">📝 메모 모아보기</button>
+            <button onclick="openBulkScheduleModal()" style="display:inline-flex; align-items:center; gap:5px; background:#F8F9FA; border:1px solid #E9ECEF; border-radius:9px; color:#666; font-size:11px; font-weight:700; padding:7px 11px; cursor:pointer; white-space:nowrap;">📌 행사 일괄 반영</button>
+        </div>
 
         <div class="section-title">내 화장대 재고 현황 <span id="productCount" style="font-size:12px; color:#999; font-weight:normal;"></span></div>
         <div id="productList"></div>
@@ -2416,9 +2433,17 @@
             // 개수형(낱개 소진) 제품은 통형과 완전히 다른 카드 — 여기서 분리 처리
             if (p.itemType === 'count') {
                 ensureBoxQueue(p);
-                const catName = (Number(p.categoryId) === 0)
-                    ? '🫙 일단 쓰고 봄'
-                    : ((categories.find(c => Number(c.id) === Number(p.categoryId)) || {}).name || '미지정');
+                // 통형과 같은 카테고리/세일 인라인 select — changeProductCategory/changeProductSchedule는
+                // itemType과 무관한 범용 함수라 그대로 재사용한다.
+                let countCategoryOptions = `<option value="0" ${Number(p.categoryId) === 0 ? 'selected' : ''}>🫙 일단 쓰고 봄</option>`;
+                categories.forEach(c => {
+                    countCategoryOptions += `<option value="${c.id}" ${Number(c.id) === Number(p.categoryId) ? 'selected' : ''}>${getCategoryIcon(c.name)} ${c.name}</option>`;
+                });
+                let countScheduleOptions = `<option value="0" ${!p.targetScheduleId ? 'selected' : ''}>일정 없이 일단 씀</option>`;
+                schedules.forEach(s => {
+                    const sDiff = Math.ceil((s.targetDate - today) / (1000 * 60 * 60 * 24));
+                    countScheduleOptions += `<option value="${s.id}" ${Number(s.id) === Number(p.targetScheduleId) ? 'selected' : ''}>${s.name} (D-${sDiff})</option>`;
+                });
                 const unit = p.unit || '개';
                 const front = p.boxQueue.length ? p.boxQueue[0] : null;
                 const isExhausted = !front;
@@ -2475,26 +2500,56 @@
                 const exhaustCount = (p.exhaustedHistory || []).length;
                 const latestBoxReview = exhaustCount > 0 ? getLatestReview(p.id, exhaustCount) : null;
                 const front_cap = front && front.size != null ? front.size : 999;
+                // 통형과 같은 미개봉/개봉 · 사용중/쉬는중 상태 체계 — 맨 앞 박스가 아직 한 번도 안 깎였으면 미개봉
+                const isCountUnopened = isCountBoxUnopened(front);
+                const isCountPausedNow = isCountPaused(p);
                 const card = document.createElement('div');
                 card.className = 'product-card';
                 card.id = `product-card-${p.id}`;
                 card.innerHTML = `
                     <button class="btn-del-corner" onclick="confirmDeleteProduct(${p.id})">삭제 🗑️</button>
                     <div class="prod-info" style="padding-right:42px;">
-                        <div style="margin-bottom:7px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                            <span class="badge neutral">📦 개수형</span>
-                            ${isExhausted ? '<span class="badge danger">다 썼어요</span>' : stockLevelBadge}
+                        <div style="margin-bottom:7px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                            ${!front ? '' : (isCountUnopened
+                                ? `<button onclick="openCountBox(${p.id})" style="background:#FFF4E6; color:#FF922B; border:1.5px solid #FFD9B3; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer;">📦 미개봉</button>`
+                                : `<span style="background:#E6F7ED; color:#1EA94A; border:1.5px solid #B3E8C4; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold;">✅ 개봉</span>`)
+                            }
+                            ${(front && !isCountUnopened)
+                                ? (isCountPausedNow
+                                    ? `<button onclick="resumeCountProduct(${p.id})" style="background:#FFF4E6; color:#F08C00; border:1.5px solid #FFD8A8; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">😴 쉬는 중</button>`
+                                    : `<button onclick="pauseCountProduct(${p.id})" style="background:#EBFBEE; color:#2F9E44; border:1.5px solid #B2F2BB; padding:5px 13px; border-radius:20px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">🟢 사용 중</button>`
+                                )
+                                : `<button style="visibility:hidden; padding:5px 13px; font-size:12px; white-space:nowrap;">⏸</button>`
+                            }
                         </div>
                         <div class="prod-name" style="display:flex; align-items:center; gap:6px;">
                             <span style="flex:1;">${p.name}</span>
                             <button onclick="editProductName(${p.id})" style="background:none; border:none; cursor:pointer; font-size:13px; padding:0 2px; flex-shrink:0;" title="이름 수정">✏️</button>
                         </div>
-                        <div class="prod-status">${catName}${p.registeredAsNew === false ? ' · 이미 쓰던 것' : ''}</div>
+                        <div style="margin-bottom:7px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                            <span class="badge neutral">📦 개수형</span>
+                            ${isExhausted ? '<span class="badge danger">다 썼어요</span>' : stockLevelBadge}
+                        </div>
+                        <div class="prod-status">${p.registeredAsNew === false ? '이미 쓰던 것' : ''}</div>
                         ${exhaustCount > 0 ? `<div class="tung-count-badge">🫙 ${getTungOrdinalLabel(exhaustCount)}${latestBoxReview ? '' : ' · 리뷰 없음'}</div>` : ''}
                         ${lastUsedText ? `<div style="font-size:11px; color:#9AAF82; margin-top:4px; font-weight:700;">🕓 ${lastUsedText}</div>` : ''}
+                        ${isCountPausedNow ? `<div style="font-size:10px; color:#B0B0B0; margin-top:2px;">⏸️ 쉬는 중 · 페이스 계산 잠시 멈춤</div>` : ''}
                         ${progressBar}
                         ${nextBoxHint}
                         ${paceText}
+                        <div style="margin-top:6px;">
+                            <select class="inline-select" onchange="changeProductCategory(${p.id}, this.value)">${countCategoryOptions}</select>
+                        </div>
+                        <div style="margin-top:6px;">
+                            <select class="inline-select" onchange="changeProductSchedule(${p.id}, this.value)">${countScheduleOptions}</select>
+                        </div>
+                        ${front ? `<div style="margin-top:6px; display:flex; align-items:center; gap:5px;">
+                            <span style="font-size:11px; color:#888; white-space:nowrap;">📅 사용 시작일</span>
+                            <input type="date" class="inline-select"
+                                value="${formatDateString(front.startDate || p.createdAt)}" max="${formatDateString(getTodayTimeline())}"
+                                style="font-size:11px; padding:3px 6px; flex:1; min-width:0;"
+                                onchange="changeCountBoxStartDate(${p.id}, this.value)">
+                        </div>` : ''}
                         <div style="margin-top:6px; display:flex; align-items:center; gap:5px;">
                             <span style="font-size:11px; color:#888; white-space:nowrap;">🗓️ 화장대 등록일</span>
                             <span style="font-size:11px; color:#AAA; font-weight:600;">${formatDateString(p.createdAt)}</span>
@@ -3443,7 +3498,48 @@
             renderProducts();
         }
     }
-    
+
+    // ══════════ 행사 일괄 반영 — 카테고리를 골라 그 카테고리 제품 전체에 세일 일정을 한 번에 적용 ══════════
+    function openBulkScheduleModal() {
+        const today = getTodayTimeline();
+        const catSel = document.getElementById('bulkScheduleCategorySelect');
+        let catHtml = '<option value="all">전체 카테고리</option><option value="0">🫙 일단 쓰고 봄</option>';
+        categories.forEach(c => { catHtml += `<option value="${c.id}">${getCategoryIcon(c.name)} ${c.name}</option>`; });
+        catSel.innerHTML = catHtml;
+
+        const schedSel = document.getElementById('bulkScheduleTargetSelect');
+        let schedHtml = '<option value="0">일정 없이 일단 씀</option>';
+        schedules.forEach(s => {
+            const sDiff = Math.ceil((s.targetDate - today) / (1000 * 60 * 60 * 24));
+            schedHtml += `<option value="${s.id}">${s.name} (D-${sDiff})</option>`;
+        });
+        schedSel.innerHTML = schedHtml;
+
+        document.getElementById('bulkScheduleOverlay').classList.add('active');
+    }
+    function cancelBulkSchedule() {
+        document.getElementById('bulkScheduleOverlay').classList.remove('active');
+    }
+    function applyBulkSchedule() {
+        const catVal = document.getElementById('bulkScheduleCategorySelect').value;
+        const schedVal = Number(document.getElementById('bulkScheduleTargetSelect').value);
+        let count = 0;
+        products.forEach(p => {
+            if (p.archived) return;
+            if (catVal !== 'all' && Number(p.categoryId) !== Number(catVal)) return;
+            p.targetScheduleId = schedVal;
+            count++;
+        });
+        cancelBulkSchedule();
+        if (count === 0) {
+            showToast('해당하는 제품이 없어요');
+            return;
+        }
+        showToast(`📌 ${count}개 제품에 일괄 반영했어요`);
+        saveToStorage();
+        renderProducts();
+    }
+
     let pendingDeleteId = null;
     function confirmDeleteProduct(productId) {
         pendingDeleteId = productId;
@@ -5216,15 +5312,83 @@
     // p.stock/p.originalStock은 하위호환용 미러 필드(합계/맨 앞 박스 크기)로 계속 동기화해둔다.
     function ensureBoxQueue(p) {
         if (p.boxQueue) return;
+        // 마이그레이션되는 기존 제품은 이미 쓰고 있던 거라 '개봉' 상태로 간주
         if (p.originalStock && p.originalStock > 0) {
-            p.boxQueue = p.stock > 0 ? [{ size: p.originalStock, remaining: p.stock, startDate: p.createdAt }] : [];
+            p.boxQueue = p.stock > 0 ? [{ size: p.originalStock, remaining: p.stock, startDate: p.createdAt, opened: true }] : [];
         } else {
-            p.boxQueue = p.stock > 0 ? [{ size: null, remaining: p.stock, startDate: p.createdAt }] : [];
+            p.boxQueue = p.stock > 0 ? [{ size: null, remaining: p.stock, startDate: p.createdAt, opened: true }] : [];
         }
     }
     function syncCountMirrors(p) {
         p.stock = p.boxQueue.reduce((s, b) => s + b.remaining, 0);
         p.originalStock = p.boxQueue.length ? p.boxQueue[0].size : null;
+    }
+    function isCountBoxUnopened(front) {
+        return !!front && !front.opened;
+    }
+    function isCountPaused(p) {
+        const last = p.pauseHistory && p.pauseHistory.length ? p.pauseHistory[p.pauseHistory.length - 1] : null;
+        return !!(last && !last.resumedAt);
+    }
+    // 미개봉 → 개봉: 박스 시작일을 오늘로 다시 잡는다 (큐에 대기하다 실제로는 며칠 뒤에 열었을 수 있어서)
+    function openCountBox(id) {
+        const p = products.find(x => x.id === id);
+        if (!p || p.itemType !== 'count') return;
+        ensureBoxQueue(p);
+        if (!p.boxQueue.length) return;
+        const front = p.boxQueue[0];
+        front.opened = true;
+        front.startDate = getTodayTimeline();
+        showToast('🎉 개봉 완료! 이 박스 사용 기간 계산을 오늘부터 시작해요');
+        saveToStorage();
+        renderProducts();
+    }
+    // 통형의 changeOpenedDate와 같은 역할 — 맨 앞 박스의 사용 시작일을 직접 지정
+    function changeCountBoxStartDate(id, val) {
+        const p = products.find(pr => pr.id === id);
+        if (!p || !val || p.itemType !== 'count') return;
+        ensureBoxQueue(p);
+        if (!p.boxQueue.length) return;
+        const parts = val.split('-');
+        if (parts.length !== 3) return;
+        const ts = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).getTime();
+        if (isNaN(ts)) return;
+        const front = p.boxQueue[0];
+        front.startDate = ts;
+        front.opened = true; // 시작일을 직접 지정 = "이 날부터 실제로 썼다"는 의사표시 → 미개봉 상태였다면 개봉으로 전환
+        // 통형과 같은 이유로, 쉬는 중이었다면 정리해서 페이스 계산 오차를 방지한다.
+        let pauseCleared = false;
+        if (p.pauseHistory && p.pauseHistory.length > 0) {
+            const last = p.pauseHistory[p.pauseHistory.length - 1];
+            if (last && !last.resumedAt) {
+                p.pauseHistory.pop();
+                pauseCleared = true;
+            }
+        }
+        showToast(pauseCleared ? '📅 사용 시작일 변경 · 사용 중으로 전환됐어요' : '📅 사용 시작일이 변경됐어요');
+        saveToStorage();
+        renderProducts();
+    }
+    function pauseCountProduct(id) {
+        const p = products.find(x => x.id === id);
+        if (!p || p.itemType !== 'count') return;
+        if (!p.pauseHistory) p.pauseHistory = [];
+        const last = p.pauseHistory[p.pauseHistory.length - 1];
+        if (last && !last.resumedAt) return;
+        p.pauseHistory.push({ pausedAt: getTodayTimeline(), resumedAt: null });
+        showToast('😴 쉬는 중! 다시 켜기 전까지 페이스 계산에 안 넣어요');
+        saveToStorage();
+        renderProducts();
+    }
+    function resumeCountProduct(id) {
+        const p = products.find(x => x.id === id);
+        if (!p || !p.pauseHistory) return;
+        const last = p.pauseHistory[p.pauseHistory.length - 1];
+        if (!last || last.resumedAt) return;
+        last.resumedAt = getTodayTimeline();
+        showToast('🟢 사용 중! 다시 기록을 이어가요');
+        saveToStorage();
+        renderProducts();
     }
     function decrementCountStock(id, el) {
         const p = products.find(x => x.id === id);
@@ -5239,6 +5403,10 @@
         p.countHistory.push({ date: getTodayTimeline() });
 
         const front = p.boxQueue[0];
+        if (!front.opened) {
+            front.opened = true;
+            front.startDate = getTodayTimeline(); // 대기하다 실제로 지금 처음 쓰기 시작한 거라 시작일을 오늘로 재설정
+        }
         front.remaining -= 1;
         // '박스 완료' = 맨 앞 박스가 정확히 0이 되는 순간 — 다른 박스 수량과 섞일 일이 없다.
         const boxCompleted = front.remaining <= 0;
@@ -5320,7 +5488,7 @@
         ensureBoxQueue(p);
         const sizeCapped = Math.min(size, 999);
         const wasEmpty = p.boxQueue.length === 0;
-        for (let i = 0; i < count; i++) p.boxQueue.push({ size: sizeCapped, remaining: sizeCapped, startDate: null });
+        for (let i = 0; i < count; i++) p.boxQueue.push({ size: sizeCapped, remaining: sizeCapped, startDate: null, opened: false });
         if (wasEmpty) p.boxQueue[0].startDate = getTodayTimeline(); // 비어있다가 추가되면 그 즉시 사용 시작으로 봄
         syncCountMirrors(p);
         showToast(`📦 ${count}박스(박스당 ${sizeCapped}${p.unit || '개'}) 추가했어요 · 총 재고 ${p.stock}${p.unit || '개'}`);
@@ -7924,7 +8092,7 @@
                 itemType: regItemType,   // 'bottle' | 'count' — 등록 후 변경 금지
                 stock: regItemType === 'count' ? initCountStock : 1,
                 originalStock: initBoxSize, // 하위호환용 미러(맨 앞 박스 크기) — 실제 값은 boxQueue가 갖고 있음
-                boxQueue: regItemType === 'count' ? [{ size: initBoxSize, remaining: initCountStock, startDate: createdAtVal }] : undefined,
+                boxQueue: regItemType === 'count' ? [{ size: initBoxSize, remaining: initCountStock, startDate: createdAtVal, opened: (regUsageState === 'inuse') }] : undefined,
                 unit: regItemType === 'count' ? initCountUnit : null,
                 countHistory: regItemType === 'count' ? [] : undefined, // 개수형 소진 이력(페이스 계산용) — 달력/tungHistory와는 별개
                 targetScheduleId: isNaN(targetScheduleId) ? 0 : targetScheduleId,
