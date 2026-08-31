@@ -323,6 +323,19 @@
             </div>
         </div>
     </div>
+    <div class="confirm-overlay" id="addStockOverlay">
+        <div class="confirm-box">
+            <p>상품 추가</p>
+            <div style="font-size:11px; color:var(--gray); margin-bottom:8px; margin-top:-6px;">같은 제품을 새로 사서 재고에 더할 때 써요.</div>
+            <label style="font-size:11px; color:var(--gray); display:block; text-align:left; margin-bottom:4px;">추가할 개수</label>
+            <input type="number" id="addStockQtyInput" min="1" max="99" value="1"
+                style="width:100%; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid #ddd; font-size:14px; margin-bottom:14px;">
+            <div class="confirm-btn-row">
+                <button class="confirm-btn no" onclick="cancelAddStock()">취소</button>
+                <button class="confirm-btn yes" style="background:var(--primary, #FF5A5F);" onclick="saveAddStock()">추가</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="bulkScheduleOverlay">
         <div class="confirm-box">
             <p>행사 일괄 반영</p>
@@ -2563,10 +2576,7 @@
                                 style="font-size:11px; padding:3px 6px; flex:1; min-width:0;"
                                 onchange="changeCountBoxStartDate(${p.id}, this.value)">
                         </div>` : ''}
-                        <div style="margin-top:6px; display:flex; align-items:center; gap:5px;">
-                            <span style="font-size:11px; color:#888; white-space:nowrap;">🗓️ 화장대 등록일</span>
-                            <span style="font-size:11px; color:#AAA; font-weight:600;">${formatDateString(p.createdAt)}</span>
-                        </div>
+                        ${renderRegistrationHistoryHtml(p)}
                         <div class="stock-control" style="margin-top:8px; display:flex; align-items:center; gap:6px;">
                             <button class="btn-qty" onclick="adjustCountStock(${p.id}, -1)" ${isExhausted ? 'disabled' : ''}>-</button>
                             <input type="number" min="0" max="${front_cap}" value="${front ? front.remaining : 0}"
@@ -2841,9 +2851,8 @@
 
             const openedDateStr = (!isUnopened && p.openedDate) ? formatDateString(p.openedDate) : '';
             const todayStr = formatDateString(getTodayTimeline());
-            // [등록일] 읽기전용 — 수정 불가, 기록으로 박아둔다
+            // [등록일] 히스토리(최초 등록 + 이후 "+상품 추가") — renderRegistrationHistoryHtml에서 표시
             const regTs = getRegisteredAt(p);
-            const regDateLabel = regTs ? formatDateString(regTs).replace(/-/g, '.') : null;
             const isBottleEmpty = p.stock === 0;
             const latestReview = getLatestReview(p.id, p.tungCount || 0);
             const liquidScaleY = isBottleEmpty ? 0 : 1; 
@@ -2901,11 +2910,7 @@
                             style="font-size:11px; padding:3px 6px; flex:1; min-width:0;"
                             onchange="changeOpenedDate(${p.id}, this.value)">
                     </div>
-                    ${regDateLabel ? `
-                    <div style="margin-top:5px; display:flex; align-items:center; gap:5px;">
-                        <span style="font-size:11px; color:#888; white-space:nowrap;">🗓️ 화장대 등록일</span>
-                        <span style="font-size:11px; color:#AAA; font-weight:600;">${regDateLabel}</span>
-                    </div>` : ''}
+                    ${regTs ? renderRegistrationHistoryHtml(p) : ''}
                     <div class="stock-control">
                         <button class="btn-qty" onclick="adjustStock(${p.id}, -1)">-</button>
                         <input type="number" min="0" max="99" value="${p.stock}"
@@ -2915,6 +2920,7 @@
                         <span style="font-size:12px; color:#888; margin-left:-2px;">개</span>
                         <button class="btn-qty" onclick="adjustStock(${p.id}, 1)">+</button>
                     </div>
+                    <button onclick="openAddStockModal(${p.id})" style="width:100%; margin-top:8px; background:#F1F8E9; color:#5C9A1E; border:none; border-radius:8px; font-size:12px; font-weight:700; padding:8px 0; cursor:pointer;">+ 📦 상품 추가</button>
                     <div style="margin-top:8px; border-top:1px dashed #F0F0F0; padding-top:7px;">
                         ${(p.memos && p.memos.length > 0) ? p.memos.map((m) => `
                             <div style="display:flex; align-items:flex-start; gap:4px; margin-bottom:4px;">
@@ -5402,6 +5408,33 @@
         p.stock = p.boxQueue.reduce((s, b) => s + b.remaining, 0);
         p.originalStock = p.boxQueue.length ? p.boxQueue[0].size : null;
     }
+    // 통형·개수형 공통 — "화장대 등록일" 히스토리(처음 등록 + 이후 재고 추가 시점들).
+    // 기존 제품엔 없던 필드라 처음 조회될 때 createdAt 기준으로 1건짜리 히스토리를 만들어준다.
+    function ensureRegistrationHistory(p) {
+        if (p.registrationHistory && p.registrationHistory.length) return;
+        const amount = p.itemType === 'count' ? (p.originalStock || p.stock || 1) : (p.stock || 1);
+        p.registrationHistory = [{ date: p.createdAt, amount }];
+    }
+    // "화장대 등록일" 표시 — 최근 추가 시점을 앞세우고, 기록이 여러 건이면 '더보기'로 전체 히스토리를 펼쳐 보여준다.
+    // 통형·개수형 카드가 공용으로 쓴다.
+    function renderRegistrationHistoryHtml(p) {
+        ensureRegistrationHistory(p);
+        const hist = p.registrationHistory;
+        const unitLabel = p.itemType === 'count' ? (p.unit || '개') : '개';
+        const latest = hist[hist.length - 1];
+        const latestDateStr = formatDateString(latest.date);
+        const hasMultiple = hist.length > 1;
+        const listHtml = hist.slice().reverse().map((h, idx) => {
+            const isFirst = idx === hist.length - 1; // 뒤집었으니 마지막 인덱스가 원래 맨 처음(최초 등록) 기록
+            return `<div style="font-size:10px; color:#AAA; padding:2px 0;">${formatDateString(h.date)} · ${h.amount}${unitLabel} ${isFirst ? '(첫 등록)' : '추가'}</div>`;
+        }).join('');
+        return `<div style="margin-top:6px; display:flex; align-items:center; gap:5px;">
+            <span style="font-size:11px; color:#888; white-space:nowrap;">🗓️ 화장대 등록일</span>
+            <span style="font-size:11px; color:#AAA; font-weight:600;">${latestDateStr}</span>
+            ${hasMultiple ? `<button onclick="const h=this.parentElement.nextElementSibling; const open=h.style.display!=='none'; h.style.display=open?'none':'block'; this.textContent=open?'더보기 ▾':'접기 ▴';" style="background:none; border:none; color:#BBB; font-size:10px; cursor:pointer; padding:0; margin-left:auto;">더보기 ▾</button>` : ''}
+        </div>
+        ${hasMultiple ? `<div style="display:none; margin-top:2px; padding-left:4px; border-left:2px solid #F0F0F0;">${listHtml}</div>` : ''}`;
+    }
     function isCountBoxUnopened(front) {
         return !!front && !front.opened;
     }
@@ -5570,8 +5603,35 @@
         for (let i = 0; i < count; i++) p.boxQueue.push({ size: sizeCapped, remaining: sizeCapped, startDate: null, opened: false });
         if (wasEmpty) p.boxQueue[0].startDate = getTodayTimeline(); // 비어있다가 추가되면 그 즉시 사용 시작으로 봄
         syncCountMirrors(p);
+        ensureRegistrationHistory(p);
+        p.registrationHistory.push({ date: getTodayTimeline(), amount: sizeCapped * count });
         showToast(`📦 ${count}박스(박스당 ${sizeCapped}${p.unit || '개'}) 추가했어요 · 총 재고 ${p.stock}${p.unit || '개'}`);
         cancelAddBox();
+        saveToStorage();
+        renderProducts();
+    }
+    // 통형용 "+ 상품 추가" — 개수형의 "+ 박스 추가"와 같은 위치·역할. 같은 제품을 새로 사서 재고를 늘릴 때 쓴다.
+    let pendingAddStockId = null;
+    function openAddStockModal(id) {
+        pendingAddStockId = id;
+        document.getElementById('addStockQtyInput').value = '1';
+        document.getElementById('addStockOverlay').classList.add('active');
+    }
+    function cancelAddStock() {
+        pendingAddStockId = null;
+        document.getElementById('addStockOverlay').classList.remove('active');
+    }
+    function saveAddStock() {
+        const p = products.find(x => x.id === pendingAddStockId);
+        if (!p) { cancelAddStock(); return; }
+        const qty = parseInt(document.getElementById('addStockQtyInput').value);
+        if (isNaN(qty) || qty < 1) { showToast('⚠️ 추가할 개수를 입력해주세요'); return; }
+        const qtyCapped = Math.min(qty, 99);
+        p.stock = Math.min(99, p.stock + qtyCapped);
+        ensureRegistrationHistory(p);
+        p.registrationHistory.push({ date: getTodayTimeline(), amount: qtyCapped });
+        showToast(`📦 ${qtyCapped}개 추가했어요 · 총 재고 ${p.stock}개`);
+        cancelAddStock();
         saveToStorage();
         renderProducts();
     }
@@ -8178,6 +8238,7 @@
                 openedDate: initOpenedDate,
                 unopened: regItemType === 'count' ? false : initUnopened,
                 registeredAsNew: (regUsageState === 'sealed'),   // 등록 시점 스냅샷(불변) — '지금 쓰는 중'으로 등록하면 false. 나중에 개봉해도 안 바뀜. 월간 리포트 구매 개수 집계에 씀
+                registrationHistory: [{ date: createdAtVal, amount: regItemType === 'count' ? initCountStock : 1 }], // "화장대 등록일" 히스토리 — 이후 재고 추가 시점들이 여기 쌓임
                 provisionalFirstTung: initProvisional,
                 tungHistory: [],
                 memos: []
