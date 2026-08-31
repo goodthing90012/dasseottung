@@ -5413,13 +5413,15 @@
     function ensureRegistrationHistory(p) {
         if (p.registrationHistory && p.registrationHistory.length) return;
         const amount = p.itemType === 'count' ? (p.originalStock || p.stock || 1) : (p.stock || 1);
-        p.registrationHistory = [{ date: p.createdAt, amount }];
+        // createdAt이 없는 옛날 제품은 getRegisteredAt의 id 대체 로직을 그대로 따른다 (없으면 null)
+        p.registrationHistory = [{ date: getRegisteredAt(p), amount }];
     }
     // "화장대 등록일" 표시 — 최근 추가 시점을 앞세우고, 기록이 여러 건이면 '더보기'로 전체 히스토리를 펼쳐 보여준다.
-    // 통형·개수형 카드가 공용으로 쓴다.
+    // 통형·개수형 카드가 공용으로 쓴다. 등록일을 아예 알 수 없는 제품(시드 등)은 아무것도 안 보여준다.
     function renderRegistrationHistoryHtml(p) {
         ensureRegistrationHistory(p);
-        const hist = p.registrationHistory;
+        const hist = (p.registrationHistory || []).filter(h => h.date != null && !isNaN(h.date));
+        if (hist.length === 0) return '';
         const unitLabel = p.itemType === 'count' ? (p.unit || '개') : '개';
         const latest = hist[hist.length - 1];
         const latestDateStr = formatDateString(latest.date);
