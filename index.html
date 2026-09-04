@@ -1367,6 +1367,13 @@
     // 따라서 기존 제품도 마이그레이션 없이 등록일을 복원할 수 있다.
     // 단, 시드 제품(id: 1, 2)처럼 타임스탬프가 아닌 id는 1970년으로 계산되므로 제외한다.
     const REG_ID_MIN = 1000000000000; // 2001-09-09 이전 id는 타임스탬프가 아님
+    // D-day 표시 공용 함수 — 지난 일정을 "D--3"처럼 이중 마이너스로 보여주던 버그를 막는다.
+    // 여러 곳(세일 등록/수정 목록, 각종 드롭다운)에서 같이 쓴다.
+    function formatDDay(diffDays) {
+        if (diffDays > 0) return `D-${diffDays}`;
+        if (diffDays === 0) return 'D-DAY';
+        return `${-diffDays}일 지남`;
+    }
     const getRegisteredAt = (p) => {
         if (p.createdAt && p.createdAt >= REG_ID_MIN) return p.createdAt;
         if (typeof p.id === 'number' && p.id >= REG_ID_MIN) return p.id;
@@ -2504,7 +2511,7 @@
                 let countScheduleOptions = `<option value="0" ${!p.targetScheduleId ? 'selected' : ''}>일정 없이 일단 씀</option>`;
                 schedules.forEach(s => {
                     const sDiff = Math.ceil((s.targetDate - today) / (1000 * 60 * 60 * 24));
-                    countScheduleOptions += `<option value="${s.id}" ${Number(s.id) === Number(p.targetScheduleId) ? 'selected' : ''}>${s.name} (D-${sDiff})</option>`;
+                    countScheduleOptions += `<option value="${s.id}" ${Number(s.id) === Number(p.targetScheduleId) ? 'selected' : ''}>${sDiff < 0 ? '⏰ ' : ''}${s.name} (${formatDDay(sDiff)})</option>`;
                 });
                 const unit = p.unit || '개';
                 const front = p.boxQueue.length ? p.boxQueue[0] : null;
@@ -2813,19 +2820,19 @@
                         if (avgDays === null) {
                             statusBadge = '<span class="badge neutral">🫙 분석 대기 중</span>';
                             const needMore = Math.max(2 - history.length, 1);
-                            alertText = `세일까지 D-${dDayLeft} · 아직 데이터가 부족해 비교는 어려워요 (텅 ${needMore}번 더 누르면 비교 가능)`;
+                            alertText = `세일까지 ${formatDDay(dDayLeft)} · 아직 데이터가 부족해 비교는 어려워요 (텅 ${needMore}번 더 누르면 비교 가능)`;
                         } else if (totalRemainingDays >= dDayLeft) {
                             statusBadge = '<span class="badge enough">구매일전 안전함</span>';
                             alertText = unknownCatOverduePrefix
-                                ? `${unknownCatOverduePrefix} (세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`
-                                : `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
+                                ? `${unknownCatOverduePrefix} (세일일 ${formatDDay(dDayLeft)} 대비 +${totalRemainingDays - dDayLeft}일 여유)`
+                                : `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 ${formatDDay(dDayLeft)} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
                         } else {
                             const shortfallDays = dDayLeft - totalRemainingDays;
                             const neededUnits = avgDays > 0 ? Math.ceil(shortfallDays / avgDays) : 1;
                             statusBadge = '<span class="badge danger">주기 전 소진위험</span>';
                             alertText = unknownCatOverduePrefix
-                                ? `${unknownCatOverduePrefix} (세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`
-                                : `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`;
+                                ? `${unknownCatOverduePrefix} (세일일 ${formatDDay(dDayLeft)} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`
+                                : `소진 ${totalRemainingDays}일 후 (평균 ${avgDays}일 기준 · 세일일 ${formatDDay(dDayLeft)} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`;
                         }
                     }
 
@@ -2854,15 +2861,15 @@
                 } else if (totalRemainingDays >= dDayLeft) {
                     statusBadge = '<span class="badge enough">구매일전 안전함</span>'; 
                     alertText = overduePrefix
-                        ? `${overduePrefix} (알림 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`
-                        : `소진 ${totalRemainingDays}일 후 (알림 세일일 D-${dDayLeft} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
+                        ? `${overduePrefix} (알림 세일일 ${formatDDay(dDayLeft)} 대비 +${totalRemainingDays - dDayLeft}일 여유)`
+                        : `소진 ${totalRemainingDays}일 후 (알림 세일일 ${formatDDay(dDayLeft)} 대비 +${totalRemainingDays - dDayLeft}일 여유)`;
                 } else {
                     const shortfallDays = dDayLeft - totalRemainingDays;
                     const neededUnits = Math.ceil(shortfallDays / (effectiveCategoryDays > 0 ? effectiveCategoryDays : 30));
                     statusBadge = '<span class="badge danger">주기 전 소진위험</span>'; 
                     alertText = overduePrefix
-                        ? `${overduePrefix} (세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`
-                        : `소진 ${totalRemainingDays}일 후 (세일일 D-${dDayLeft} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`;
+                        ? `${overduePrefix} (세일일 ${formatDDay(dDayLeft)} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`
+                        : `소진 ${totalRemainingDays}일 후 (세일일 ${formatDDay(dDayLeft)} 전에 바닥남 🚨 · 최소 ${neededUnits}개 더 필요해요)`;
                 }
                 if (p.stock > 0) {
                     // [변경] 실측 기록(첫 통 기간 → 실측 평균)을 앞세우고, 예측 주기는 실측과 다를 때만 보조로
@@ -2886,7 +2893,7 @@
             let inlineOptions = `<option value="0" ${!p.targetScheduleId ? 'selected' : ''}>일정 없이 일단 씀</option>`;
             schedules.forEach(s => { 
                 const sDiff = Math.ceil((s.targetDate - today) / (1000 * 60 * 60 * 24));
-                inlineOptions += `<option value="${s.id}" ${Number(s.id) === Number(p.targetScheduleId) ? 'selected' : ''}>${s.name} (D-${sDiff})</option>`; 
+                inlineOptions += `<option value="${s.id}" ${Number(s.id) === Number(p.targetScheduleId) ? 'selected' : ''}>${sDiff < 0 ? '⏰ ' : ''}${s.name} (${formatDDay(sDiff)})</option>`; 
             });
 
             // [변경점] 카테고리도 화장대 추가 이후에 바꿀 수 있도록 인라인 select 구성
@@ -3069,13 +3076,24 @@
             [...schedules].reverse().forEach(s => {
                 const diffDays = Math.ceil((s.targetDate - today) / (1000 * 60 * 60 * 24));
                 const dateStr = formatDateString(s.targetDate);
+                const isPast = diffDays < 0;
+                const linkedProducts = products.filter(p => !p.archived && Number(p.targetScheduleId) === Number(s.id));
                 schedListEl.innerHTML += `
-                    <div class="list-item-card" style="padding:10px 14px;">
-                        <div style="flex:1;"><strong>${s.name}</strong> <div style="font-size:12px; color:var(--gray); margin-top:2px;">목표일: ${dateStr} <span class="badge cycle-tag">D-${diffDays}</span></div></div>
-                        <div style="display:flex; gap:6px; align-items:center;">
-                            <button class="btn-del-action" style="background:#F0F0F0; color:#555;" onclick="editSchedule(${s.id})">수정</button>
-                            <button class="btn-del-action" onclick="deleteSchedule(${s.id})">❌</button>
+                    <div class="list-item-card" style="padding:10px 14px; ${isPast ? 'opacity:0.75;' : ''} flex-direction:column; align-items:stretch;">
+                        <div style="display:flex; align-items:center; justify-content:space-between;">
+                            <div style="flex:1;"><strong>${isPast ? '⏰ ' : ''}${s.name}</strong> <div style="font-size:12px; color:var(--gray); margin-top:2px;">목표일: ${dateStr} <span class="badge cycle-tag" style="${isPast ? 'background:#F0F0F0; color:#999;' : ''}">${formatDDay(diffDays)}</span></div></div>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                <button class="btn-del-action" style="background:#F0F0F0; color:#555;" onclick="editSchedule(${s.id})">수정</button>
+                                <button class="btn-del-action" onclick="deleteSchedule(${s.id})">❌</button>
+                            </div>
                         </div>
+                        ${linkedProducts.length > 0 ? `
+                        <div style="margin-top:6px;">
+                            <button onclick="const h=this.nextElementSibling; const open=h.style.display!=='none'; h.style.display=open?'none':'block'; this.textContent=open?'🛍️ 연동된 제품 (${linkedProducts.length}개) ▾':'🛍️ 연동된 제품 (${linkedProducts.length}개) ▴';" style="background:none; border:none; color:#888; font-size:11px; cursor:pointer; padding:0;">🛍️ 연동된 제품 (${linkedProducts.length}개) ▾</button>
+                            <div style="display:none; margin-top:4px; padding-left:6px; border-left:2px solid #F0F0F0;">
+                                ${linkedProducts.map(p => `<div style="font-size:11px; color:#AAA; padding:1px 0;">${p.itemType === 'count' ? '📦' : '🧴'} ${p.name}</div>`).join('')}
+                            </div>
+                        </div>` : ''}
                     </div>`;
             });
         }
@@ -3101,7 +3119,7 @@
             prodTarget.innerHTML = '<option value="0">📦 일정 없이 일단 씀 (재고만 관리)</option>'; 
             schedules.forEach(s => { 
                 const diffDays = Math.ceil((s.targetDate - today) / (1000 * 60 * 60 * 24));
-                prodTarget.innerHTML += `<option value="${s.id}">${s.name} (D-${diffDays})</option>`; 
+                prodTarget.innerHTML += `<option value="${s.id}">${diffDays < 0 ? '⏰ ' : ''}${s.name} (${formatDDay(diffDays)})</option>`; 
             });
         }
         
@@ -3610,7 +3628,7 @@
         let schedHtml = '<option value="0">일정 없이 일단 씀</option>';
         schedules.forEach(s => {
             const sDiff = Math.ceil((s.targetDate - today) / (1000 * 60 * 60 * 24));
-            schedHtml += `<option value="${s.id}">${s.name} (D-${sDiff})</option>`;
+            schedHtml += `<option value="${s.id}">${sDiff < 0 ? '⏰ ' : ''}${s.name} (${formatDDay(sDiff)})</option>`;
         });
         schedSel.innerHTML = schedHtml;
 
@@ -3631,7 +3649,7 @@
         let schedHtml = '<option value="0">일정 없이 일단 씀</option>';
         schedules.forEach(s => {
             const sDiff = Math.ceil((s.targetDate - today) / (1000 * 60 * 60 * 24));
-            schedHtml += `<option value="${s.id}">${s.name} (D-${sDiff})</option>`;
+            schedHtml += `<option value="${s.id}">${sDiff < 0 ? '⏰ ' : ''}${s.name} (${formatDDay(sDiff)})</option>`;
         });
         schedSel.innerHTML = schedHtml;
 
