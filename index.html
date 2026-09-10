@@ -2541,8 +2541,10 @@
                     </div>`
                     : `<div style="margin-top:8px;"><button onclick="editOriginalStock(${p.id})" style="background:none; border:1px dashed #DDD; border-radius:8px; cursor:pointer; font-size:10px; color:#AAA; padding:4px 8px;">🔢 총 수량 입력하면 진행률이 떠요</button></div>`;
                 // 대기 중인 다음 박스가 있으면 살짝 보여준다 — 큐 구조를 체감할 수 있게
-                const nextBoxHint = (p.boxQueue.length > 1)
-                    ? `<div style="font-size:10px; color:#AAA; margin-top:3px;">📦 다음 박스 대기 중: ${p.boxQueue[1].size != null ? p.boxQueue[1].size + unit : '크기 모름'}${p.boxQueue.length > 2 ? ` 외 ${p.boxQueue.length - 2}박스` : ''}</div>`
+                // "N개 외 M박스" 표현이 "총 몇 박스인지" 바로 안 읽혀서, 총 대기 박스 수를 앞세우는 문구로 변경
+                const waitingBoxCount = p.boxQueue.length - 1;
+                const nextBoxHint = (waitingBoxCount > 0)
+                    ? `<div style="font-size:10px; color:#AAA; margin-top:3px;">📦 다음 박스 대기 중: 총 ${waitingBoxCount}박스 (첫 박스 ${p.boxQueue[1].size != null ? p.boxQueue[1].size + unit : '크기 모름'})</div>`
                     : '';
                 // 재고 여유 배지 — 총 수량을 알면 비율로, 모르면 개수 기준으로 대략 판단 (전체 재고 p.stock 기준, 큐 전체 합계)
                 let stockLevelBadge = '';
