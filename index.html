@@ -336,6 +336,16 @@
             </div>
         </div>
     </div>
+    <div class="confirm-overlay" id="boxListOverlay">
+        <div class="confirm-box" style="max-width:320px;">
+            <p>박스 목록</p>
+            <div style="font-size:11px; color:var(--gray); margin-bottom:10px; margin-top:-6px;">잘못 추가된 대기 박스는 여기서 지울 수 있어요. 지금 쓰는 중인 맨 앞 박스는 여기서 못 지워요.</div>
+            <div id="boxListContent" style="max-height:280px; overflow-y:auto; text-align:left;"></div>
+            <div class="confirm-btn-row" style="margin-top:12px;">
+                <button class="confirm-btn no" onclick="closeBoxListModal()" style="flex:1;">닫기</button>
+            </div>
+        </div>
+    </div>
     <div class="confirm-overlay" id="bulkScheduleOverlay">
         <div class="confirm-box">
             <p>행사 일괄 반영</p>
@@ -2544,7 +2554,7 @@
                 // "N개 외 M박스" 표현이 "총 몇 박스인지" 바로 안 읽혀서, 총 대기 박스 수를 앞세우는 문구로 변경
                 const waitingBoxCount = p.boxQueue.length - 1;
                 const nextBoxHint = (waitingBoxCount > 0)
-                    ? `<div style="font-size:10px; color:#AAA; margin-top:3px;">📦 다음 박스 대기 중: 총 ${waitingBoxCount}박스 (첫 박스 ${p.boxQueue[1].size != null ? p.boxQueue[1].size + unit : '크기 모름'})</div>`
+                    ? `<div style="font-size:10px; color:#AAA; margin-top:3px;">📦 다음 박스 대기 중: 총 ${waitingBoxCount}박스 (첫 박스 ${p.boxQueue[1].size != null ? p.boxQueue[1].size + unit : '크기 모름'}) <button onclick="openBoxListModal(${p.id})" style="background:none; border:none; color:#BBB; text-decoration:underline; font-size:10px; cursor:pointer; padding:0;">목록 보기</button></div>`
                     : '';
                 // 재고 여유 배지 — 총 수량을 알면 비율로, 모르면 개수 기준으로 대략 판단 (전체 재고 p.stock 기준, 큐 전체 합계)
                 let stockLevelBadge = '';
@@ -5688,6 +5698,47 @@
         showToast(`📦 ${count}박스(박스당 ${sizeCapped}${p.unit || '개'}) 추가했어요 · 총 재고 ${p.stock}${p.unit || '개'}`);
         cancelAddBox();
         saveToStorage();
+        renderProducts();
+    }
+    // 박스 목록 — 대기 중인 박스를 하나씩 보고 잘못 들어간 걸 개별로 지울 수 있게 한다.
+    // 지금 쓰는 중인 맨 앞 박스(index 0)는 여기서 못 지운다 — 이미 소비 기록이 얽혀있어 위험함.
+    let pendingBoxListId = null;
+    function openBoxListModal(id) {
+        pendingBoxListId = id;
+        renderBoxListModal();
+        document.getElementById('boxListOverlay').classList.add('active');
+    }
+    function closeBoxListModal() {
+        pendingBoxListId = null;
+        document.getElementById('boxListOverlay').classList.remove('active');
+    }
+    function renderBoxListModal() {
+        const p = products.find(x => x.id === pendingBoxListId);
+        const content = document.getElementById('boxListContent');
+        if (!p || !content) return;
+        ensureBoxQueue(p);
+        const unit = p.unit || '개';
+        content.innerHTML = p.boxQueue.map((b, idx) => {
+            const sizeLabel = b.size != null ? `${b.size}${unit}` : '크기 모름';
+            if (idx === 0) {
+                return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #F5F5F5;">
+                    <span style="font-size:13px; color:#333;">🟢 지금 쓰는 중 · ${b.remaining}/${sizeLabel}</span>
+                </div>`;
+            }
+            return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #F5F5F5;">
+                <span style="font-size:13px; color:#888;">대기 ${idx}번째 · ${sizeLabel}</span>
+                <button onclick="removeQueuedBox(${p.id}, ${idx})" style="background:#FFEBEB; color:#FF3B30; border:none; border-radius:8px; font-size:11px; font-weight:700; padding:5px 9px; cursor:pointer;">삭제</button>
+            </div>`;
+        }).join('') || `<div style="font-size:12px; color:#BBB; text-align:center; padding:20px 0;">박스가 없어요</div>`;
+    }
+    function removeQueuedBox(productId, boxIndex) {
+        const p = products.find(x => x.id === productId);
+        if (!p || boxIndex <= 0 || boxIndex >= p.boxQueue.length) return;
+        p.boxQueue.splice(boxIndex, 1);
+        syncCountMirrors(p);
+        showToast('🗑️ 박스를 지웠어요');
+        saveToStorage();
+        renderBoxListModal();
         renderProducts();
     }
     // 통형용 "+ 상품 추가" — 개수형의 "+ 박스 추가"와 같은 위치·역할. 같은 제품을 새로 사서 재고를 늘릴 때 쓴다.
