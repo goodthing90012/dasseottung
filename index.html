@@ -2750,9 +2750,13 @@
             let isOverdue = false;   // 현재 통이 예상 주기를 이미 넘겨서 쓰고 있는 상태 — "소진 N일 후" 문구만 보면 오해하기 쉬워서 별도 문구를 쓴다
             let sealedUnitsCount = 0;
             if (p.stock > 0) {
-                const remainingInCurrentBottle = Math.max(effectiveCategoryDays - daysUsed, 0);
                 sealedUnitsCount = p.stock - 1; // 현재 쓰는 1개를 제외한 미개봉 재고
                 isOverdue = (effectiveCategoryDays != null && effectiveCategoryDays > 0) && daysUsed > effectiveCategoryDays;
+                // [보정] 완료된 텅이 하나도 없어 평균 풀에 못 낀 통이라도, "지금까지 최소 daysUsed일은 갔다"는 건 확실한 사실이다.
+                // 평균 계산(실측 평균/블렌딩/카테고리 풀링) 로직 자체는 절대 안 건드리고, 그 결과값 위에 하한선만 얹는다.
+                // 이렇게 하면 여분 통의 예상 기간도 같이 끌어올려져서, "이 제품은 원래 오래 가는 편"이라는 게 반영된다.
+                if (isOverdue) effectiveCategoryDays = daysUsed;
+                const remainingInCurrentBottle = Math.max(effectiveCategoryDays - daysUsed, 0);
                 totalRemainingDays = remainingInCurrentBottle + (sealedUnitsCount * effectiveCategoryDays);
             }
             // 예상 주기 초과 시 보여줄 문구 — "소진 N일 후"라고만 하면 "벌써 N일이나 넘게 썼는데 왜 N일 남았다는 거지"로
@@ -2800,10 +2804,13 @@
                     let unknownCatSealedUnits = 0;
                     let unknownCatOverdue = false;
                     if (avgDays !== null) {
-                        const remainingInCurrentBottle = Math.max(avgDays - daysUsed, 0);
                         unknownCatSealedUnits = p.stock - 1;
                         unknownCatOverdue = avgDays > 0 && daysUsed > avgDays;
-                        totalRemainingDays = remainingInCurrentBottle + (unknownCatSealedUnits * avgDays);
+                        // [보정] 알려진 카테고리 쪽과 동일 — 실측 평균 계산 자체는 안 건드리고, 지금까지 최소
+                        // daysUsed일은 갔다는 확실한 사실로 하한선만 얹는다(여분 통 예상 기간도 같이 올라감).
+                        const effectiveAvgDays = unknownCatOverdue ? daysUsed : avgDays;
+                        const remainingInCurrentBottle = Math.max(effectiveAvgDays - daysUsed, 0);
+                        totalRemainingDays = remainingInCurrentBottle + (unknownCatSealedUnits * effectiveAvgDays);
                     }
                     // 알려진 카테고리 쪽과 같은 이유로, 실측 평균을 이미 넘겨 쓰고 있으면 "소진 N일 후"만으론 헷갈려서 앞세워 알려준다
                     const unknownCatOverduePrefix = unknownCatOverdue
@@ -5808,8 +5815,11 @@
                 ? Math.round(history.reduce((s, h) => s + h.days, 0) / history.length)
                 : null;
             if (avgDays === null) return false; // 데이터 부족 → 분석 대기 (위험 아님)
-            const remainingInCurrentBottle = Math.max(avgDays - daysUsed, 0);
-            const totalRemainingDays = remainingInCurrentBottle + ((p.stock - 1) * avgDays);
+            // [보정] renderProducts()와 동일 — 완료된 실측 평균이 있어도, 지금 진행 중인 통이 그 평균보다
+            // 이미 오래 갔으면 최소 그만큼은 간다는 확실한 사실을 반영한다(평균 계산 자체는 안 건드림).
+            const effectiveAvgDays = Math.max(avgDays, daysUsed);
+            const remainingInCurrentBottle = Math.max(effectiveAvgDays - daysUsed, 0);
+            const totalRemainingDays = remainingInCurrentBottle + ((p.stock - 1) * effectiveAvgDays);
             return totalRemainingDays < dDayLeft;
         } else {
             const realHistory = (p.tungHistory || []).filter(h => !h.provisional);
@@ -5828,6 +5838,8 @@
                     effectiveCategoryDays = Math.round(myCategory.days * (1 - poolBlend) + pooled.avg * poolBlend);
                 }
             }
+            // [보정] renderProducts()와 동일 — 지금까지 최소 daysUsed일은 갔다는 사실로 하한선을 얹는다.
+            if (daysUsed > effectiveCategoryDays) effectiveCategoryDays = daysUsed;
             const remainingInCurrentBottle = Math.max(effectiveCategoryDays - daysUsed, 0);
             const totalRemainingDays = remainingInCurrentBottle + ((p.stock - 1) * effectiveCategoryDays);
             return totalRemainingDays < dDayLeft;
