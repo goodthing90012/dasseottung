@@ -1,187 +1,149 @@
-const CACHE_NAME = 'dahaettung-v168';
+// 다썼텅 서비스워커 (오프라인-퍼스트)
+// 업데이트 정책: '앱 새로고침' 버튼을 누를 때만 캐시를 비우고 다시 받는다.
+// (자동 강제 업데이트는 오프라인 캐시 리스크 때문에 도입하지 않음 → skipWaiting 미사용)
 
-const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  './logo.png',
-  './char-allclear.png'
-];
+const CACHE = 'dasseottung-v62';
+const PUSH_DATA_CACHE = 'dasseottung-push-data';   // 알림용 루틴 스냅샷 (버전 정리 대상 아님)
+const PUSH_SNAPSHOT_URL = './__routine-push-snapshot';
 
-// 설치: 핵심 파일 캐시 (항상 최신으로 받기 위해 reload 사용)
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) =>
-      cache.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload' })))
-    ).catch(() => {
-      // 일부 파일이 실패해도 핵심 파일(index.html)만은 캐시해서 설치를 이어감
-      return caches.open(CACHE_NAME).then((cache) =>
-        cache.add(new Request('./index.html', { cache: 'reload' }))
-      );
-    })
-  );
-  self.skipWaiting();
+// 앱 셸: 오프라인에서도 앱이 뜨도록 미리 캐시해 둔다.
+// (이미지/이모지는 index.html 안에 base64로 인라인되어 있어 별도 캐싱 불필요)
+const PRECACHE_URLS = ['./', './index.html', './manifest.json'];
+
+// ── install: 앱 셸을 캐시. 하나가 없어도(예: manifest 누락) 전체가 깨지지 않게 개별 캐시.
+self.addEventListener('install', (event) => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await Promise.all(
+      PRECACHE_URLS.map((url) => cache.add(url).catch(() => {}))
+    );
+    // skipWaiting()은 일부러 호출하지 않음 — 사용자가 직접 새로고침할 때만 갱신
+  })());
 });
 
-// 활성화: 구버전 캐시 삭제
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+// ── activate: 옛 버전 캐시만 정리하고, 새 워커가 활성화되면 페이지 제어를 넘겨받는다.
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter((k) => k !== CACHE && k !== PUSH_DATA_CACHE).map((k) => caches.delete(k)));
+    await self.clients.claim();
+  })());
 });
 
-// ── 공유 대상(Share Target): 다른 앱에서 "다했텅"으로 사진을 공유했을 때 받는 곳 ──
-// GitHub Pages는 정적 호스팅이라 서버 코드가 없어서, 서비스워커가 POST를 직접 가로채 처리한다.
-const SHARE_DB_NAME = 'dahaettung-share-tmp';
-function openShareDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(SHARE_DB_NAME, 1);
-    req.onupgradeneeded = () => { req.result.createObjectStore('pending', { autoIncrement: true }); };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function storePendingShareFiles(files) {
-  const db = await openShareDB();
-  await new Promise((resolve, reject) => {
-    const tx = db.transaction('pending', 'readwrite');
-    const store = tx.objectStore('pending');
-    files.forEach((f) => store.add({ blob: f, name: f.name || '', type: f.type || '', sharedAt: Date.now() }));
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-  db.close();
-}
+// ── fetch: 같은 출처 GET만 처리. 캐시 우선, 없으면 네트워크에서 받아 캐시에 저장.
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
 
-// 요청 가로채기: HTML은 항상 최신 우선, 정적 파일은 캐시 우선
-self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return; // 외부 요청은 그대로 네트워크
 
-  // 다른 앱의 공유 시트에서 "다했텅"을 선택했을 때 오는 요청
-  if (e.request.method === 'POST' && url.pathname.endsWith('/share-target')) {
-    e.respondWith((async () => {
+  // 내비게이션(HTML): 캐시된 앱 셸을 우선 제공(오프라인 대비).
+  // '앱 새로고침'이 캐시를 비운 직후엔 캐시가 없으므로 네트워크에서 최신본을 받아 다시 캐싱한다.
+  if (req.mode === 'navigate') {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE);
+      const cached = await cache.match('./index.html');
+      if (cached) return cached;
       try {
-        const formData = await e.request.formData();
-        const files = formData.getAll('photos').filter((f) => f && typeof f === 'object' && f.size > 0);
-        if (files.length) await storePendingShareFiles(files);
-      } catch (err) { /* 실패해도 앱은 정상적으로 열리게 그냥 진행 */ }
-      return Response.redirect('./?shared=1', 303);
+        const fresh = await fetch(req);              // 새로고침 시 ?v=... 우회 포함
+        if (fresh && fresh.ok) cache.put('./index.html', fresh.clone());
+        return fresh;
+      } catch (e) {
+        // 오프라인이고 셸도 없으면 디렉터리 인덱스라도 시도
+        const fallback = await cache.match('./');
+        if (fallback) return fallback;
+        throw e;
+      }
     })());
     return;
   }
 
-  if (e.request.method !== 'GET') return; // POST 등은 그냥 통과
-
-  const isHTML =
-    e.request.mode === 'navigate' ||
-    e.request.destination === 'document' ||
-    e.request.url.endsWith('.html') ||
-    e.request.url.endsWith('/');
-
-  if (isHTML) {
-    // HTML: 네트워크에서 최신을 먼저 받아오고, 실패하면 캐시 → 그것도 없으면 index.html로 대체
-    e.respondWith(
-      fetch(e.request, { cache: 'no-store' })
-        .then((res) => {
-          if (res && res.status === 200) {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
-          }
-          return res;
-        })
-        .catch(() =>
-          caches.match(e.request).then((cached) => cached || caches.match('./index.html'))
-        )
-    );
-  } else {
-    // 이미지 등 정적 파일: 캐시 우선, 없으면 네트워크에서 받아 검증 후 저장
-    e.respondWith(
-      caches.match(e.request).then((cached) => {
-        if (cached) return cached;
-        return fetch(e.request)
-          .then((res) => {
-            if (res && res.status === 200 && res.type === 'basic') {
-              const copy = res.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
-            }
-            return res;
-          })
-          .catch(() => cached);
-      })
-    );
-  }
+  // 그 외 정적 자원: 캐시 우선, 없으면 네트워크에서 받아 캐시에 저장
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    const cached = await cache.match(req, { ignoreSearch: true });
+    if (cached) return cached;
+    const fresh = await fetch(req);
+    if (fresh && fresh.ok && fresh.type === 'basic') cache.put(req, fresh.clone());
+    return fresh;
+  })());
 });
 
-// ── 저녁 알림: GitHub Actions가 매일 밤 푸시 신호를 보내면, 앱이 적어둔 스냅샷을 읽어 "아직 안 한 것"을 보여줌 ──
-function openReminderDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open('dahaettung-reminder', 1);
-    req.onupgradeneeded = () => { req.result.createObjectStore('kv'); };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+// ── 루틴 알림 (웹 푸시) ─────────────────────────────────────────
+// GitHub Actions가 보내는 건 {type:"routine-reminder"} 신호뿐.
+// 알림 문구는 앱이 저장해 둔 스냅샷(오늘~7일 뒤 루틴 상태)으로 여기서 만든다.
+// ※ userVisibleOnly 약속 때문에 푸시가 오면 '항상' 알림을 띄워야 한다
+//   (안 띄우면 브라우저가 기본 문구를 띄우거나, iOS는 구독을 끊어버릴 수 있음).
+
+function localDateStr(d) {
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
 }
-async function readReminderSnapshot() {
+
+async function readRoutineSnapshot() {
   try {
-    const db = await openReminderDB();
-    const snap = await new Promise((resolve) => {
-      const r = db.transaction('kv', 'readonly').objectStore('kv').get('snapshot');
-      r.onsuccess = () => resolve(r.result || null);
-      r.onerror = () => resolve(null);
-    });
-    db.close();
-    return snap;
+    const cache = await caches.open(PUSH_DATA_CACHE);
+    const res = await cache.match(PUSH_SNAPSHOT_URL);
+    return res ? await res.json() : null;
   } catch (e) { return null; }
 }
-function localDateStr(d) {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+async function buildRoutineNotification() {
+  const snap = await readRoutineSnapshot();
+  const today = localDateStr(new Date());
+  const items = snap && snap.days ? snap.days[today] : undefined;
+
+  // 스냅샷이 없거나 너무 오래돼 오늘 칸이 없으면 → 일반 문구
+  if (!Array.isArray(items)) {
+    return { title: '오늘 루틴 체크했텅? 🧴', body: '다썼텅을 열어서 오늘 루틴을 확인해 보세요.' };
+  }
+  if (!snap.hasRoutines || items.length === 0) {
+    return { title: '오늘은 쉬는 날이텅 😴', body: '오늘 예정된 루틴이 없어요. 푹 쉬어요!' };
+  }
+  const pending = items.filter((it) => !it.done);
+  if (pending.length === 0) {
+    return { title: '오늘 루틴 올클리어! ⭐', body: `${items.length}개 전부 다 했텅. 고생했어요!` };
+  }
+  const lines = pending.slice(0, 5).map((it) => `• ${it.name}${it.note ? ` (${it.note})` : ''}`);
+  if (pending.length > 5) lines.push(`외 ${pending.length - 5}개`);
+  return { title: `아직 안 한 루틴 ${pending.length}개 🫧`, body: lines.join('\n') };
 }
-// 알림 문구 결정 — 스냅샷에 오늘 데이터가 없으면(앱을 2주 넘게 안 열었거나 처음) 일반 안내로 대체
-function buildReminder(snap, todayStr) {
-  const day = snap && snap.days ? snap.days[todayStr] : null;
-  if (!day) return { title: '다했텅 체크할 시간이에요', body: '오늘 한 일을 체크해 보세요 💚' };
-  if (day.total === 0) return null; // 오늘 할 게 아예 없으면 조용히(아래서 최소 알림 처리)
-  if (day.pending.length === 0) return { title: '🎉 오늘 올클리어!', body: '다 했텅! 수고했어요 💚' };
-  const shown = day.pending.slice(0, 4).join(' · ');
-  const more = day.pending.length > 4 ? ` 외 ${day.pending.length - 4}개` : '';
-  return { title: `📋 아직 안 한 게 ${day.pending.length}개 있어요`, body: shown + more };
-}
-async function showDailyReminder() {
-  const snap = await readReminderSnapshot();
-  const msg = buildReminder(snap, localDateStr(new Date()))
-    || { title: '다했텅', body: '오늘은 등록된 일정이 없어요' }; // 푸시는 반드시 알림을 띄워야 해서 최소 문구
-  return self.registration.showNotification(msg.title, {
-    body: msg.body,
-    icon: './icon-192.png',
-    badge: './icon-192.png',
-    tag: 'daily-reminder', // 같은 날 여러 번 와도 하나로 덮어씀
+
+async function showRoutineNotification() {
+  const n = await buildRoutineNotification();
+  return self.registration.showNotification(n.title, {
+    body: n.body,
+    tag: 'routine-reminder',     // 같은 날 여러 번 와도 하나로 교체
     renotify: true,
-    data: { url: './?from=reminder' },
+    data: { url: './?tab=routine' }
   });
 }
-self.addEventListener('push', (e) => { e.waitUntil(showDailyReminder()); });
-self.addEventListener('message', (e) => {
-  if (e.data && e.data.type === 'reminder-preview') e.waitUntil(showDailyReminder());
+
+self.addEventListener('push', (event) => {
+  event.waitUntil(showRoutineNotification());
 });
-// 알림 클릭: 이미 열린 다했텅 창이 있으면 앞으로 띄우고 "오늘 체크 탭" 신호만 보냄(새로고침 없이),
-// 없거나 실패하면 새로 연다. (예전엔 navigate()로 이동하다 실패하면 아무것도 안 열리는 버그가 있었음)
-async function openFromReminder(targetUrl) {
-  const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true });
-  const win = wins.find((w) => w.url.startsWith(self.registration.scope));
-  if (win) {
-    win.postMessage({ type: 'open-check-today' }); // 체크 탭 전환 신호는 먼저 보내둠(포커스 성공 여부와 무관)
-    try { return await win.focus(); }
-    catch (err) { /* 앞으로 띄우기 실패하면 아래에서 새로 열기 */ }
+
+// 설정 화면 '미리보기' 버튼 → 실제와 같은 경로로 한 번 띄움
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'preview-routine-push') {
+    event.waitUntil(showRoutineNotification());
   }
-  return clients.openWindow(targetUrl);
-}
-self.addEventListener('notificationclick', (e) => {
-  e.notification.close();
-  const target = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
-  e.waitUntil(openFromReminder(target));
+});
+
+// 알림 탭 → 열려 있는 앱이 있으면 그 창을 루틴 탭으로, 없으면 새로 연다
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of all) {
+      if (c.url.startsWith(self.registration.scope)) {
+        c.postMessage({ type: 'open-routine' });
+        return c.focus();
+      }
+    }
+    const url = (event.notification.data && event.notification.data.url) || './?tab=routine';
+    return self.clients.openWindow(url);
+  })());
 });
